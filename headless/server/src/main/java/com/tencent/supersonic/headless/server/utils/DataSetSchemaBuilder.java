@@ -12,6 +12,11 @@ import com.tencent.supersonic.headless.api.pojo.SchemaValueMap;
 import com.tencent.supersonic.headless.api.pojo.response.DataSetSchemaResp;
 import com.tencent.supersonic.headless.api.pojo.response.DimSchemaResp;
 import com.tencent.supersonic.headless.api.pojo.response.MetricSchemaResp;
+import com.tencent.supersonic.headless.api.pojo.response.TermResp;
+import org.apache.logging.log4j.util.Strings;
+import org.springframework.beans.BeanUtils;
+import org.springframework.util.CollectionUtils;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -19,9 +24,6 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
-import org.apache.logging.log4j.util.Strings;
-import org.springframework.beans.BeanUtils;
-import org.springframework.util.CollectionUtils;
 
 public class DataSetSchemaBuilder {
 
@@ -30,6 +32,7 @@ public class DataSetSchemaBuilder {
         dataSetSchema.setQueryConfig(resp.getQueryConfig());
         SchemaElement dataSet = SchemaElement.builder()
                 .dataSet(resp.getId())
+                .dataSetName(resp.getName())
                 .id(resp.getId())
                 .name(resp.getName())
                 .bizName(resp.getBizName())
@@ -52,6 +55,9 @@ public class DataSetSchemaBuilder {
         Set<SchemaElement> dimensionValues = getDimensionValues(resp);
         dataSetSchema.getDimensionValues().addAll(dimensionValues);
 
+        Set<SchemaElement> terms = getTerms(resp);
+        dataSetSchema.getTerms().addAll(terms);
+
         SchemaElement entity = getEntity(resp);
         if (Objects.nonNull(entity)) {
             dataSetSchema.setEntity(entity);
@@ -66,6 +72,7 @@ public class DataSetSchemaBuilder {
             if (metric.getIsTag() == 1) {
                 SchemaElement tagToAdd = SchemaElement.builder()
                         .dataSet(resp.getId())
+                        .dataSetName(resp.getName())
                         .model(metric.getModelId())
                         .id(metric.getId())
                         .name(metric.getName())
@@ -73,6 +80,9 @@ public class DataSetSchemaBuilder {
                         .type(SchemaElementType.TAG)
                         .useCnt(metric.getUseCnt())
                         .alias(alias)
+                        .defaultAgg(metric.getDefaultAgg())
+                        .isTag(metric.getIsTag())
+                        .description(metric.getDescription())
                         .build();
                 tags.add(tagToAdd);
             }
@@ -96,6 +106,7 @@ public class DataSetSchemaBuilder {
             if (dim.getIsTag() == 1) {
                 SchemaElement tagToAdd = SchemaElement.builder()
                         .dataSet(resp.getId())
+                        .dataSetName(resp.getName())
                         .model(dim.getModelId())
                         .id(dim.getId())
                         .name(dim.getName())
@@ -104,6 +115,8 @@ public class DataSetSchemaBuilder {
                         .useCnt(dim.getUseCnt())
                         .alias(alias)
                         .schemaValueMaps(schemaValueMaps)
+                        .isTag(dim.getIsTag())
+                        .description(dim.getDescription())
                         .build();
                 tags.add(tagToAdd);
             }
@@ -143,6 +156,7 @@ public class DataSetSchemaBuilder {
             }
             SchemaElement dimToAdd = SchemaElement.builder()
                     .dataSet(resp.getId())
+                    .dataSetName(resp.getName())
                     .model(dim.getModelId())
                     .id(dim.getId())
                     .name(dim.getName())
@@ -151,6 +165,8 @@ public class DataSetSchemaBuilder {
                     .useCnt(dim.getUseCnt())
                     .alias(alias)
                     .schemaValueMaps(schemaValueMaps)
+                    .isTag(dim.getIsTag())
+                    .description(dim.getDescription())
                     .build();
             dimensions.add(dimToAdd);
         }
@@ -174,6 +190,7 @@ public class DataSetSchemaBuilder {
             }
             SchemaElement dimValueToAdd = SchemaElement.builder()
                     .dataSet(resp.getId())
+                    .dataSetName(resp.getName())
                     .model(dim.getModelId())
                     .id(dim.getId())
                     .name(dim.getName())
@@ -181,6 +198,8 @@ public class DataSetSchemaBuilder {
                     .type(SchemaElementType.VALUE)
                     .useCnt(dim.getUseCnt())
                     .alias(new ArrayList<>(Arrays.asList(dimValueAlias.toArray(new String[0]))))
+                    .isTag(dim.getIsTag())
+                    .description(dim.getDescription())
                     .build();
             dimensionValues.add(dimValueToAdd);
         }
@@ -195,6 +214,7 @@ public class DataSetSchemaBuilder {
 
             SchemaElement metricToAdd = SchemaElement.builder()
                     .dataSet(resp.getId())
+                    .dataSetName(resp.getName())
                     .model(metric.getModelId())
                     .id(metric.getId())
                     .name(metric.getName())
@@ -205,11 +225,35 @@ public class DataSetSchemaBuilder {
                     .relatedSchemaElements(getRelateSchemaElement(metric))
                     .defaultAgg(metric.getDefaultAgg())
                     .dataFormatType(metric.getDataFormatType())
+                    .isTag(metric.getIsTag())
+                    .description(metric.getDescription())
                     .build();
             metrics.add(metricToAdd);
 
         }
         return metrics;
+    }
+
+    private static Set<SchemaElement> getTerms(DataSetSchemaResp resp) {
+        Set<SchemaElement> terms = new HashSet<>();
+        for (TermResp termResp : resp.getTermResps()) {
+            List<String> alias = termResp.getAlias();
+            SchemaElement metricToAdd = SchemaElement.builder()
+                    .dataSet(resp.getId())
+                    .dataSetName(resp.getName())
+                    .model(-1L)
+                    .id(termResp.getId())
+                    .name(termResp.getName())
+                    .bizName(termResp.getName())
+                    .type(SchemaElementType.TERM)
+                    .useCnt(0L)
+                    .alias(alias)
+                    .description(termResp.getDescription())
+                    .build();
+            terms.add(metricToAdd);
+
+        }
+        return terms;
     }
 
     private static List<RelatedSchemaElement> getRelateSchemaElement(MetricSchemaResp metricSchemaResp) {

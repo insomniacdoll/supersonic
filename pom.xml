@@ -26,14 +26,16 @@
     </parent>
 
     <properties>
+        <revision>0.9.2-SNAPSHOT</revision>
         <java.source.version>1.8</java.source.version>
         <java.target.version>1.8</java.target.version>
         <maven.compiler.source>8</maven.compiler.source>
         <maven.compiler.target>8</maven.compiler.target>
         <file.encoding>UTF-8</file.encoding>
         <apache.log4j.version>2.17.1</apache.log4j.version>
-        <pagehelper.version>5.3.3</pagehelper.version>
-        <pagehelper.spring.version>1.2.10</pagehelper.spring.version>
+        <jsqlparser.version>4.7</jsqlparser.version>
+        <pagehelper.version>6.1.0</pagehelper.version>
+        <pagehelper.spring.version>2.1.0</pagehelper.spring.version>
         <mybatis.version>3.5.3</mybatis.version>
         <lombok.version>1.18.20</lombok.version>
         <guava.version>20.0</guava.version>
@@ -63,8 +65,7 @@
         <calcite.avatica.version>1.23.0</calcite.avatica.version>
         <xk.time.version>3.2.4</xk.time.version>
         <mockito-inline.version>4.5.1</mockito-inline.version>
-        <jsqlparser.version>4.5</jsqlparser.version>
-        <revision>0.9.0-SNAPSHOT</revision>
+
         <!-- Do not bump spotless plugin version since 2.30.0 is the latest version supports Java 8-->
         <maven.plugin.spotless.version>2.30.0</maven.plugin.spotless.version>
         <spotless.python.includes></spotless.python.includes>
@@ -137,11 +138,6 @@
             <dependency>
                 <groupId>dev.langchain4j</groupId>
                 <artifactId>langchain4j-embeddings</artifactId>
-                <version>${langchain4j.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>dev.langchain4j</groupId>
-                <artifactId>langchain4j-hugging-face</artifactId>
                 <version>${langchain4j.version}</version>
             </dependency>
             <dependency>

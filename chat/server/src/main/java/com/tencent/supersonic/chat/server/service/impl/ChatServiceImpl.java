@@ -34,6 +34,7 @@ import com.tencent.supersonic.headless.server.service.SearchService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+
 import java.util.List;
 
 
@@ -62,12 +63,8 @@ public class ChatServiceImpl implements ChatService {
     }
 
     @Override
-    public MapResp performMapping(ChatParseReq chatParseReq) {
-        return getMapResp(chatParseReq);
-    }
-
-    @Override
     public ParseResp performParsing(ChatParseReq chatParseReq) {
+        String queryText = chatParseReq.getQueryText();
         ParseResp parseResp = new ParseResp(chatParseReq.getChatId(), chatParseReq.getQueryText());
         chatManageService.createChatQuery(chatParseReq, parseResp);
         ChatParseContext chatParseContext = buildParseContext(chatParseReq);
@@ -77,6 +74,8 @@ public class ChatServiceImpl implements ChatService {
         for (ParseResultProcessor processor : parseResultProcessors) {
             processor.process(chatParseContext, parseResp);
         }
+        parseResp.setQueryText(queryText);
+        chatParseReq.setQueryText(queryText);
         chatManageService.batchAddParse(chatParseReq, parseResp);
         return parseResp;
     }
@@ -108,16 +107,6 @@ public class ChatServiceImpl implements ChatService {
         MapResp mapResp = chatQueryService.performMapping(queryReq);
         chatParseContext.setMapInfo(mapResp.getMapInfo());
         return chatParseContext;
-    }
-
-    private MapResp getMapResp(ChatParseReq chatParseReq) {
-        ChatParseContext chatParseContext = new ChatParseContext();
-        BeanMapper.mapper(chatParseReq, chatParseContext);
-        AgentService agentService = ContextUtils.getBean(AgentService.class);
-        Agent agent = agentService.getAgent(chatParseReq.getAgentId());
-        chatParseContext.setAgent(agent);
-        QueryReq queryReq = QueryReqConverter.buildText2SqlQueryReq(chatParseContext);
-        return chatQueryService.performMapping(queryReq);
     }
 
     private ChatExecuteContext buildExecuteContext(ChatExecuteReq chatExecuteReq) {

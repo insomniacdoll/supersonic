@@ -18,7 +18,7 @@ public interface DataSetService {
 
     DataSetResp getDataSet(Long id);
 
-    List<DataSetResp> getDataSetList(MetaFilter metaFilter, User user);
+    List<DataSetResp> getDataSetList(MetaFilter metaFilter);
 
     void delete(Long id, User user);
 
@@ -28,8 +28,14 @@ public interface DataSetService {
 
     List<DataSetResp> getDataSets(User user);
 
+    List<DataSetResp> getDataSets(String dataSetName, User user);
+
+    List<DataSetResp> getDataSets(List<String> dataSetNames, User user);
+
     List<DataSetResp> getDataSetsInheritAuth(User user, Long domainId);
 
     SemanticQueryReq convert(QueryDataSetReq queryDataSetReq);
+
+    Long getDataSetIdFromSql(String sql, User user);
 
 }

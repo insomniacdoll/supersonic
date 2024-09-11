@@ -34,7 +34,6 @@ const OverviewContainer: React.FC<Props> = ({ mode, domainManger, dispatch }) =>
     const targetNode = domainList.filter((item: any) => {
       return `${item.id}` === domainId;
     })[0];
-
     if (!targetNode) {
       const firstRootNode = domainList.filter((item: any) => {
         return item.parentId === 0;
@@ -164,7 +163,7 @@ const OverviewContainer: React.FC<Props> = ({ mode, domainManger, dispatch }) =>
   };
 
   const handleModelChange = (model?: ISemantic.IModelItem) => {
-    queryModelList();
+    // queryModelList();
     if (!model) {
       return;
     }
@@ -180,10 +179,10 @@ const OverviewContainer: React.FC<Props> = ({ mode, domainManger, dispatch }) =>
     });
   };
 
-  const cleanModelInfo = (domainId: number) => {
+  const cleanModelInfo = (domainId) => {
     setIsModel(false);
-    pushUrlMenu(domainId, 0, 'overview');
     setActiveKey('overview');
+    pushUrlMenu(domainId, 0, 'overview');
     dispatch({
       type: 'domainManger/setSelectModel',
       selectModelId: 0,
@@ -203,7 +202,7 @@ const OverviewContainer: React.FC<Props> = ({ mode, domainManger, dispatch }) =>
           <div className={styles.treeContainer}>
             <DomainListTree
               createDomainBtnVisible={mode === 'domain' ? true : false}
-              onTreeSelected={(domainData) => {
+              onTreeSelected={(domainData: ISemantic.IDomainItem) => {
                 const { id, name } = domainData;
                 cleanModelInfo(id);
                 dispatch({
@@ -211,6 +210,12 @@ const OverviewContainer: React.FC<Props> = ({ mode, domainManger, dispatch }) =>
                   selectDomainId: id,
                   selectDomainName: name,
                   domainData,
+                });
+                dispatch({
+                  type: 'domainManger/setModelTableHistoryParams',
+                  payload: {
+                    [id]: {},
+                  },
                 });
               }}
               onTreeDataUpdate={() => {

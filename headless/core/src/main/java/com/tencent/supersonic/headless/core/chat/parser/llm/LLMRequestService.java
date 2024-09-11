@@ -16,6 +16,12 @@ import com.tencent.supersonic.headless.core.config.OptimizationConfig;
 import com.tencent.supersonic.headless.core.pojo.QueryContext;
 import com.tencent.supersonic.headless.core.utils.ComponentFactory;
 import com.tencent.supersonic.headless.core.utils.S2SqlDateHelper;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.tuple.Pair;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.util.CollectionUtils;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -24,12 +30,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
-import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.lang3.tuple.Pair;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-import org.springframework.util.CollectionUtils;
 
 @Slf4j
 @Service
@@ -41,7 +41,7 @@ public class LLMRequestService {
     private OptimizationConfig optimizationConfig;
 
     public boolean isSkip(QueryContext queryCtx) {
-        if (!queryCtx.isEnableLLM()) {
+        if (!queryCtx.getText2SQLType().enableLLM()) {
             log.info("not enable llm, skip");
             return true;
         }
@@ -61,11 +61,12 @@ public class LLMRequestService {
     }
 
     public LLMReq getLlmReq(QueryContext queryCtx, Long dataSetId,
-            SemanticSchema semanticSchema, List<LLMReq.ElementValue> linkingValues) {
+                            SemanticSchema semanticSchema, List<LLMReq.ElementValue> linkingValues) {
         Map<Long, String> dataSetIdToName = semanticSchema.getDataSetIdToName();
         String queryText = queryCtx.getQueryText();
 
         LLMReq llmReq = new LLMReq();
+
         llmReq.setQueryText(queryText);
         LLMReq.FilterCondition filterCondition = new LLMReq.FilterCondition();
         llmReq.setFilterCondition(filterCondition);
@@ -103,7 +104,7 @@ public class LLMRequestService {
     }
 
     protected List<String> getFieldNameList(QueryContext queryCtx, Long dataSetId,
-            LLMParserConfig llmParserConfig) {
+                                            LLMParserConfig llmParserConfig) {
 
         Set<String> results = getTopNFieldNames(queryCtx, dataSetId, llmParserConfig);
 
@@ -142,7 +143,7 @@ public class LLMRequestService {
         return extraInfoSb.toString();
     }
 
-    protected List<ElementValue> getValueList(QueryContext queryCtx, Long dataSetId) {
+    public List<ElementValue> getValueList(QueryContext queryCtx, Long dataSetId) {
         Map<Long, String> itemIdToName = getItemIdToName(queryCtx, dataSetId);
         List<SchemaElementMatch> matchedElements = queryCtx.getMapInfo().getMatchedElements(dataSetId);
         if (CollectionUtils.isEmpty(matchedElements)) {

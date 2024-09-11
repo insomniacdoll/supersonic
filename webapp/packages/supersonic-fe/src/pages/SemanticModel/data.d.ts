@@ -23,6 +23,7 @@ export declare namespace IDataSource {
     authorized?: boolean;
     dataFormatType?: string;
     dataFormat?: string;
+    comment?: string;
   }
 
   interface IIdentifiersItem {
@@ -109,11 +110,13 @@ export declare namespace ISemantic {
     name: string;
     bizName: string;
     description: any;
+    children: IDomainItem[];
     hasEditPermission: boolean;
     status?: number;
     typeEnum?: any;
     sensitiveLevel?: number;
     parentId: number;
+    hasModel: boolean;
     fullPath?: string;
     viewers?: any[];
     viewOrgs?: any[];
@@ -430,6 +433,12 @@ export declare namespace ISemantic {
     sensitiveLevel: SENSITIVE_LEVEL;
     domainId: number;
     ext: null;
+  }
+
+  interface ITermItem {
+    name: string;
+    description: string;
+    similarTerms: string[];
   }
 }
 

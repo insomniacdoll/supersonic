@@ -33,6 +33,7 @@ import com.tencent.supersonic.headless.server.annotation.S2DataPermission;
 import com.tencent.supersonic.headless.server.manager.SemanticSchemaManager;
 import com.tencent.supersonic.headless.server.service.AppService;
 import com.tencent.supersonic.headless.server.service.Catalog;
+import com.tencent.supersonic.headless.server.service.DataSetService;
 import com.tencent.supersonic.headless.server.service.QueryService;
 import com.tencent.supersonic.headless.server.utils.QueryReqConverter;
 import com.tencent.supersonic.headless.server.utils.QueryUtils;
@@ -59,6 +60,7 @@ public class QueryServiceImpl implements QueryService {
     private final SemanticSchemaManager semanticSchemaManager;
     private final QueryParser queryParser;
     private final QueryPlanner queryPlanner;
+    private final DataSetService dataSetService;
 
     public QueryServiceImpl(
             StatUtils statUtils,
@@ -68,7 +70,8 @@ public class QueryServiceImpl implements QueryService {
             AppService appService,
             SemanticSchemaManager semanticSchemaManager,
             DefaultQueryParser queryParser,
-            QueryPlanner queryPlanner) {
+            QueryPlanner queryPlanner,
+            DataSetService dataSetService) {
         this.statUtils = statUtils;
         this.queryUtils = queryUtils;
         this.queryReqConverter = queryReqConverter;
@@ -77,6 +80,7 @@ public class QueryServiceImpl implements QueryService {
         this.semanticSchemaManager = semanticSchemaManager;
         this.queryParser = queryParser;
         this.queryPlanner = queryPlanner;
+        this.dataSetService = dataSetService;
     }
 
     @Override
@@ -97,7 +101,7 @@ public class QueryServiceImpl implements QueryService {
             }
             StatUtils.get().setUseResultCache(false);
             //3 query
-            QueryStatement queryStatement = buildQueryStatement(queryReq);
+            QueryStatement queryStatement = buildQueryStatement(queryReq, user);
             SemanticQueryResp result = query(queryStatement);
             //4 reset cache and set stateInfo
             Boolean setCacheSuccess = queryCache.put(cacheKey, result);
@@ -118,7 +122,12 @@ public class QueryServiceImpl implements QueryService {
         }
     }
 
-    private QueryStatement buildSqlQueryStatement(QuerySqlReq querySqlReq) throws Exception {
+    private QueryStatement buildSqlQueryStatement(QuerySqlReq querySqlReq, User user) throws Exception {
+        //If dataSetId or DataSetName is empty, parse dataSetId from the SQL
+        if (querySqlReq.needGetDataSetId()) {
+            Long dataSetId = dataSetService.getDataSetIdFromSql(querySqlReq.getSql(), user);
+            querySqlReq.setDataSetId(dataSetId);
+        }
         SchemaFilterReq filter = buildSchemaFilterReq(querySqlReq);
         SemanticSchemaResp semanticSchemaResp = catalog.fetchSemanticSchema(filter);
         QueryStatement queryStatement = queryReqConverter.convert(querySqlReq, semanticSchemaResp);
@@ -129,15 +138,15 @@ public class QueryServiceImpl implements QueryService {
         return queryStatement;
     }
 
-    private QueryStatement buildQueryStatement(SemanticQueryReq semanticQueryReq) throws Exception {
+    private QueryStatement buildQueryStatement(SemanticQueryReq semanticQueryReq, User user) throws Exception {
         if (semanticQueryReq instanceof QuerySqlReq) {
-            return buildSqlQueryStatement((QuerySqlReq) semanticQueryReq);
+            return buildSqlQueryStatement((QuerySqlReq) semanticQueryReq, user);
         }
         if (semanticQueryReq instanceof QueryStructReq) {
             return buildStructQueryStatement((QueryStructReq) semanticQueryReq);
         }
         if (semanticQueryReq instanceof QueryMultiStructReq) {
-            return buildMultiStructQueryStatement((QueryMultiStructReq) semanticQueryReq);
+            return buildMultiStructQueryStatement((QueryMultiStructReq) semanticQueryReq, user);
         }
         return null;
     }
@@ -157,11 +166,11 @@ public class QueryServiceImpl implements QueryService {
         return queryStatement;
     }
 
-    private QueryStatement buildMultiStructQueryStatement(QueryMultiStructReq queryMultiStructReq)
+    private QueryStatement buildMultiStructQueryStatement(QueryMultiStructReq queryMultiStructReq, User user)
             throws Exception {
         List<QueryStatement> sqlParsers = new ArrayList<>();
         for (QueryStructReq queryStructReq : queryMultiStructReq.getQueryStructReqs()) {
-            QueryStatement queryStatement = buildQueryStatement(queryStructReq);
+            QueryStatement queryStatement = buildQueryStatement(queryStructReq, user);
             SemanticModel semanticModel = queryStatement.getSemanticModel();
             queryStatement.setModelIds(queryStructReq.getModelIds());
             queryStatement.setSemanticModel(semanticModel);
@@ -196,7 +205,7 @@ public class QueryServiceImpl implements QueryService {
     @Override
     public <T> ExplainResp explain(ExplainSqlReq<T> explainSqlReq, User user) throws Exception {
         T queryReq = explainSqlReq.getQueryReq();
-        QueryStatement queryStatement = buildQueryStatement((SemanticQueryReq) queryReq);
+        QueryStatement queryStatement = buildQueryStatement((SemanticQueryReq) queryReq, user);
         queryStatement = plan(queryStatement);
         return getExplainResp(queryStatement);
     }

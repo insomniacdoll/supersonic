@@ -26,6 +26,9 @@ public class OptimizationConfig {
     @Value("${metric.dimension.threshold:0.3}")
     private Double metricDimensionThresholdConfig;
 
+    @Value("${dimension.value.min.threshold:0.2}")
+    private Double dimensionValueMinThresholdConfig;
+
     @Value("${dimension.value.threshold:0.5}")
     private Double dimensionValueThresholdConfig;
 
@@ -40,7 +43,7 @@ public class OptimizationConfig {
     @Value("${embedding.mapper.word.min:4}")
     private int embeddingMapperWordMin;
 
-    @Value("${embedding.mapper.word.max:5}")
+    @Value("${embedding.mapper.word.max:4}")
     private int embeddingMapperWordMax;
 
     @Value("${embedding.mapper.batch:50}")
@@ -52,8 +55,11 @@ public class OptimizationConfig {
     @Value("${embedding.mapper.round.number:10}")
     private int embeddingMapperRoundNumber;
 
-    @Value("${embedding.mapper.distance.threshold:0.01}")
-    private Double embeddingMapperDistanceThreshold;
+    @Value("${embedding.mapper.min.threshold:0.6}")
+    private Double embeddingMapperMinThreshold;
+
+    @Value("${embedding.mapper.threshold:0.99}")
+    private Double embeddingMapperThreshold;
 
     @Value("${s2SQL.linking.value.switch:true}")
     private boolean useLinkingValueSwitch;
@@ -93,6 +99,10 @@ public class OptimizationConfig {
 
     public Double getMetricDimensionThresholdConfig() {
         return convertValue("metric.dimension.threshold", Double.class, metricDimensionThresholdConfig);
+    }
+
+    public Double getDimensionValueMinThresholdConfig() {
+        return convertValue("dimension.value.min.threshold", Double.class, dimensionValueMinThresholdConfig);
     }
 
     public Double getDimensionValueThresholdConfig() {
@@ -135,8 +145,12 @@ public class OptimizationConfig {
         return convertValue("embedding.mapper.round.number", Integer.class, embeddingMapperRoundNumber);
     }
 
-    public Double getEmbeddingMapperDistanceThreshold() {
-        return convertValue("embedding.mapper.distance.threshold", Double.class, embeddingMapperDistanceThreshold);
+    public Double getEmbeddingMapperMinThreshold() {
+        return convertValue("embedding.mapper.min.threshold", Double.class, embeddingMapperMinThreshold);
+    }
+
+    public Double getEmbeddingMapperThreshold() {
+        return convertValue("embedding.mapper.threshold", Double.class, embeddingMapperThreshold);
     }
 
     public boolean isUseLinkingValueSwitch() {

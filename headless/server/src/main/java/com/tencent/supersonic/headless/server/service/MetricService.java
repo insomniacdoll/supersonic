@@ -2,6 +2,7 @@ package com.tencent.supersonic.headless.server.service;
 
 import com.github.pagehelper.PageInfo;
 import com.tencent.supersonic.auth.api.authentication.pojo.User;
+import com.tencent.supersonic.common.pojo.DataEvent;
 import com.tencent.supersonic.common.pojo.enums.EventType;
 import com.tencent.supersonic.headless.api.pojo.DrillDownDimension;
 import com.tencent.supersonic.headless.api.pojo.MetricQueryDefaultConfig;
@@ -12,8 +13,10 @@ import com.tencent.supersonic.headless.api.pojo.request.PageMetricReq;
 import com.tencent.supersonic.headless.api.pojo.request.QueryMetricReq;
 import com.tencent.supersonic.headless.api.pojo.request.QueryStructReq;
 import com.tencent.supersonic.headless.api.pojo.response.MetricResp;
+import com.tencent.supersonic.headless.api.pojo.response.ModelResp;
 import com.tencent.supersonic.headless.server.pojo.MetaFilter;
 import com.tencent.supersonic.headless.server.pojo.MetricsFilter;
+
 import java.util.List;
 import java.util.Set;
 
@@ -31,7 +34,11 @@ public interface MetricService {
 
     void batchUnPublish(List<Long> metricIds, User user);
 
+    void batchUpdateClassifications(MetaBatchReq metaBatchReq, User user);
+
     void deleteMetric(Long id, User user) throws Exception;
+
+    PageInfo<MetricResp> queryMetricMarket(PageMetricReq pageMetricReq, User user);
 
     PageInfo<MetricResp> queryMetric(PageMetricReq pageMetricReq, User user);
 
@@ -59,5 +66,9 @@ public interface MetricService {
 
     List<MetricResp> queryMetrics(MetricsFilter metricsFilter);
 
+    void batchFillMetricDefaultAgg(List<MetricResp> metricResps, List<ModelResp> modelResps);
+
     QueryStructReq convert(QueryMetricReq queryMetricReq);
+
+    DataEvent getDataEvent();
 }

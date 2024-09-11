@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Table, Select, Checkbox, Input, Alert, Space, Tooltip, Form, Switch } from 'antd';
+import React, { useState } from 'react';
+import { Table, Select, Checkbox, Input, Space, Tooltip, Form, Switch, Row, Col } from 'antd';
 import TableTitleTooltips from '../../components/TableTitleTooltips';
 import { isUndefined } from 'lodash';
 import { ExclamationCircleOutlined } from '@ant-design/icons';
@@ -20,12 +20,11 @@ type FieldItem = {
   dataType: string;
   name: string;
   type: EnumDataSourceType;
+  comment?: string;
   agg?: string;
   checked?: number;
   dateFormat?: string;
   timeGranularity?: string;
-  // entityNames?: string[];
-  // tagObjectId?: number;
   isTag?: number;
 };
 const { Search } = Input;
@@ -134,19 +133,17 @@ const ModelFieldForm: React.FC<Props> = ({
     {
       title: '扩展配置',
       dataIndex: 'extender',
-      width: 185,
+      width: 200,
       render: (_: any, record: FieldItem) => {
         const { type } = record;
         if (type === EnumDataSourceType.PRIMARY) {
           return (
             <Space>
-              {/* <FormItem name="tagObjectId"> */}
               <Select
                 style={{ minWidth: 150 }}
                 value={tagObjectId}
                 placeholder="请选择所属对象"
                 onChange={(value) => {
-                  // handleFieldChange(record, 'tagObjectId', value);
                   onTagObjectChange?.(value);
                 }}
                 options={tagObjectList.map((item: ISemantic.ITagObjectItem) => {
@@ -156,21 +153,6 @@ const ModelFieldForm: React.FC<Props> = ({
                   };
                 })}
               />
-              {/* </FormItem> */}
-              {/* <Select
-                style={{ minWidth: 345 }}
-                mode="tags"
-                value={entityNames}
-                placeholder="输入实体名称后回车确认，支持英文逗号自动分隔"
-                tokenSeparators={[',']}
-                onChange={(value) => {
-                  handleFieldChange(record, 'entityNames', value);
-                }}
-                maxTagCount={9}
-              />
-              <Tooltip title="主键可以作为一个实体，在此设置一个或多个实体名称">
-                <ExclamationCircleOutlined />
-              </Tooltip> */}
             </Space>
           );
         }
@@ -183,6 +165,7 @@ const ModelFieldForm: React.FC<Props> = ({
               onChange={(value) => {
                 handleFieldChange(record, 'agg', value);
               }}
+              allowClear
               defaultValue={AGG_OPTIONS[0].value}
               style={{ width: '100%' }}
             >
@@ -269,9 +252,10 @@ const ModelFieldForm: React.FC<Props> = ({
         />
       ),
       dataIndex: 'fastCreate',
-      width: 100,
+      width: 200,
       render: (_: any, record: FieldItem) => {
-        const { type, name } = record;
+        const { type, name, comment } = record;
+        const inputValue = name || comment;
         if (
           [
             EnumDataSourceType.PRIMARY,
@@ -284,41 +268,49 @@ const ModelFieldForm: React.FC<Props> = ({
           const isCreateName = getCreateFieldName(type);
           const editState = !isUndefined(record[isCreateName]) ? !!record[isCreateName] : true;
           return (
-            <Checkbox
-              checked={editState}
-              onChange={(e) => {
-                const value = e.target.checked ? 1 : 0;
-                if (!value) {
-                  onFieldChange(record.bizName, {
-                    ...record,
-                    name: '',
-                    checked: value,
-                    [isCreateName]: value,
-                  });
-                } else {
-                  onFieldChange(record.bizName, {
-                    ...record,
-                    checked: value,
-                    [isCreateName]: value,
-                  });
-                }
-              }}
-            >
-              <Input
-                className={!name && styles.dataSourceFieldsName}
-                value={name}
-                disabled={!editState}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  onFieldChange(record.bizName, {
-                    ...record,
-                    name: value,
-                    [isCreateName]: 1,
-                  });
-                }}
-                placeholder="请填写名称"
-              />
-            </Checkbox>
+            <Row>
+              <Col flex="25px">
+                <Checkbox
+                  style={{ width: '100%', position: 'relative', top: 5 }}
+                  checked={editState}
+                  onChange={(e) => {
+                    const value = e.target.checked ? 1 : 0;
+                    if (!value) {
+                      onFieldChange(record.bizName, {
+                        ...record,
+                        name: '',
+                        checked: value,
+                        [isCreateName]: value,
+                      });
+                    } else {
+                      onFieldChange(record.bizName, {
+                        ...record,
+                        checked: value,
+                        [isCreateName]: value,
+                      });
+                    }
+                  }}
+                />
+              </Col>
+              <Col flex="auto">
+                <Input
+                  className={!inputValue && styles.dataSourceFieldsName}
+                  style={{ minHeight: 20 }}
+                  value={inputValue}
+                  disabled={!editState}
+                  minLength={1}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    onFieldChange(record.bizName, {
+                      ...record,
+                      name: value,
+                      [isCreateName]: 1,
+                    });
+                  }}
+                  placeholder="请填写名称"
+                />
+              </Col>
+            </Row>
           );
         }
         return <></>;

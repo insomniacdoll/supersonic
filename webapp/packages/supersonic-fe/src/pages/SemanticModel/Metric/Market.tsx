@@ -1,6 +1,7 @@
-import type { ActionType, ProColumns } from '@ant-design/pro-table';
-import ProTable from '@ant-design/pro-table';
+import type { ActionType, ProColumns } from '@ant-design/pro-components';
+import { ProTable } from '@ant-design/pro-components';
 import { message, Space, Popconfirm, Tag, Spin, Tooltip } from 'antd';
+import MetricAddClass from './components/MetricAddClass';
 import React, { useRef, useState, useEffect } from 'react';
 import type { Dispatch } from 'umi';
 import { connect, history, useModel } from 'umi';
@@ -65,6 +66,8 @@ const ClassMetricTable: React.FC<Props> = ({ domainManger, dispatch }) => {
   const [hasAllPermission, setHasAllPermission] = useState<boolean>(true);
 
   const actionRef = useRef<ActionType>();
+
+  const [addClassVisible, setAddClassVisible] = useState<boolean>(false);
 
   useEffect(() => {
     queryMetricList(filterParams);
@@ -372,9 +375,6 @@ const ClassMetricTable: React.FC<Props> = ({ domainManger, dispatch }) => {
       }
       setSelectedRowKeys(selectedRowKeys);
     },
-    // getCheckboxProps: (record: ISemantic.IMetricItem) => ({
-    //   disabled: !record.hasAdminRes,
-    // }),
   };
 
   const onMenuClick = (key: string) => {
@@ -384,6 +384,9 @@ const ClassMetricTable: React.FC<Props> = ({ domainManger, dispatch }) => {
         break;
       case 'batchStop':
         queryBatchUpdateStatus(selectedRowKeys, StatusEnum.OFFLINE);
+        break;
+      case 'batchAddClass':
+        setAddClassVisible(true);
         break;
       default:
         break;
@@ -395,6 +398,21 @@ const ClassMetricTable: React.FC<Props> = ({ domainManger, dispatch }) => {
       <div className={styles.metricFilterWrapper}>
         <MetricFilter
           initFilterValues={filterParams}
+          extraNode={
+            <BatchCtrlDropDownButton
+              key="ctrlBtnList"
+              downloadLoading={downloadLoading}
+              onDeleteConfirm={() => {
+                queryBatchUpdateStatus(selectedRowKeys, StatusEnum.DELETED);
+              }}
+              disabledList={hasAllPermission ? [] : ['batchStart', 'batchStop', 'batchDelete']}
+              extenderList={['batchAddClass']}
+              onMenuClick={onMenuClick}
+              onDownloadDateRangeChange={(searchDateRange, pickerType) => {
+                downloadMetricQuery(selectedRowKeys, searchDateRange, pickerType);
+              }}
+            />
+          }
           onFiltersChange={(_, values) => {
             if (_.showType !== undefined) {
               setLoading(true);
@@ -441,20 +459,6 @@ const ClassMetricTable: React.FC<Props> = ({ domainManger, dispatch }) => {
               type: 'checkbox',
               ...rowSelection,
             }}
-            toolBarRender={() => [
-              <BatchCtrlDropDownButton
-                key="ctrlBtnList"
-                downloadLoading={downloadLoading}
-                onDeleteConfirm={() => {
-                  queryBatchUpdateStatus(selectedRowKeys, StatusEnum.DELETED);
-                }}
-                disabledList={hasAllPermission ? [] : ['batchStart', 'batchStop', 'batchDelete']}
-                onMenuClick={onMenuClick}
-                onDownloadDateRangeChange={(searchDateRange, pickerType) => {
-                  downloadMetricQuery(selectedRowKeys, searchDateRange, pickerType);
-                }}
-              />,
-            ]}
             loading={loading}
             onChange={(data: any) => {
               const { current, pageSize, total } = data;
@@ -466,7 +470,7 @@ const ClassMetricTable: React.FC<Props> = ({ domainManger, dispatch }) => {
               setPagination(pagin);
               queryMetricList({ ...pagin, ...filterParams });
             }}
-            options={{ reload: false, density: false, fullScreen: false }}
+            options={false}
           />
         )}
       </>
@@ -509,6 +513,25 @@ const ClassMetricTable: React.FC<Props> = ({ domainManger, dispatch }) => {
           maskClosable={true}
           onNodeChange={({ eventName }: { eventName: string }) => {
             setInfoDrawerVisible(false);
+          }}
+        />
+      )}
+      {addClassVisible && (
+        <MetricAddClass
+          ids={selectedRowKeys as number[]}
+          createModalVisible={addClassVisible}
+          onCancel={() => {
+            setAddClassVisible(false);
+          }}
+          onSuccess={() => {
+            setAddClassVisible(false);
+            queryMetricList(filterParams);
+            dispatch({
+              type: 'domainManger/queryMetricList',
+              payload: {
+                domainId: selectDomainId,
+              },
+            });
           }}
         />
       )}

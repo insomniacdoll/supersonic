@@ -57,18 +57,20 @@ public class DomainServiceImpl implements DomainService {
     }
 
     @Override
-    public void createDomain(DomainReq domainReq, User user) {
+    public DomainResp createDomain(DomainReq domainReq, User user) {
         DomainDO domainDO = DomainConvert.convert(domainReq, user);
         domainDO.setStatus(StatusEnum.ONLINE.getCode());
         domainRepository.createDomain(domainDO);
+        return DomainConvert.convert(domainDO);
     }
 
     @Override
-    public void updateDomain(DomainUpdateReq domainUpdateReq, User user) {
+    public DomainResp updateDomain(DomainUpdateReq domainUpdateReq, User user) {
         domainUpdateReq.updatedBy(user.getName());
         DomainDO domainDO = getDomainDO(domainUpdateReq.getId());
         BeanMapper.mapper(domainUpdateReq, domainDO);
         domainRepository.updateDomain(domainDO);
+        return DomainConvert.convert(domainDO);
     }
 
     @Override
@@ -106,14 +108,19 @@ public class DomainServiceImpl implements DomainService {
             domainWithAuthAll.addAll(getParentDomain(domainIds));
         }
         List<ModelResp> modelResps = modelService.getModelAuthList(user, null, AuthType.ADMIN);
+        List<Long> domainIdsFromModel = modelResps.stream().map(ModelResp::getDomainId).collect(Collectors.toList());
         if (!CollectionUtils.isEmpty(modelResps)) {
-            List<Long> domainIds = modelResps.stream().map(ModelResp::getDomainId).collect(Collectors.toList());
-            domainWithAuthAll.addAll(getParentDomain(domainIds));
+            domainWithAuthAll.addAll(getParentDomain(domainIdsFromModel));
         }
         List<DataSetResp> dataSetResps = dataSetService.getDataSets(user);
         if (!CollectionUtils.isEmpty(dataSetResps)) {
             List<Long> domainIds = dataSetResps.stream().map(DataSetResp::getDomainId).collect(Collectors.toList());
             domainWithAuthAll.addAll(getParentDomain(domainIds));
+        }
+        for (DomainResp domainResp : domainWithAuthAll) {
+            if (domainIdsFromModel.contains(domainResp.getId())) {
+                domainResp.setHasModel(true);
+            }
         }
         return new ArrayList<>(domainWithAuthAll).stream()
                 .sorted(Comparator.comparingLong(DomainResp::getId)).collect(Collectors.toList());

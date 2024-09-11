@@ -294,3 +294,17 @@ update s2_metric set is_publish = 1;
 
 --20240402
 alter table s2_dimension add column `ext` varchar(1000) DEFAULT NULL;
+
+--20240510
+CREATE TABLE IF NOT EXISTS `s2_term` (
+    `id` bigint(20) NOT NULL  AUTO_INCREMENT,
+    `domain_id` bigint(20),
+    `name` varchar(255)  NOT NULL ,
+    `description` varchar(500) DEFAULT NULL ,
+    `alias` varchar(1000)  NOT NULL ,
+    `created_at` datetime NOT NULL ,
+    `created_by` varchar(100) NOT NULL ,
+    `updated_at` datetime DEFAULT NULL ,
+    `updated_by` varchar(100) DEFAULT NULL ,
+    PRIMARY KEY (`id`)
+);

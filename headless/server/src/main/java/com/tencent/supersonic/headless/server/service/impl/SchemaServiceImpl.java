@@ -33,6 +33,7 @@ import com.tencent.supersonic.headless.api.pojo.response.ModelResp;
 import com.tencent.supersonic.headless.api.pojo.response.ModelSchemaResp;
 import com.tencent.supersonic.headless.api.pojo.response.SemanticSchemaResp;
 import com.tencent.supersonic.headless.api.pojo.response.TagResp;
+import com.tencent.supersonic.headless.api.pojo.response.TermResp;
 import com.tencent.supersonic.headless.server.pojo.MetaFilter;
 import com.tencent.supersonic.headless.server.pojo.ModelFilter;
 import com.tencent.supersonic.headless.server.pojo.TagFilter;
@@ -44,6 +45,7 @@ import com.tencent.supersonic.headless.server.service.ModelRelaService;
 import com.tencent.supersonic.headless.server.service.ModelService;
 import com.tencent.supersonic.headless.server.service.SchemaService;
 import com.tencent.supersonic.headless.server.service.TagMetaService;
+import com.tencent.supersonic.headless.server.service.TermService;
 import com.tencent.supersonic.headless.server.utils.DataSetSchemaBuilder;
 import com.tencent.supersonic.headless.server.utils.DimensionConverter;
 import com.tencent.supersonic.headless.server.utils.MetricConverter;
@@ -60,6 +62,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
@@ -86,6 +89,7 @@ public class SchemaServiceImpl implements SchemaService {
     private final DataSetService dataSetService;
     private final ModelRelaService modelRelaService;
     private final TagMetaService tagService;
+    private final TermService termService;
 
     public SchemaServiceImpl(ModelService modelService,
             DimensionService dimensionService,
@@ -93,7 +97,7 @@ public class SchemaServiceImpl implements SchemaService {
             DomainService domainService,
             DataSetService dataSetService,
             ModelRelaService modelRelaService,
-            StatUtils statUtils, TagMetaService tagService) {
+            StatUtils statUtils, TagMetaService tagService, TermService termService) {
         this.modelService = modelService;
         this.dimensionService = dimensionService;
         this.metricService = metricService;
@@ -102,6 +106,7 @@ public class SchemaServiceImpl implements SchemaService {
         this.modelRelaService = modelRelaService;
         this.statUtils = statUtils;
         this.tagService = tagService;
+        this.termService = termService;
     }
 
     @SneakyThrows
@@ -163,11 +168,14 @@ public class SchemaServiceImpl implements SchemaService {
         MetaFilter metaFilter = new MetaFilter();
         metaFilter.setStatus(StatusEnum.ONLINE.getCode());
         metaFilter.setIds(filter.getDataSetIds());
-        List<DataSetResp> dataSetResps = dataSetService.getDataSetList(metaFilter, User.getFakeUser());
+        List<DataSetResp> dataSetResps = dataSetService.getDataSetList(metaFilter);
         Map<Long, DataSetResp> dataSetRespMap = getDataSetMap(dataSetResps);
-
+        Set<Long> domainIds = dataSetResps.stream().map(DataSetResp::getDomainId)
+                .collect(Collectors.toSet());
         List<Long> modelIds = dataSetRespMap.values().stream().map(DataSetResp::getAllModels)
                 .flatMap(Collection::stream).collect(Collectors.toList());
+        Map<Long, List<TermResp>> termMaps = termService.getTermSets(domainIds);
+
 
         metaFilter.setModelIds(modelIds);
         metaFilter.setIds(Lists.newArrayList());
@@ -178,7 +186,7 @@ public class SchemaServiceImpl implements SchemaService {
 
         metaFilter.setIds(modelIds);
         List<ModelResp> modelResps = modelService.getModelList(metaFilter);
-
+        metricService.batchFillMetricDefaultAgg(metricResps, modelResps);
         TagFilter tagFilter = new TagFilter();
         tagFilter.setModelIds(modelIds);
 
@@ -198,7 +206,7 @@ public class SchemaServiceImpl implements SchemaService {
             dataSetSchemaResp.setMetrics(metricSchemaResps);
             dataSetSchemaResp.setModelResps(modelResps.stream().filter(modelResp ->
                     dataSetResp.getAllModels().contains(modelResp.getId())).collect(Collectors.toList()));
-
+            dataSetSchemaResp.setTermResps(termMaps.getOrDefault(dataSetResp.getDomainId(), Lists.newArrayList()));
             dataSetSchemaResps.add(dataSetSchemaResp);
         }
         fillStaticInfo(dataSetSchemaResps);
@@ -404,7 +412,7 @@ public class SchemaServiceImpl implements SchemaService {
             }
             parentItem.getChildren().add(itemResp);
         }
-        List<DataSetResp> dataSetResps = dataSetService.getDataSetList(new MetaFilter(), User.getFakeUser());
+        List<DataSetResp> dataSetResps = dataSetService.getDataSetList(new MetaFilter());
         for (DataSetResp dataSetResp : dataSetResps) {
             ItemResp itemResp = itemRespMap.get(dataSetResp.getDomainId());
             if (itemResp != null) {

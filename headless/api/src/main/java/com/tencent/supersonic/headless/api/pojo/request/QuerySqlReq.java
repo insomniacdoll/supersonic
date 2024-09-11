@@ -1,14 +1,16 @@
 package com.tencent.supersonic.headless.api.pojo.request;
 
-import com.tencent.supersonic.common.pojo.enums.QueryType;
 import lombok.Data;
 import lombok.ToString;
+import org.apache.commons.collections.CollectionUtils;
+
+import java.util.Objects;
 
 @Data
 @ToString
 public class QuerySqlReq extends SemanticQueryReq {
-    private QueryType queryType;
     private String sql;
+    private Integer limit = 1000;
 
     @Override
     public String toCustomizedString() {
@@ -27,4 +29,8 @@ public class QuerySqlReq extends SemanticQueryReq {
         return stringBuilder.toString();
     }
 
+    public boolean needGetDataSetId() {
+        return (Objects.isNull(this.getDataSetId()) || this.getDataSetId() <= 0)
+                && (CollectionUtils.isEmpty(this.getModelIds()));
+    }
 }

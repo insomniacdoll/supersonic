@@ -6,11 +6,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.tuple.Pair;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
 import java.util.ArrayList;
+import java.util.Map;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.List;
-import java.util.Map;
 
 @Component
 @Slf4j
@@ -85,7 +85,7 @@ public class SqlPromptGenerator {
     }
 
     public List<List<Map<String, String>>> getExampleCombos(List<Map<String, String>> exampleList, int numFewShots,
-            int numSelfConsistency) {
+                                                            int numSelfConsistency) {
         List<List<Map<String, String>>> results = new ArrayList<>();
         for (int i = 0; i < numSelfConsistency; i++) {
             List<Map<String, String>> shuffledList = new ArrayList<>(exampleList);
@@ -118,7 +118,7 @@ public class SqlPromptGenerator {
     }
 
     public List<String> generateSqlPromptPool(LLMReq llmReq, List<String> schemaLinkStrPool,
-            List<List<Map<String, String>>> fewshotExampleListPool) {
+                                              List<List<Map<String, String>>> fewshotExampleListPool) {
         List<String> sqlPromptPool = new ArrayList<>();
         for (int i = 0; i < schemaLinkStrPool.size(); i++) {
             String schemaLinkStr = schemaLinkStrPool.get(i);
@@ -127,6 +127,21 @@ public class SqlPromptGenerator {
             sqlPromptPool.add(sqlPrompt);
         }
         return sqlPromptPool;
+    }
+
+    public String generateRewritePrompt(List<Map<String, String>> rewriteExamples) {
+        String instruction = "#this is a multi-turn text-to-sql scenes,you need consider the contextual "
+                + "questions and semantics, rewriting current question for expressing complete semantics of "
+                + "the current question based on the contextual questions.";
+        List<String> exampleKeys = Arrays.asList("contextualQuestions", "currentQuestion", "rewritingCurrentQuestion");
+        StringBuilder rewriteSb = new StringBuilder();
+        rewriteExamples.stream().forEach(o -> {
+            exampleKeys.stream().forEach(example -> {
+                rewriteSb.append(example + ":" + o.get(example) + "\n");
+            });
+            rewriteSb.append("\n");
+        });
+        return instruction + InputFormat.SEPERATOR + rewriteSb.toString();
     }
 
 }

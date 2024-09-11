@@ -65,6 +65,10 @@ public class MetricResp extends SchemaItem {
 
     private Integer isPublish;
 
+    private double similarity;
+
+    private String defaultAgg;
+
     public void setClassifications(String tag) {
         if (StringUtils.isBlank(tag)) {
             classifications = Lists.newArrayList();
@@ -88,14 +92,6 @@ public class MetricResp extends SchemaItem {
             return Lists.newArrayList();
         }
         return relateDimension.getDrillDownDimensions();
-    }
-
-    public String getDefaultAgg() {
-        if (metricDefineByMeasureParams != null
-                && CollectionUtils.isNotEmpty(metricDefineByMeasureParams.getMeasures())) {
-            return metricDefineByMeasureParams.getMeasures().get(0).getAgg();
-        }
-        return "";
     }
 
     public String getExpr() {

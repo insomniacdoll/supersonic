@@ -138,7 +138,7 @@ public class TagMetaServiceImpl implements TagMetaService {
     }
 
     @Override
-    public List<TagDO> getTagDOList(TagFilter tagFilter, User user) {
+    public List<TagDO> getTagDOList(TagFilter tagFilter) {
         return tagRepository.getTagDOList(tagFilter);
     }
 
@@ -160,6 +160,9 @@ public class TagMetaServiceImpl implements TagMetaService {
             modelRespList = modelRespList.stream()
                     .filter(modelResp -> tagMarketPageReq.getTagObjectId().equals(modelResp.getTagObjectId()))
                     .collect(Collectors.toList());
+        }
+        if (CollectionUtils.isEmpty(modelRespList)) {
+            return new PageInfo<TagResp>();
         }
         List<Long> modelIds = modelRespList.stream().map(model -> model.getId()).collect(Collectors.toList());
 
@@ -243,6 +246,7 @@ public class TagMetaServiceImpl implements TagMetaService {
             tagResp.setModelName(metric.getModelName());
             tagResp.setDomainId(metric.getDomainId());
             tagResp.setSensitiveLevel(metric.getSensitiveLevel());
+            tagResp.setExt(metric.getExt());
         }
         if (TagDefineType.DIMENSION.name().equalsIgnoreCase(tagDO.getType())) {
             DimensionResp dimensionResp = dimensionService.getDimension(tagDO.getItemId());
@@ -251,6 +255,7 @@ public class TagMetaServiceImpl implements TagMetaService {
             tagResp.setModelId(dimensionResp.getModelId());
             tagResp.setModelName(dimensionResp.getModelName());
             tagResp.setSensitiveLevel(dimensionResp.getSensitiveLevel());
+            tagResp.setExt(dimensionResp.getExt());
         }
 
         return tagResp;
@@ -383,11 +388,11 @@ public class TagMetaServiceImpl implements TagMetaService {
     }
 
     @Override
-    public List<TagItem> getTagItems(User user, List<Long> itemIds, TagDefineType tagDefineType) {
+    public List<TagItem> getTagItems(List<Long> itemIds, TagDefineType tagDefineType) {
         TagFilter tagFilter = new TagFilter();
         tagFilter.setTagDefineType(tagDefineType);
         tagFilter.setItemIds(itemIds);
-        Set<Long> dimensionItemSet = getTagDOList(tagFilter, user).stream().map(TagDO::getItemId)
+        Set<Long> dimensionItemSet = getTagDOList(tagFilter).stream().map(TagDO::getItemId)
                 .collect(Collectors.toSet());
         return itemIds.stream().map(entry -> {
                     TagItem tagItem = new TagItem();
