@@ -5,12 +5,13 @@ import com.tencent.supersonic.headless.api.pojo.DataSetDetail;
 import com.tencent.supersonic.headless.api.pojo.DataSetModelConfig;
 import com.tencent.supersonic.headless.api.pojo.QueryConfig;
 import com.tencent.supersonic.headless.api.pojo.SchemaItem;
+import lombok.Data;
+import org.springframework.util.CollectionUtils;
+
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.stream.Collectors;
-import lombok.Data;
-import org.springframework.util.CollectionUtils;
 
 @Data
 public class DataSetResp extends SchemaItem {
@@ -27,38 +28,44 @@ public class DataSetResp extends SchemaItem {
 
     private List<String> adminOrgs = new ArrayList<>();
 
-    private QueryConfig queryConfig;
+    private QueryConfig queryConfig = new QueryConfig();
 
     private List<TagItem> allMetrics = new ArrayList<>();
 
     private List<TagItem> allDimensions = new ArrayList<>();
 
     public List<Long> metricIds() {
-        return getDataSetModelConfigs().stream().map(DataSetModelConfig::getMetrics)
-                .flatMap(Collection::stream).collect(Collectors.toList());
+        return getDataSetModelConfigs().stream()
+                .map(DataSetModelConfig::getMetrics)
+                .flatMap(Collection::stream)
+                .collect(Collectors.toList());
     }
 
     public List<Long> dimensionIds() {
-        return getDataSetModelConfigs().stream().map(DataSetModelConfig::getDimensions)
-                .flatMap(Collection::stream).collect(Collectors.toList());
+        return getDataSetModelConfigs().stream()
+                .map(DataSetModelConfig::getDimensions)
+                .flatMap(Collection::stream)
+                .collect(Collectors.toList());
     }
 
     public List<Long> getAllModels() {
-        return getDataSetModelConfigs().stream().map(DataSetModelConfig::getId)
+        return getDataSetModelConfigs().stream()
+                .map(DataSetModelConfig::getId)
                 .collect(Collectors.toList());
     }
 
     public List<Long> getAllIncludeAllModels() {
-        return getDataSetModelConfigs().stream().filter(DataSetModelConfig::getIncludesAll)
+        return getDataSetModelConfigs().stream()
+                .filter(DataSetModelConfig::getIncludesAll)
                 .map(DataSetModelConfig::getId)
                 .collect(Collectors.toList());
     }
 
     private List<DataSetModelConfig> getDataSetModelConfigs() {
-        if (dataSetDetail == null || CollectionUtils.isEmpty(dataSetDetail.getDataSetModelConfigs())) {
+        if (dataSetDetail == null
+                || CollectionUtils.isEmpty(dataSetDetail.getDataSetModelConfigs())) {
             return Lists.newArrayList();
         }
         return dataSetDetail.getDataSetModelConfigs();
     }
-
 }

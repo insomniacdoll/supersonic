@@ -1,8 +1,7 @@
-import { Tag, Space, Tooltip, Typography } from 'antd';
+import { Tag, Space, Tooltip } from 'antd';
 import React, { ReactNode } from 'react';
-import { connect } from 'umi';
-import type { StateType } from '../../model';
 import dayjs from 'dayjs';
+import { basePath } from '../../../../../config/defaultSettings';
 import {
   ExportOutlined,
   SolutionOutlined,
@@ -23,7 +22,6 @@ import IndicatorStar from '../../components/IndicatorStar';
 
 type Props = {
   tagData: ISemantic.ITagItem;
-  domainManger: StateType;
   onNodeChange: (params?: { eventName?: string }) => void;
   onEditBtnClick?: (tagData: any) => void;
   onDimensionRelationBtnClick?: () => void;
@@ -92,10 +90,10 @@ const TagInfoSider: React.FC<Props> = ({ tagData, dimensionMap, metricMap }) => 
               <span
                 className={styles.gotoMetricListIcon}
                 onClick={() => {
-                  window.open(`/webapp/model/${tagData.domainId}/${tagData.modelId}/`);
+                  window.open(`${basePath}model/${tagData.domainId}/${tagData.modelId}/`);
                 }}
               >
-                <Tooltip title="前往所属模型指标列表">
+                <Tooltip title="前往所属模3型指标列表">
                   <ExportOutlined />
                 </Tooltip>
               </span>
@@ -141,7 +139,7 @@ const TagInfoSider: React.FC<Props> = ({ tagData, dimensionMap, metricMap }) => 
                   <span
                     className={styles.gotoMetricListIcon}
                     onClick={() => {
-                      window.open(`/webapp/model/${tagData.domainId}/0/overview`);
+                      window.open(`${basePath}model/${tagData.domainId}/0/overview`);
                     }}
                   >
                     <Tooltip title="前往模型设置页">
@@ -251,6 +249,4 @@ const TagInfoSider: React.FC<Props> = ({ tagData, dimensionMap, metricMap }) => 
   );
 };
 
-export default connect(({ domainManger }: { domainManger: StateType }) => ({
-  domainManger,
-}))(TagInfoSider);
+export default TagInfoSider;

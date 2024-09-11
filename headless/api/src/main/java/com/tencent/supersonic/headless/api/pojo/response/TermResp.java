@@ -6,7 +6,6 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import javax.validation.constraints.NotNull;
 import java.util.List;
 
 @Data
@@ -16,7 +15,6 @@ public class TermResp extends RecordInfo {
 
     private Long id;
 
-    @NotNull(message = "主题域ID不可为空")
     private Long domainId;
 
     private String name;
@@ -25,4 +23,7 @@ public class TermResp extends RecordInfo {
 
     private List<String> alias = Lists.newArrayList();
 
+    private List<Long> relatedMetrics = Lists.newArrayList();
+
+    private List<Long> relateDimensions = Lists.newArrayList();
 }

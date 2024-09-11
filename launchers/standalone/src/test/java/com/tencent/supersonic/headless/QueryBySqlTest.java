@@ -12,11 +12,13 @@ import static java.time.LocalDate.now;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
+
 public class QueryBySqlTest extends BaseTest {
 
     @Test
     public void testDetailQuery() throws Exception {
-        SemanticQueryResp semanticQueryResp = queryBySql("SELECT 用户,访问次数 FROM 超音数PVUV统计 WHERE 用户='alice' ");
+        SemanticQueryResp semanticQueryResp =
+                queryBySql("SELECT 用户,访问次数 FROM 超音数PVUV统计 WHERE 用户='alice' ");
 
         assertEquals(2, semanticQueryResp.getColumns().size());
         QueryColumn firstColumn = semanticQueryResp.getColumns().get(0);
@@ -28,7 +30,8 @@ public class QueryBySqlTest extends BaseTest {
 
     @Test
     public void testSumQuery() throws Exception {
-        SemanticQueryResp semanticQueryResp = queryBySql("SELECT SUM(访问次数) AS 访问次数 FROM 超音数PVUV统计 ");
+        SemanticQueryResp semanticQueryResp =
+                queryBySql("SELECT SUM(访问次数) AS 访问次数 FROM 超音数PVUV统计 ");
 
         assertEquals(1, semanticQueryResp.getColumns().size());
         QueryColumn queryColumn = semanticQueryResp.getColumns().get(0);
@@ -38,7 +41,8 @@ public class QueryBySqlTest extends BaseTest {
 
     @Test
     public void testGroupByQuery() throws Exception {
-        SemanticQueryResp result = queryBySql("SELECT 部门, SUM(访问次数) AS 访问次数 FROM 超音数PVUV统计  GROUP BY 部门 ");
+        SemanticQueryResp result =
+                queryBySql("SELECT 部门, SUM(访问次数) AS 访问次数 FROM 超音数PVUV统计  GROUP BY 部门 ");
         assertEquals(2, result.getColumns().size());
         QueryColumn firstColumn = result.getColumns().get(0);
         QueryColumn secondColumn = result.getColumns().get(1);
@@ -49,8 +53,9 @@ public class QueryBySqlTest extends BaseTest {
 
     @Test
     public void testFilterQuery() throws Exception {
-        SemanticQueryResp result = queryBySql(
-                "SELECT 部门, SUM(访问次数) AS 访问次数 FROM 超音数PVUV统计 WHERE 部门 ='HR' GROUP BY 部门 ");
+        SemanticQueryResp result =
+                queryBySql(
+                        "SELECT 部门, SUM(访问次数) AS 访问次数 FROM 超音数PVUV统计 WHERE 部门 ='HR' GROUP BY 部门 ");
         assertEquals(2, result.getColumns().size());
         QueryColumn firstColumn = result.getColumns().get(0);
         QueryColumn secondColumn = result.getColumns().get(1);
@@ -74,14 +79,16 @@ public class QueryBySqlTest extends BaseTest {
 
     @Test
     public void testCacheQuery() throws Exception {
-        SemanticQueryResp result1 = queryBySql("SELECT 部门, SUM(访问次数) AS 访问次数 FROM 超音数PVUV统计  GROUP BY 部门 ");
-        SemanticQueryResp result2 = queryBySql("SELECT 部门, SUM(访问次数) AS 访问次数 FROM 超音数PVUV统计  GROUP BY 部门 ");
-        assertTrue(result1 == result2);
+        queryBySql("SELECT 部门, SUM(访问次数) AS 访问次数 FROM 超音数PVUV统计  GROUP BY 部门 ");
+        SemanticQueryResp result2 =
+                queryBySql("SELECT 部门, SUM(访问次数) AS 访问次数 FROM 超音数PVUV统计  GROUP BY 部门 ");
+        assertTrue(result2.isUseCache());
     }
 
     @Test
     public void testBizNameQuery() throws Exception {
-        SemanticQueryResp result1 = queryBySql("SELECT SUM(pv) FROM 超音数PVUV统计  WHERE department ='HR'");
+        SemanticQueryResp result1 =
+                queryBySql("SELECT SUM(pv) FROM 超音数PVUV统计  WHERE department ='HR'");
         SemanticQueryResp result2 = queryBySql("SELECT SUM(访问次数) FROM 超音数PVUV统计  WHERE 部门 ='HR'");
         assertEquals(1, result1.getColumns().size());
         assertEquals(1, result2.getColumns().size());
@@ -92,27 +99,36 @@ public class QueryBySqlTest extends BaseTest {
     @Test
     public void testAuthorization_model() {
         User alice = DataUtils.getUserAlice();
-        assertThrows(InvalidPermissionException.class,
+        setDomainNotOpenToAll();
+        assertThrows(
+                InvalidPermissionException.class,
                 () -> queryBySql("SELECT SUM(pv) FROM 超音数PVUV统计  WHERE department ='HR'", alice));
     }
 
     @Test
     public void testAuthorization_sensitive_metric() throws Exception {
         User tom = DataUtils.getUserTom();
+        assertThrows(
+                InvalidPermissionException.class,
+                () ->
+                        queryBySql(
+                                "SELECT SUM(stay_hours) FROM 停留时长统计  WHERE department ='HR'", tom));
+    }
+
+    @Test
+    public void testAuthorization_sensitive_metric_jack() throws Exception {
+        User jack = DataUtils.getUserJack();
         SemanticQueryResp semanticQueryResp =
-                queryBySql("SELECT SUM(stay_hours) FROM 停留时长统计  WHERE department ='HR'", tom);
-        Assertions.assertEquals(false, semanticQueryResp.getColumns().get(0).getAuthorized());
-        Assertions.assertEquals("******",
-                semanticQueryResp.getResultList().get(0).get("SUM(stay_hours)"));
+                queryBySql("SELECT SUM(stay_hours) FROM 停留时长统计", jack);
+        Assertions.assertTrue(semanticQueryResp.getResultList().size() > 0);
     }
 
     @Test
     public void testAuthorization_row_permission() throws Exception {
         User tom = DataUtils.getUserTom();
         SemanticQueryResp semanticQueryResp =
-                queryBySql("SELECT SUM(stay_hours) FROM 停留时长统计  WHERE department ='HR'", tom);
+                queryBySql("SELECT SUM(pv) FROM 超音数PVUV统计  WHERE department ='HR'", tom);
         Assertions.assertNotNull(semanticQueryResp.getQueryAuthorization().getMessage());
         Assertions.assertTrue(semanticQueryResp.getSql().contains("user_name = 'tom'"));
     }
-
 }

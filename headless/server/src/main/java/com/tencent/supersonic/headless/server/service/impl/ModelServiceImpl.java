@@ -13,36 +13,35 @@ import com.tencent.supersonic.headless.api.pojo.Dim;
 import com.tencent.supersonic.headless.api.pojo.Identify;
 import com.tencent.supersonic.headless.api.pojo.ItemDateFilter;
 import com.tencent.supersonic.headless.api.pojo.Measure;
+import com.tencent.supersonic.headless.api.pojo.MetaFilter;
 import com.tencent.supersonic.headless.api.pojo.request.DateInfoReq;
 import com.tencent.supersonic.headless.api.pojo.request.DimensionReq;
 import com.tencent.supersonic.headless.api.pojo.request.FieldRemovedReq;
 import com.tencent.supersonic.headless.api.pojo.request.MetaBatchReq;
 import com.tencent.supersonic.headless.api.pojo.request.MetricReq;
 import com.tencent.supersonic.headless.api.pojo.request.ModelReq;
+import com.tencent.supersonic.headless.api.pojo.response.DataSetResp;
 import com.tencent.supersonic.headless.api.pojo.response.DatabaseResp;
 import com.tencent.supersonic.headless.api.pojo.response.DimensionResp;
 import com.tencent.supersonic.headless.api.pojo.response.DomainResp;
 import com.tencent.supersonic.headless.api.pojo.response.MetricResp;
 import com.tencent.supersonic.headless.api.pojo.response.ModelResp;
 import com.tencent.supersonic.headless.api.pojo.response.UnAvailableItemResp;
-import com.tencent.supersonic.headless.api.pojo.response.DataSetResp;
 import com.tencent.supersonic.headless.server.persistence.dataobject.DateInfoDO;
 import com.tencent.supersonic.headless.server.persistence.dataobject.ModelDO;
 import com.tencent.supersonic.headless.server.persistence.repository.DateInfoRepository;
 import com.tencent.supersonic.headless.server.persistence.repository.ModelRepository;
-import com.tencent.supersonic.headless.server.pojo.MetaFilter;
 import com.tencent.supersonic.headless.server.pojo.ModelFilter;
+import com.tencent.supersonic.headless.server.service.DataSetService;
 import com.tencent.supersonic.headless.server.service.DatabaseService;
 import com.tencent.supersonic.headless.server.service.DimensionService;
 import com.tencent.supersonic.headless.server.service.DomainService;
 import com.tencent.supersonic.headless.server.service.MetricService;
 import com.tencent.supersonic.headless.server.service.ModelService;
-import com.tencent.supersonic.headless.server.service.DataSetService;
 import com.tencent.supersonic.headless.server.utils.ModelConverter;
 import com.tencent.supersonic.headless.server.utils.NameCheckUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.logging.log4j.util.Strings;
 import org.springframework.beans.BeanUtils;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
@@ -58,7 +57,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
-
 
 @Service
 @Slf4j
@@ -80,14 +78,15 @@ public class ModelServiceImpl implements ModelService {
 
     private DateInfoRepository dateInfoRepository;
 
-    public ModelServiceImpl(ModelRepository modelRepository,
-                            DatabaseService databaseService,
-                            @Lazy DimensionService dimensionService,
-                            @Lazy MetricService metricService,
-                            DomainService domainService,
-                            UserService userService,
-                            DataSetService dataSetService,
-                            DateInfoRepository dateInfoRepository) {
+    public ModelServiceImpl(
+            ModelRepository modelRepository,
+            DatabaseService databaseService,
+            @Lazy DimensionService dimensionService,
+            @Lazy MetricService metricService,
+            DomainService domainService,
+            UserService userService,
+            DataSetService dataSetService,
+            DateInfoRepository dateInfoRepository) {
         this.modelRepository = modelRepository;
         this.databaseService = databaseService;
         this.dimensionService = dimensionService;
@@ -101,7 +100,7 @@ public class ModelServiceImpl implements ModelService {
     @Override
     @Transactional
     public ModelResp createModel(ModelReq modelReq, User user) throws Exception {
-        checkName(modelReq);
+        checkParams(modelReq);
         ModelDO modelDO = ModelConverter.convert(modelReq, user);
         modelRepository.createModel(modelDO);
         batchCreateDimension(modelDO, user);
@@ -112,42 +111,25 @@ public class ModelServiceImpl implements ModelService {
     @Override
     @Transactional
     public ModelResp updateModel(ModelReq modelReq, User user) throws Exception {
-        checkName(modelReq);
+        checkParams(modelReq);
         ModelDO modelDO = modelRepository.getModelById(modelReq.getId());
-        int oldStatus = modelDO.getStatus();
         ModelConverter.convert(modelDO, modelReq, user);
         modelRepository.updateModel(modelDO);
         batchCreateDimension(modelDO, user);
         batchCreateMetric(modelDO, user);
-        statusPublish(oldStatus, modelDO);
         return ModelConverter.convert(modelDO);
-    }
-
-    private void statusPublish(Integer oldStatus, ModelDO modelDO) {
-        if (oldStatus.equals(modelDO.getStatus())) {
-            return;
-        }
-        EventType eventType = null;
-        if (oldStatus.equals(StatusEnum.ONLINE.getCode())
-                && modelDO.getStatus().equals(StatusEnum.OFFLINE.getCode())) {
-            eventType = EventType.DELETE;
-        } else if (oldStatus.equals(StatusEnum.OFFLINE.getCode())
-                && modelDO.getStatus().equals(StatusEnum.ONLINE.getCode())) {
-            eventType = EventType.ADD;
-        }
-        log.info("model:{} status from {} to {}", modelDO.getId(), oldStatus, modelDO.getStatus());
-        metricService.sendMetricEventBatch(Lists.newArrayList(modelDO.getId()), eventType);
-        dimensionService.sendDimensionEventBatch(Lists.newArrayList(modelDO.getId()), eventType);
     }
 
     @Override
     public List<ModelResp> getModelList(MetaFilter metaFilter) {
         ModelFilter modelFilter = new ModelFilter();
         BeanUtils.copyProperties(metaFilter, modelFilter);
-        List<ModelResp> modelResps = ModelConverter.convertList(modelRepository.getModelList(modelFilter));
+        List<ModelResp> modelResps =
+                ModelConverter.convertList(modelRepository.getModelList(modelFilter));
         if (modelFilter.getDataSetId() != null) {
             DataSetResp dataSetResp = dataSetService.getDataSet(modelFilter.getDataSetId());
-            return modelResps.stream().filter(modelResp -> dataSetResp.getAllModels().contains(modelResp.getId()))
+            return modelResps.stream()
+                    .filter(modelResp -> dataSetResp.getAllModels().contains(modelResp.getId()))
                     .collect(Collectors.toList());
         }
         return modelResps;
@@ -160,7 +142,8 @@ public class ModelServiceImpl implements ModelService {
         if (CollectionUtils.isEmpty(modelResps)) {
             return map;
         }
-        return modelResps.stream().collect(Collectors.toMap(ModelResp::getId, a -> a, (k1, k2) -> k1));
+        return modelResps.stream()
+                .collect(Collectors.toMap(ModelResp::getId, a -> a, (k1, k2) -> k1));
     }
 
     @Override
@@ -202,8 +185,10 @@ public class ModelServiceImpl implements ModelService {
         metaFilter.setFieldsDepend(fieldRemovedReq.getFields());
         List<MetricResp> metricResps = metricService.getMetrics(metaFilter);
         List<DimensionResp> dimensionResps = dimensionService.getDimensions(metaFilter);
-        return UnAvailableItemResp.builder().dimensionResps(dimensionResps)
-                .metricResps(metricResps).build();
+        return UnAvailableItemResp.builder()
+                .dimensionResps(dimensionResps)
+                .metricResps(metricResps)
+                .build();
     }
 
     private void batchCreateDimension(ModelDO modelDO, User user) throws Exception {
@@ -216,27 +201,35 @@ public class ModelServiceImpl implements ModelService {
         metricService.createMetricBatch(metricReqs, user);
     }
 
-    private void checkName(ModelReq modelReq) {
+    private void checkParams(ModelReq modelReq) {
         String forbiddenCharacters = NameCheckUtils.findForbiddenCharacters(modelReq.getName());
         if (StringUtils.isNotBlank(forbiddenCharacters)) {
-            String message = String.format("模型名称[%s]包含特殊字符(%s), 请修改", modelReq.getName(), forbiddenCharacters);
+            String message =
+                    String.format(
+                            "模型名称[%s]包含特殊字符(%s), 请修改", modelReq.getName(), forbiddenCharacters);
             throw new InvalidArgumentException(message);
         }
+
+        if (!NameCheckUtils.isValidIdentifier(modelReq.getBizName())) {
+            String message = String.format("模型英文名[%s]需要为下划线字母数字组合, 请修改", modelReq.getBizName());
+            throw new InvalidArgumentException(message);
+        }
+
         List<Dim> dims = modelReq.getModelDetail().getDimensions();
         List<Measure> measures = modelReq.getModelDetail().getMeasures();
-        List<Dim> timeDims = modelReq.getTimeDimension();
         List<Identify> identifies = modelReq.getModelDetail().getIdentifiers();
         if (CollectionUtils.isEmpty(dims)) {
             throw new InvalidArgumentException("缺少维度信息");
         }
-        if (!CollectionUtils.isEmpty(measures) && CollectionUtils.isEmpty(timeDims)) {
-            throw new InvalidArgumentException("有度量时, 不可缺少时间维度");
-        }
         for (Measure measure : measures) {
-            String measureForbiddenCharacters = NameCheckUtils.findForbiddenCharacters(measure.getName());
+            String measureForbiddenCharacters =
+                    NameCheckUtils.findForbiddenCharacters(measure.getName());
             if (StringUtils.isNotBlank(measure.getName())
                     && StringUtils.isNotBlank(measureForbiddenCharacters)) {
-                String message = String.format("度量[%s]包含特殊字符(%s), 请修改", measure.getName(), measureForbiddenCharacters);
+                String message =
+                        String.format(
+                                "度量[%s]包含特殊字符(%s), 请修改",
+                                measure.getName(), measureForbiddenCharacters);
                 throw new InvalidArgumentException(message);
             }
         }
@@ -244,16 +237,21 @@ public class ModelServiceImpl implements ModelService {
             String dimForbiddenCharacters = NameCheckUtils.findForbiddenCharacters(dim.getName());
             if (StringUtils.isNotBlank(dim.getName())
                     && StringUtils.isNotBlank(dimForbiddenCharacters)) {
-                String message = String.format("维度[%s]包含特殊字符(%s), 请修改", dim.getName(), dimForbiddenCharacters);
+                String message =
+                        String.format(
+                                "维度[%s]包含特殊字符(%s), 请修改", dim.getName(), dimForbiddenCharacters);
                 throw new InvalidArgumentException(message);
             }
         }
         for (Identify identify : identifies) {
-            String identifyForbiddenCharacters = NameCheckUtils.findForbiddenCharacters(identify.getName());
+            String identifyForbiddenCharacters =
+                    NameCheckUtils.findForbiddenCharacters(identify.getName());
             if (StringUtils.isNotBlank(identify.getName())
                     && StringUtils.isNotBlank(identifyForbiddenCharacters)) {
-                String message = String.format("主键/外键[%s]包含特殊字符(%s), 请修改", identify.getName(),
-                        identifyForbiddenCharacters);
+                String message =
+                        String.format(
+                                "主键/外键[%s]包含特殊字符(%s), 请修改",
+                                identify.getName(), identifyForbiddenCharacters);
                 throw new InvalidArgumentException(message);
             }
         }
@@ -283,10 +281,10 @@ public class ModelServiceImpl implements ModelService {
             String startDate1 = item.getStartDate();
             String endDate1 = item.getEndDate();
             List<String> unavailableDateList1 = item.getUnavailableDateList();
-            if (Strings.isNotEmpty(startDate1) && startDate1.compareTo(startDate) > 0) {
+            if (StringUtils.isNotEmpty(startDate1) && startDate1.compareTo(startDate) > 0) {
                 startDate = startDate1;
             }
-            if (Strings.isNotEmpty(endDate1) && endDate1.compareTo(endDate) < 0) {
+            if (StringUtils.isNotEmpty(endDate1) && endDate1.compareTo(endDate) < 0) {
                 endDate = endDate1;
             }
             if (!CollectionUtils.isEmpty(unavailableDateList1)) {
@@ -301,25 +299,31 @@ public class ModelServiceImpl implements ModelService {
     public List<ModelResp> getModelListWithAuth(User user, Long domainId, AuthType authType) {
         List<ModelResp> modelResps = getModelAuthList(user, domainId, authType);
         Set<ModelResp> modelRespSet = new HashSet<>(modelResps);
-        List<ModelResp> modelRespsAuthInheritDomain = getModelRespAuthInheritDomain(user, domainId, authType);
+        List<ModelResp> modelRespsAuthInheritDomain =
+                getModelRespAuthInheritDomain(user, domainId, authType);
         modelRespSet.addAll(modelRespsAuthInheritDomain);
-        return modelRespSet.stream().sorted(Comparator.comparingLong(ModelResp::getId))
+        return modelRespSet.stream()
+                .sorted(Comparator.comparingLong(ModelResp::getId))
                 .collect(Collectors.toList());
     }
 
-    public List<ModelResp> getModelRespAuthInheritDomain(User user, Long domainId, AuthType authType) {
-        List<Long> domainIds = domainService.getDomainAuthSet(user, authType)
-                .stream().map(DomainResp::getId)
-                .collect(Collectors.toList());
+    public List<ModelResp> getModelRespAuthInheritDomain(
+            User user, Long domainId, AuthType authType) {
+        List<Long> domainIds =
+                domainService.getDomainAuthSet(user, authType).stream()
+                        .filter(
+                                domainResp -> {
+                                    if (domainId == null) {
+                                        return true;
+                                    } else {
+                                        return domainId.equals(domainResp.getId())
+                                                || domainId.equals(domainResp.getParentId());
+                                    }
+                                })
+                        .map(DomainResp::getId)
+                        .collect(Collectors.toList());
         if (CollectionUtils.isEmpty(domainIds)) {
             return Lists.newArrayList();
-        }
-        if (domainId != null) {
-            if (domainIds.contains(domainId)) {
-                domainIds = Lists.newArrayList(domainId);
-            } else {
-                return Lists.newArrayList();
-            }
         }
         ModelFilter modelFilter = new ModelFilter();
         modelFilter.setIncludesDetail(false);
@@ -336,14 +340,16 @@ public class ModelServiceImpl implements ModelService {
         Set<String> orgIds = userService.getUserAllOrgId(user.getName());
         List<ModelResp> modelWithAuth = Lists.newArrayList();
         if (authTypeEnum.equals(AuthType.ADMIN)) {
-            modelWithAuth = modelResps.stream()
-                    .filter(modelResp -> checkAdminPermission(orgIds, user, modelResp))
-                    .collect(Collectors.toList());
+            modelWithAuth =
+                    modelResps.stream()
+                            .filter(modelResp -> checkAdminPermission(orgIds, user, modelResp))
+                            .collect(Collectors.toList());
         }
         if (authTypeEnum.equals(AuthType.VISIBLE)) {
-            modelWithAuth = modelResps.stream()
-                    .filter(domainResp -> checkDataSeterPermission(orgIds, user, domainResp))
-                    .collect(Collectors.toList());
+            modelWithAuth =
+                    modelResps.stream()
+                            .filter(domainResp -> checkDataSetPermission(orgIds, user, domainResp))
+                            .collect(Collectors.toList());
         }
         return modelWithAuth;
     }
@@ -360,14 +366,16 @@ public class ModelServiceImpl implements ModelService {
         if (CollectionUtils.isEmpty(modelResps)) {
             return modelResps;
         }
-        return modelResps.stream().filter(modelResp ->
-                domainIds.contains(modelResp.getDomainId())).collect(Collectors.toList());
+        return modelResps.stream()
+                .filter(modelResp -> domainIds.contains(modelResp.getDomainId()))
+                .collect(Collectors.toList());
     }
 
     @Override
     public List<ModelResp> getAllModelByDomainIds(List<Long> domainIds) {
         Set<DomainResp> domainResps = domainService.getDomainChildren(domainIds);
-        List<Long> allDomainIds = domainResps.stream().map(DomainResp::getId).collect(Collectors.toList());
+        List<Long> allDomainIds =
+                domainResps.stream().map(DomainResp::getId).collect(Collectors.toList());
         return getModelByDomainIds(allDomainIds);
     }
 
@@ -377,9 +385,9 @@ public class ModelServiceImpl implements ModelService {
         if (modelDO == null) {
             return null;
         }
-        Map<Long, DomainResp> domainRespMap = domainService.getDomainList().stream()
-                .collect(Collectors.toMap(DomainResp::getId, d -> d));
-        return ModelConverter.convert(modelDO, domainRespMap);
+
+        DomainResp domainResp = domainService.getDomain(modelDO.getDomainId());
+        return ModelConverter.convert(modelDO, domainResp);
     }
 
     @Override
@@ -424,13 +432,35 @@ public class ModelServiceImpl implements ModelService {
         if (CollectionUtils.isEmpty(modelDOS)) {
             return;
         }
-        modelDOS = modelDOS.stream()
-                .peek(modelDO -> {
-                    modelDO.setStatus(metaBatchReq.getStatus());
-                    modelDO.setUpdatedAt(new Date());
-                    modelDO.setUpdatedBy(user.getName());
-                })
-                .collect(Collectors.toList());
+        modelDOS =
+                modelDOS.stream()
+                        .peek(
+                                modelDO -> {
+                                    modelDO.setStatus(metaBatchReq.getStatus());
+                                    modelDO.setUpdatedAt(new Date());
+                                    modelDO.setUpdatedBy(user.getName());
+                                    if (StatusEnum.OFFLINE
+                                                    .getCode()
+                                                    .equals(metaBatchReq.getStatus())
+                                            || StatusEnum.DELETED
+                                                    .getCode()
+                                                    .equals(metaBatchReq.getStatus())) {
+                                        metricService.sendMetricEventBatch(
+                                                Lists.newArrayList(modelDO.getId()),
+                                                EventType.DELETE);
+                                        dimensionService.sendDimensionEventBatch(
+                                                Lists.newArrayList(modelDO.getId()),
+                                                EventType.DELETE);
+                                    } else if (StatusEnum.ONLINE
+                                            .getCode()
+                                            .equals(metaBatchReq.getStatus())) {
+                                        metricService.sendMetricEventBatch(
+                                                Lists.newArrayList(modelDO.getId()), EventType.ADD);
+                                        dimensionService.sendDimensionEventBatch(
+                                                Lists.newArrayList(modelDO.getId()), EventType.ADD);
+                                    }
+                                })
+                        .collect(Collectors.toList());
         modelRepository.batchUpdate(modelDOS);
     }
 
@@ -440,12 +470,14 @@ public class ModelServiceImpl implements ModelService {
 
     private List<DateInfoReq> convert(List<DateInfoDO> dateInfoDOList) {
         List<DateInfoReq> dateInfoCommendList = new ArrayList<>();
-        dateInfoDOList.forEach(dateInfoDO -> {
-            DateInfoReq dateInfoCommend = new DateInfoReq();
-            BeanUtils.copyProperties(dateInfoDO, dateInfoCommend);
-            dateInfoCommend.setUnavailableDateList(JsonUtil.toList(dateInfoDO.getUnavailableDateList(), String.class));
-            dateInfoCommendList.add(dateInfoCommend);
-        });
+        dateInfoDOList.forEach(
+                dateInfoDO -> {
+                    DateInfoReq dateInfoCommend = new DateInfoReq();
+                    BeanUtils.copyProperties(dateInfoDO, dateInfoCommend);
+                    dateInfoCommend.setUnavailableDateList(
+                            JsonUtil.toList(dateInfoDO.getUnavailableDateList(), String.class));
+                    dateInfoCommendList.add(dateInfoCommend);
+                });
         return dateInfoCommendList;
     }
 
@@ -470,7 +502,8 @@ public class ModelServiceImpl implements ModelService {
         return false;
     }
 
-    public static boolean checkDataSeterPermission(Set<String> orgIds, User user, ModelResp modelResp) {
+    public static boolean checkDataSetPermission(
+            Set<String> orgIds, User user, ModelResp modelResp) {
         if (checkAdminPermission(orgIds, user, modelResp)) {
             return true;
         }
@@ -496,5 +529,4 @@ public class ModelServiceImpl implements ModelService {
         }
         return false;
     }
-
 }

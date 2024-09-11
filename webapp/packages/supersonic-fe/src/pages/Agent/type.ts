@@ -27,7 +27,7 @@ export const AGENT_TOOL_TYPE_LIST = [
 
 export enum QueryModeEnum {
   METRIC = 'METRIC',
-  TAG = 'TAG',
+  DETAIL = 'DETAIL',
 }
 
 export const QUERY_MODE_LIST = [
@@ -36,8 +36,8 @@ export const QUERY_MODE_LIST = [
     value: QueryModeEnum.METRIC,
   },
   {
-    label: '标签模式',
-    value: QueryModeEnum.TAG,
+    label: '明细模式',
+    value: QueryModeEnum.DETAIL,
   },
 ];
 
@@ -56,6 +56,35 @@ export type AgentConfigType = {
   tools: AgentToolType[];
 };
 
+export type LlmConfigType = {
+  provider: string;
+  baseUrl: string;
+  apiKey: string;
+  modelName: string;
+  temperature: number;
+  timeOut: number;
+};
+
+// export type EmbeddingModelConfigType = {
+//   apiKey: string;
+//   baseUrl: string;
+//   // logRequests: true,
+//   // logResponses: true,
+//   // maxRetries: number,
+//   // maxToken: number,
+//   modelName: string;
+//   modelPath: string;
+//   provider: string;
+//   vocabularyPath: string;
+// };
+
+export type MultiTurnConfig = {
+  enableMultiTurn: boolean;
+};
+export type VisualConfig = {
+  defaultShowType: string;
+};
+
 export type AgentType = {
   id?: number;
   name?: string;
@@ -68,6 +97,9 @@ export type AgentType = {
   status?: 0 | 1;
   enableSearch?: 0 | 1;
   agentConfig?: AgentConfigType;
+  modelConfig: LlmConfigType;
+  multiTurnConfig?: MultiTurnConfig;
+  visualConfig?: VisualConfig;
 };
 
 export type ModelType = {
@@ -82,4 +114,32 @@ export type MetricType = {
   id: number;
   name: string;
   bizName: string;
+};
+
+export enum StatusEnum {
+  PENDING = 'PENDING',
+  ENABLED = 'ENABLED',
+  DISABLED = 'DISABLED',
+}
+
+export enum ReviewEnum {
+  POSITIVE = 'POSITIVE',
+  NEGATIVE = 'NEGATIVE',
+}
+
+export type MemoryType = {
+  id: number;
+  question: string;
+  agent_id: number;
+  db_schema: string;
+  s2_sql: string;
+  status: StatusEnum;
+  llm_review: ReviewEnum;
+  llm_comment: string;
+  human_review: ReviewEnum;
+  human_comment: string;
+  created_at: string;
+  updated_at: string;
+  created_by: string;
+  updated_by: string;
 };

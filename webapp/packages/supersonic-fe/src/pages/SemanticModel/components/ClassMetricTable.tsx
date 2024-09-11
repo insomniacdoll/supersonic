@@ -2,10 +2,8 @@ import type { ActionType, ProColumns } from '@ant-design/pro-components';
 import { ProTable } from '@ant-design/pro-components';
 import { message, Button, Space, Popconfirm, Input, Select, Tag } from 'antd';
 import React, { useRef, useState, useEffect } from 'react';
-import type { Dispatch } from 'umi';
-import { StatusEnum } from '../enum';
-import { connect, history } from 'umi';
-import type { StateType } from '../model';
+import { StatusEnum, SemanticNodeType } from '../enum';
+import { useModel } from '@umijs/max';
 import { SENSITIVE_LEVEL_ENUM, SENSITIVE_LEVEL_OPTIONS, TAG_DEFINE_TYPE } from '../constant';
 import {
   queryMetric,
@@ -18,6 +16,7 @@ import {
 } from '../service';
 import MetricInfoCreateForm from './MetricInfoCreateForm';
 import BatchCtrlDropDownButton from '@/components/BatchCtrlDropDownButton';
+import BatchSensitiveLevelModal from '@/components/BatchCtrlDropDownButton/BatchSensitiveLevelModal';
 import TableHeaderFilter from './TableHeaderFilter';
 import styles from './style.less';
 import { ISemantic } from '../data';
@@ -25,12 +24,16 @@ import { ColumnsConfig } from './TableColumnRender';
 
 type Props = {
   onEmptyMetricData?: () => void;
-  dispatch: Dispatch;
-  domainManger: StateType;
 };
 
-const ClassMetricTable: React.FC<Props> = ({ onEmptyMetricData, domainManger, dispatch }) => {
-  const { selectModelId: modelId, selectDomainId } = domainManger;
+const ClassMetricTable: React.FC<Props> = ({ onEmptyMetricData }) => {
+  const domainModel = useModel('SemanticModel.domainData');
+  const modelModel = useModel('SemanticModel.modelData');
+  const metricModel = useModel('SemanticModel.metricData');
+  const { selectDomainId } = domainModel;
+  const { selectModelId: modelId } = modelModel;
+  const { MrefreshMetricList } = metricModel;
+  const [batchSensitiveLevelOpenState, setBatchSensitiveLevelOpenState] = useState<boolean>(false);
   const [createModalVisible, setCreateModalVisible] = useState<boolean>(false);
   const [metricItem, setMetricItem] = useState<ISemantic.IMetricItem>();
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
@@ -60,12 +63,7 @@ const ClassMetricTable: React.FC<Props> = ({ onEmptyMetricData, domainManger, di
     });
     if (code === 200) {
       queryMetricList({ ...filterParams, ...defaultPagination });
-      dispatch({
-        type: 'domainManger/queryMetricList',
-        payload: {
-          modelId,
-        },
-      });
+      MrefreshMetricList({ modelId });
       return;
     }
     message.error(msg);
@@ -87,12 +85,7 @@ const ClassMetricTable: React.FC<Props> = ({ onEmptyMetricData, domainManger, di
     setLoading(false);
     if (code === 200) {
       queryMetricList({ ...filterParams, ...defaultPagination });
-      dispatch({
-        type: 'domainManger/queryMetricList',
-        payload: {
-          modelId,
-        },
-      });
+      MrefreshMetricList({ modelId });
       return;
     }
     message.error(msg);
@@ -108,12 +101,7 @@ const ClassMetricTable: React.FC<Props> = ({ onEmptyMetricData, domainManger, di
     });
     if (code === 200) {
       queryMetricList({ ...filterParams, ...defaultPagination });
-      dispatch({
-        type: 'domainManger/queryMetricList',
-        payload: {
-          modelId,
-        },
-      });
+      MrefreshMetricList({ modelId });
       return;
     }
     message.error(msg);
@@ -121,9 +109,12 @@ const ClassMetricTable: React.FC<Props> = ({ onEmptyMetricData, domainManger, di
 
   useEffect(() => {
     queryMetricList({ ...filterParams, ...defaultPagination });
-  }, [filterParams]);
+  }, [filterParams, modelId]);
 
   const queryMetricList = async (params: any) => {
+    if (!modelId) {
+      return;
+    }
     setLoading(true);
     const { code, data, msg } = await queryMetric({
       ...pagination,
@@ -151,7 +142,7 @@ const ClassMetricTable: React.FC<Props> = ({ onEmptyMetricData, domainManger, di
     }
   };
 
-  const columnsConfig = ColumnsConfig();
+  const columnsConfig = ColumnsConfig({ indicatorInfo: { url: '/model/metric/edit/' } });
 
   const columns: ProColumns[] = [
     {
@@ -324,6 +315,9 @@ const ClassMetricTable: React.FC<Props> = ({ onEmptyMetricData, domainManger, di
       case 'batchUnPublish':
         queryBatchUpdatePublish(selectedRowKeys, false);
         break;
+      case 'batchSensitiveLevel':
+        setBatchSensitiveLevelOpenState(true);
+        break;
       default:
         break;
     }
@@ -461,7 +455,12 @@ const ClassMetricTable: React.FC<Props> = ({ onEmptyMetricData, domainManger, di
           <BatchCtrlDropDownButton
             key="ctrlBtnList"
             downloadLoading={downloadLoading}
-            extenderList={['batchPublish', 'batchUnPublish', 'exportTagButton']}
+            extenderList={[
+              'batchSensitiveLevel',
+              'batchPublish',
+              'batchUnPublish',
+              'exportTagButton',
+            ]}
             onDeleteConfirm={() => {
               queryBatchUpdateStatus(selectedRowKeys, StatusEnum.DELETED);
             }}
@@ -481,21 +480,28 @@ const ClassMetricTable: React.FC<Props> = ({ onEmptyMetricData, domainManger, di
           onSubmit={() => {
             setCreateModalVisible(false);
             queryMetricList({ ...filterParams, ...defaultPagination });
-            dispatch({
-              type: 'domainManger/queryMetricList',
-              payload: {
-                modelId,
-              },
-            });
+            MrefreshMetricList({ modelId });
           }}
           onCancel={() => {
             setCreateModalVisible(false);
           }}
         />
       )}
+      {batchSensitiveLevelOpenState && (
+        <BatchSensitiveLevelModal
+          ids={selectedRowKeys as number[]}
+          open={batchSensitiveLevelOpenState}
+          type={SemanticNodeType.METRIC}
+          onCancel={() => {
+            setBatchSensitiveLevelOpenState(false);
+          }}
+          onSubmit={() => {
+            queryMetricList({ ...filterParams, ...pagination });
+            setBatchSensitiveLevelOpenState(false);
+          }}
+        />
+      )}
     </>
   );
 };
-export default connect(({ domainManger }: { domainManger: StateType }) => ({
-  domainManger,
-}))(ClassMetricTable);
+export default ClassMetricTable;

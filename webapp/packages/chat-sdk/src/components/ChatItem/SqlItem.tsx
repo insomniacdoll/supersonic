@@ -3,12 +3,16 @@ import { format } from 'sql-formatter';
 import { CopyToClipboard } from 'react-copy-to-clipboard';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { solarizedlight } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import { message } from 'antd';
+import { Button, message } from 'antd';
 import { PREFIX_CLS } from '../../common/constants';
-import { CheckCircleFilled, UpOutlined } from '@ant-design/icons';
+import { CheckCircleFilled, DownloadOutlined, UpOutlined } from '@ant-design/icons';
 import { SqlInfoType } from '../../common/type';
+import { exportTextFile } from '../../utils/utils';
 
 type Props = {
+  agentId?: number;
+  queryId: number;
+  question: string;
   llmReq?: any;
   llmResp?: any;
   integrateSystem?: string;
@@ -18,6 +22,9 @@ type Props = {
 };
 
 const SqlItem: React.FC<Props> = ({
+  agentId,
+  queryId,
+  question,
   llmReq,
   llmResp,
   integrateSystem,
@@ -38,13 +45,111 @@ const SqlItem: React.FC<Props> = ({
     setSqlType('');
   };
 
-  if (!llmReq && !sqlInfo.s2SQL && !sqlInfo.correctS2SQL && !sqlInfo.querySQL) {
+  if (!llmReq && !sqlInfo.parsedS2SQL && !sqlInfo.correctedS2SQL && !sqlInfo.querySQL) {
     return null;
   }
 
   const { schema, linking, priorExts } = llmReq || {};
 
   const fewShots = (Object.values(llmResp?.sqlRespMap || {})[0] as any)?.fewShots || [];
+
+  const getSchemaMapText = () => {
+    return `
+Schema映射
+${schema?.fieldNameList?.length > 0 ? `名称：${schema.fieldNameList.join('、')}` : ''}${
+      linking?.length > 0
+        ? `
+取值：${linking
+            .map((item: any) => {
+              return `${item.fieldName}: ${item.fieldValue}`;
+            })
+            .join('、')}`
+        : ''
+    }${
+      priorExts
+        ? `
+附加：${priorExts}`
+        : ''
+    }${
+      schema?.terms?.length > 0
+        ? `
+术语：${schema.terms
+            .map((item: any) => {
+              return `${item.name}${item.alias?.length > 0 ? `(${item.alias.join(',')})` : ''}: ${
+                item.description
+              }`;
+            })
+            .join('、')}`
+        : ''
+    }
+
+`;
+  };
+
+  const getFewShotText = () => {
+    return `
+Few-shot示例${fewShots
+      .map((item: any, index: number) => {
+        return `
+
+示例${index + 1}：
+问题：${item.question}
+SQL：
+${format(item.sql)}
+`;
+      })
+      .join('')}
+`;
+  };
+
+  const getParsedS2SQLText = () => {
+    return `
+${queryMode === 'LLM_S2SQL' || queryMode === 'PLAIN_TEXT' ? 'LLM' : 'Rule'}解析S2SQL
+
+${format(sqlInfo.parsedS2SQL)}
+`;
+  };
+
+  const getCorrectedS2SQLText = () => {
+    return `
+修正S2SQL
+
+${format(sqlInfo.correctedS2SQL)}
+`;
+  };
+
+  const getQuerySQLText = () => {
+    return `
+最终执行SQL
+
+${format(sqlInfo.querySQL)}
+`;
+  };
+
+  const onExportLog = () => {
+    let text = '';
+    if (question) {
+      text += `
+问题：${question}
+`;
+    }
+    if (llmReq) {
+      text += getSchemaMapText();
+    }
+    if (fewShots.length > 0) {
+      text += getFewShotText();
+    }
+    if (sqlInfo.parsedS2SQL) {
+      text += getParsedS2SQLText();
+    }
+    if (sqlInfo.correctedS2SQL) {
+      text += getCorrectedS2SQLText();
+    }
+    if (sqlInfo.querySQL) {
+      text += getQuerySQLText();
+    }
+    exportTextFile(text, `supersonic-debug-${agentId}-${queryId}.log`);
+  };
 
   return (
     <div className={`${tipPrefixCls}-parse-tip`}>
@@ -87,25 +192,25 @@ const SqlItem: React.FC<Props> = ({
               Few-shot示例
             </div>
           )}
-          {sqlInfo.s2SQL && (
+          {sqlInfo.parsedS2SQL && (
             <div
               className={`${tipPrefixCls}-content-option ${
-                sqlType === 's2SQL' ? `${tipPrefixCls}-content-option-active` : ''
+                sqlType === 'parsedS2SQL' ? `${tipPrefixCls}-content-option-active` : ''
               }`}
               onClick={() => {
-                setSqlType(sqlType === 's2SQL' ? '' : 's2SQL');
+                setSqlType(sqlType === 'parsedS2SQL' ? '' : 'parsedS2SQL');
               }}
             >
-              {queryMode === 'LLM_S2SQL' ? 'LLM' : 'Rule'}解析S2SQL
+              {queryMode === 'LLM_S2SQL' || queryMode === 'PLAIN_TEXT' ? 'LLM' : 'Rule'}解析S2SQL
             </div>
           )}
-          {sqlInfo.correctS2SQL && (
+          {sqlInfo.correctedS2SQL && (
             <div
               className={`${tipPrefixCls}-content-option ${
-                sqlType === 'correctS2SQL' ? `${tipPrefixCls}-content-option-active` : ''
+                sqlType === 'correctedS2SQL' ? `${tipPrefixCls}-content-option-active` : ''
               }`}
               onClick={() => {
-                setSqlType(sqlType === 'correctS2SQL' ? '' : 'correctS2SQL');
+                setSqlType(sqlType === 'correctedS2SQL' ? '' : 'correctedS2SQL');
               }}
             >
               修正S2SQL
@@ -123,6 +228,10 @@ const SqlItem: React.FC<Props> = ({
               最终执行SQL
             </div>
           )}
+          <Button className={`${prefixCls}-export-log`} size="small" onClick={onExportLog}>
+            <DownloadOutlined />
+            导出日志
+          </Button>
         </div>
       </div>
       <div
@@ -162,6 +271,20 @@ const SqlItem: React.FC<Props> = ({
                 <div className={`${prefixCls}-schema-content`}>{priorExts}</div>
               </div>
             )}
+            {schema?.terms?.length > 0 && (
+              <div className={`${prefixCls}-schema-row`}>
+                <div className={`${prefixCls}-schema-title`}>术语：</div>
+                <div className={`${prefixCls}-schema-content`}>
+                  {schema.terms
+                    .map((item: any) => {
+                      return `${item.name}${
+                        item.alias?.length > 0 ? `(${item.alias.join(',')})` : ''
+                      }: ${item.description}`;
+                    })
+                    .join('、')}
+                </div>
+              </div>
+            )}
           </div>
         )}
         {sqlType === 'fewShots' && (
@@ -173,9 +296,7 @@ const SqlItem: React.FC<Props> = ({
                   <div className={`${prefixCls}-few-shot-content`}>
                     <div className={`${prefixCls}-few-shot-content-item`}>
                       <div className={`${prefixCls}-few-shot-content-title`}>问题：</div>
-                      <div className={`${prefixCls}-few-shot-content-text`}>
-                        {item.questionAugmented}
-                      </div>
+                      <div className={`${prefixCls}-few-shot-content-text`}>{item.question}</div>
                     </div>
                     <div className={`${prefixCls}-few-shot-content-item`}>
                       <div className={`${prefixCls}-few-shot-content-title`}>SQL：</div>

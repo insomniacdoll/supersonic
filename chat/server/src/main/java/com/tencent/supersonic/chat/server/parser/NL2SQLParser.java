@@ -1,164 +1,114 @@
 package com.tencent.supersonic.chat.server.parser;
 
-import com.tencent.supersonic.chat.server.persistence.repository.ChatQueryRepository;
-import com.tencent.supersonic.chat.server.pojo.ChatParseContext;
+import com.tencent.supersonic.chat.api.pojo.response.QueryResp;
+import com.tencent.supersonic.chat.server.agent.MultiTurnConfig;
+import com.tencent.supersonic.chat.server.plugin.PluginQueryManager;
+import com.tencent.supersonic.chat.server.pojo.ChatContext;
+import com.tencent.supersonic.chat.server.pojo.ParseContext;
+import com.tencent.supersonic.chat.server.service.ChatContextService;
+import com.tencent.supersonic.chat.server.service.ChatManageService;
 import com.tencent.supersonic.chat.server.util.QueryReqConverter;
+import com.tencent.supersonic.common.config.EmbeddingConfig;
+import com.tencent.supersonic.common.pojo.Text2SQLExemplar;
+import com.tencent.supersonic.common.service.impl.ExemplarServiceImpl;
 import com.tencent.supersonic.common.util.ContextUtils;
-import com.tencent.supersonic.common.util.JsonUtil;
-import com.tencent.supersonic.headless.api.pojo.SchemaMapInfo;
+import com.tencent.supersonic.headless.api.pojo.SchemaElement;
+import com.tencent.supersonic.headless.api.pojo.SchemaElementMatch;
+import com.tencent.supersonic.headless.api.pojo.SchemaElementType;
 import com.tencent.supersonic.headless.api.pojo.SemanticParseInfo;
-import com.tencent.supersonic.headless.api.pojo.request.QueryReq;
+import com.tencent.supersonic.headless.api.pojo.request.QueryFilter;
+import com.tencent.supersonic.headless.api.pojo.request.QueryNLReq;
+import com.tencent.supersonic.headless.api.pojo.response.MapResp;
 import com.tencent.supersonic.headless.api.pojo.response.ParseResp;
-import com.tencent.supersonic.headless.core.chat.mapper.SchemaMapper;
-import com.tencent.supersonic.headless.core.chat.parser.llm.LLMRequestService;
-import com.tencent.supersonic.headless.core.chat.parser.llm.RewriteQueryGeneration;
-import com.tencent.supersonic.headless.core.chat.query.llm.s2sql.LLMReq;
-import com.tencent.supersonic.headless.core.chat.query.llm.s2sql.LLMSqlQuery;
-import com.tencent.supersonic.headless.core.pojo.QueryContext;
-import com.tencent.supersonic.headless.server.service.ChatQueryService;
+import com.tencent.supersonic.headless.api.pojo.response.QueryState;
+import com.tencent.supersonic.headless.server.facade.service.ChatLayerService;
+import dev.langchain4j.data.message.AiMessage;
+import dev.langchain4j.model.chat.ChatLanguageModel;
+import dev.langchain4j.model.input.Prompt;
+import dev.langchain4j.model.input.PromptTemplate;
+import dev.langchain4j.model.output.Response;
+import dev.langchain4j.provider.ModelProvider;
+import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.util.CollectionUtils;
 
-import java.util.List;
-import java.util.Collections;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-
+import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 
-
-import com.tencent.supersonic.headless.server.service.impl.ChatQueryServiceImpl;
-import com.tencent.supersonic.headless.server.utils.ComponentFactory;
-import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.collections.MapUtils;
-import org.apache.commons.lang3.StringUtils;
-import org.springframework.core.env.Environment;
-
-import static com.tencent.supersonic.common.pojo.Constants.CONTEXT;
+import static com.tencent.supersonic.chat.server.parser.ParserConfig.PARSER_MULTI_TURN_ENABLE;
 
 @Slf4j
-public class NL2SQLParser implements ChatParser {
+public class NL2SQLParser implements ChatQueryParser {
 
-    private int contextualNum = 5;
+    private static final Logger keyPipelineLog = LoggerFactory.getLogger("keyPipeline");
 
-    private List<SchemaMapper> schemaMappers = ComponentFactory.getSchemaMappers();
+    private static final String REWRITE_USER_QUESTION_INSTRUCTION =
+            ""
+                    + "#Role: You are a data product manager experienced in data requirements."
+                    + "#Task: Your will be provided with current and history questions asked by a user,"
+                    + "along with their mapped schema elements(metric, dimension and value),"
+                    + "please try understanding the semantics and rewrite a question."
+                    + "#Rules: "
+                    + "1.ALWAYS keep relevant entities, metrics, dimensions, values and date ranges."
+                    + "2.ONLY respond with the rewritten question."
+                    + "#Current Question: {{current_question}}"
+                    + "#Current Mapped Schema: {{current_schema}}"
+                    + "#History Question: {{history_question}}"
+                    + "#History Mapped Schema: {{history_schema}}"
+                    + "#History SQL: {{history_sql}}"
+                    + "#Rewritten Question: ";
+
+    private static final String REWRITE_ERROR_MESSAGE_INSTRUCTION =
+            ""
+                    + "#Role: You are a data business partner who closely interacts with business people.\n"
+                    + "#Task: Your will be provided with user input, system output and some examples, "
+                    + "please respond shortly to teach user how to ask the right question, "
+                    + "by using `Examples` as references."
+                    + "#Rules: ALWAYS respond with the same language as the `Input`.\n"
+                    + "#Input: {{user_question}}\n"
+                    + "#Output: {{system_message}}\n"
+                    + "#Examples: {{examples}}\n"
+                    + "#Response: ";
 
     @Override
-    public void parse(ChatParseContext chatParseContext, ParseResp parseResp) {
-        if (!chatParseContext.enableNL2SQL()) {
+    public void parse(ParseContext parseContext, ParseResp parseResp) {
+        if (!parseContext.enableNL2SQL() || checkSkip(parseResp)) {
             return;
         }
-        if (checkSkip(parseResp)) {
-            return;
-        }
-        considerMultiturn(chatParseContext, parseResp);
-        QueryReq queryReq = QueryReqConverter.buildText2SqlQueryReq(chatParseContext);
+        ChatContextService chatContextService = ContextUtils.getBean(ChatContextService.class);
+        ChatContext chatCtx = chatContextService.getOrCreateContext(parseContext.getChatId());
 
-        Environment environment = ContextUtils.getBean(Environment.class);
-        String multiTurn = environment.getProperty("multi.turn");
-        if (StringUtils.isNotBlank(multiTurn) && Boolean.parseBoolean(multiTurn)) {
-            queryReq.setMapInfo(new SchemaMapInfo());
-        }
+        ChatLanguageModel chatLanguageModel =
+                ModelProvider.getChatModel(parseContext.getAgent().getModelConfig());
 
-        ChatQueryService chatQueryService = ContextUtils.getBean(ChatQueryService.class);
-        ParseResp text2SqlParseResp = chatQueryService.performParsing(queryReq);
-        if (!ParseResp.ParseState.FAILED.equals(text2SqlParseResp.getState())) {
+        processMultiTurn(chatLanguageModel, parseContext);
+        QueryNLReq queryNLReq = QueryReqConverter.buildText2SqlQueryReq(parseContext, chatCtx);
+        addDynamicExemplars(parseContext.getAgent().getId(), queryNLReq);
+
+        ChatLayerService chatLayerService = ContextUtils.getBean(ChatLayerService.class);
+        ParseResp text2SqlParseResp = chatLayerService.performParsing(queryNLReq);
+        if (ParseResp.ParseState.COMPLETED.equals(text2SqlParseResp.getState())) {
             parseResp.getSelectedParses().addAll(text2SqlParseResp.getSelectedParses());
-        }
-        parseResp.getParseTimeCost().setSqlTime(text2SqlParseResp.getParseTimeCost().getSqlTime());
-    }
-
-    private void considerMultiturn(ChatParseContext chatParseContext, ParseResp parseResp) {
-        Environment environment = ContextUtils.getBean(Environment.class);
-        RewriteQueryGeneration rewriteQueryGeneration = ContextUtils.getBean(RewriteQueryGeneration.class);
-        String multiTurn = environment.getProperty("multi.turn");
-        String multiNum = environment.getProperty("multi.num");
-        if (StringUtils.isBlank(multiTurn) || !Boolean.parseBoolean(multiTurn)) {
-            return;
-        }
-        log.info("multi turn text-to-sql!");
-        List<ParseResp> contextualList = getContextualList(parseResp, multiNum);
-        List<String> contextualQuestions = getContextualQuestionsWithLink(contextualList);
-        StringBuffer currentPromptSb = new StringBuffer();
-        if (contextualQuestions.size() == 0) {
-            currentPromptSb.append("contextualQuestions:" + "\n");
         } else {
-            currentPromptSb.append("contextualQuestions:" + "\n" + String.join("\n", contextualQuestions) + "\n");
+            parseResp.setErrorMsg(
+                    rewriteErrorMessage(
+                            chatLanguageModel,
+                            parseContext.getQueryText(),
+                            text2SqlParseResp.getErrorMsg(),
+                            queryNLReq.getDynamicExemplars(),
+                            parseContext.getAgent().getExamples()));
         }
-        String currentQuestion = getQueryLinks(chatParseContext);
-        currentPromptSb.append("currentQuestion:" + currentQuestion + "\n");
-        currentPromptSb.append("rewritingCurrentQuestion:\n");
-        String rewriteQuery = rewriteQueryGeneration.generation(currentPromptSb.toString());
-        log.info("rewriteQuery:{}", rewriteQuery);
-        chatParseContext.setQueryText(rewriteQuery);
-    }
-
-    private List<String> getContextualQuestionsWithLink(List<ParseResp> contextualList) {
-        List<String> contextualQuestions = new ArrayList<>();
-        contextualList.stream().forEach(o -> {
-            Map<String, Object> map = JsonUtil.toMap(JsonUtil.toString(
-                    o.getSelectedParses().get(0).getProperties().get(CONTEXT)), String.class, Object.class);
-            LLMReq llmReq = JsonUtil.toObject(JsonUtil.toString(map.get("llmReq")), LLMReq.class);
-            List<LLMReq.ElementValue> linking = llmReq.getLinking();
-            List<String> priorLinkingList = new ArrayList<>();
-            for (LLMReq.ElementValue priorLinking : linking) {
-                String fieldName = priorLinking.getFieldName();
-                String fieldValue = priorLinking.getFieldValue();
-                priorLinkingList.add("‘" + fieldValue + "‘是一个‘" + fieldName + "‘");
-            }
-            String linkingListStr = String.join("，", priorLinkingList);
-            String questionAugmented = String.format("%s (补充信息:%s) ", o.getQueryText(), linkingListStr);
-            contextualQuestions.add(questionAugmented);
-        });
-        return contextualQuestions;
-    }
-
-    private List<ParseResp> getContextualList(ParseResp parseResp, String multiNum) {
-        ChatQueryRepository chatQueryRepository = ContextUtils.getBean(ChatQueryRepository.class);
-        List<ParseResp> contextualParseInfoList = chatQueryRepository.getContextualParseInfo(
-                parseResp.getChatId()).stream().filter(o -> o.getSelectedParses().get(0)
-                .getQueryMode().equals(LLMSqlQuery.QUERY_MODE)
-        ).collect(Collectors.toList());
-        if (StringUtils.isNotBlank(multiNum) && StringUtils.isNumeric(multiNum)) {
-            int num = Integer.parseInt(multiNum);
-            contextualNum = Math.min(contextualNum, num);
-        }
-        List<ParseResp> contextualList = contextualParseInfoList.subList(0,
-                Math.min(contextualNum, contextualParseInfoList.size()));
-        Collections.reverse(contextualList);
-        return contextualList;
-    }
-
-    private String getQueryLinks(ChatParseContext chatParseContext) {
-        QueryReq queryReq = QueryReqConverter.buildText2SqlQueryReq(chatParseContext);
-
-        ChatQueryServiceImpl chatQueryService = ContextUtils.getBean(ChatQueryServiceImpl.class);
-        // build queryContext and chatContext
-        QueryContext queryCtx = chatQueryService.buildQueryContext(queryReq);
-
-        // 1. mapper
-        if (Objects.isNull(chatParseContext.getMapInfo())
-                || MapUtils.isEmpty(chatParseContext.getMapInfo().getDataSetElementMatches())) {
-            schemaMappers.forEach(mapper -> {
-                mapper.map(queryCtx);
-            });
-        }
-        LLMRequestService requestService = ContextUtils.getBean(LLMRequestService.class);
-        Long dataSetId = requestService.getDataSetId(queryCtx);
-        log.info("dataSetId:{}", dataSetId);
-        if (dataSetId == null) {
-            return null;
-        }
-        List<LLMReq.ElementValue> linkingValues = requestService.getValueList(queryCtx, dataSetId);
-        List<String> priorLinkingList = new ArrayList<>();
-        for (LLMReq.ElementValue priorLinking : linkingValues) {
-            String fieldName = priorLinking.getFieldName();
-            String fieldValue = priorLinking.getFieldValue();
-            priorLinkingList.add("‘" + fieldValue + "‘是一个‘" + fieldName + "‘");
-        }
-        String linkingListStr = String.join("，", priorLinkingList);
-        String questionAugmented = String.format("%s (补充信息:%s) ", chatParseContext.getQueryText(), linkingListStr);
-        log.info("questionAugmented:{}", questionAugmented);
-        return questionAugmented;
+        parseResp.setState(text2SqlParseResp.getState());
+        parseResp.getParseTimeCost().setSqlTime(text2SqlParseResp.getParseTimeCost().getSqlTime());
+        formatParseResult(parseResp);
     }
 
     private boolean checkSkip(ParseResp parseResp) {
@@ -171,4 +121,197 @@ public class NL2SQLParser implements ChatParser {
         return false;
     }
 
+    private void formatParseResult(ParseResp parseResp) {
+        List<SemanticParseInfo> selectedParses = parseResp.getSelectedParses();
+        for (SemanticParseInfo parseInfo : selectedParses) {
+            formatParseInfo(parseInfo);
+        }
+    }
+
+    private void formatParseInfo(SemanticParseInfo parseInfo) {
+        if (!PluginQueryManager.isPluginQuery(parseInfo.getQueryMode())) {
+            formatNL2SQLParseInfo(parseInfo);
+        }
+    }
+
+    private void formatNL2SQLParseInfo(SemanticParseInfo parseInfo) {
+        StringBuilder textBuilder = new StringBuilder();
+        textBuilder.append("**数据集:** ").append(parseInfo.getDataSet().getName()).append(" ");
+        Optional<SchemaElement> metric = parseInfo.getMetrics().stream().findFirst();
+        metric.ifPresent(
+                schemaElement ->
+                        textBuilder.append("**指标:** ").append(schemaElement.getName()).append(" "));
+        List<String> dimensionNames =
+                parseInfo.getDimensions().stream()
+                        .map(SchemaElement::getName)
+                        .filter(Objects::nonNull)
+                        .collect(Collectors.toList());
+        if (!CollectionUtils.isEmpty(dimensionNames)) {
+            textBuilder.append("**维度:** ").append(String.join(",", dimensionNames));
+        }
+        textBuilder.append("\n\n**筛选条件:** \n");
+        if (parseInfo.getDateInfo() != null) {
+            textBuilder
+                    .append("**数据时间:** ")
+                    .append(parseInfo.getDateInfo().getStartDate())
+                    .append("~")
+                    .append(parseInfo.getDateInfo().getEndDate())
+                    .append(" ");
+        }
+        if (!CollectionUtils.isEmpty(parseInfo.getDimensionFilters())
+                || CollectionUtils.isEmpty(parseInfo.getMetricFilters())) {
+            Set<QueryFilter> queryFilters = parseInfo.getDimensionFilters();
+            queryFilters.addAll(parseInfo.getMetricFilters());
+            for (QueryFilter queryFilter : queryFilters) {
+                textBuilder
+                        .append("**")
+                        .append(queryFilter.getName())
+                        .append("**")
+                        .append(" ")
+                        .append(queryFilter.getOperator().getValue())
+                        .append(" ")
+                        .append(queryFilter.getValue())
+                        .append(" ");
+            }
+        }
+        parseInfo.setTextInfo(textBuilder.toString());
+    }
+
+    private void processMultiTurn(ChatLanguageModel chatLanguageModel, ParseContext parseContext) {
+        ParserConfig parserConfig = ContextUtils.getBean(ParserConfig.class);
+        MultiTurnConfig agentMultiTurnConfig = parseContext.getAgent().getMultiTurnConfig();
+        Boolean globalMultiTurnConfig =
+                Boolean.valueOf(parserConfig.getParameterValue(PARSER_MULTI_TURN_ENABLE));
+
+        Boolean multiTurnConfig =
+                agentMultiTurnConfig != null
+                        ? agentMultiTurnConfig.isEnableMultiTurn()
+                        : globalMultiTurnConfig;
+        if (!Boolean.TRUE.equals(multiTurnConfig)) {
+            return;
+        }
+
+        // derive mapping result of current question and parsing result of last question.
+        ChatLayerService chatLayerService = ContextUtils.getBean(ChatLayerService.class);
+        QueryNLReq queryNLReq = QueryReqConverter.buildText2SqlQueryReq(parseContext);
+        MapResp currentMapResult = chatLayerService.performMapping(queryNLReq);
+
+        List<QueryResp> historyQueries = getHistoryQueries(parseContext.getChatId(), 1);
+        if (historyQueries.size() == 0) {
+            return;
+        }
+        QueryResp lastQuery = historyQueries.get(0);
+        SemanticParseInfo lastParseInfo = lastQuery.getParseInfos().get(0);
+        Long dataId = lastParseInfo.getDataSetId();
+
+        String curtMapStr =
+                generateSchemaPrompt(currentMapResult.getMapInfo().getMatchedElements(dataId));
+        String histMapStr = generateSchemaPrompt(lastParseInfo.getElementMatches());
+        String histSQL = lastParseInfo.getSqlInfo().getCorrectedS2SQL();
+
+        Map<String, Object> variables = new HashMap<>();
+        variables.put("current_question", currentMapResult.getQueryText());
+        variables.put("current_schema", curtMapStr);
+        variables.put("history_question", lastQuery.getQueryText());
+        variables.put("history_schema", histMapStr);
+        variables.put("history_sql", histSQL);
+
+        Prompt prompt = PromptTemplate.from(REWRITE_USER_QUESTION_INSTRUCTION).apply(variables);
+        keyPipelineLog.info("NL2SQLParser reqPrompt:{}", prompt.text());
+
+        Response<AiMessage> response = chatLanguageModel.generate(prompt.toUserMessage());
+        String rewrittenQuery = response.content().text();
+        keyPipelineLog.info("NL2SQLParser modelResp:{}", rewrittenQuery);
+        parseContext.setQueryText(rewrittenQuery);
+        QueryNLReq rewrittenQueryNLReq = QueryReqConverter.buildText2SqlQueryReq(parseContext);
+        MapResp rewrittenQueryMapResult = chatLayerService.performMapping(rewrittenQueryNLReq);
+        parseContext.setMapInfo(rewrittenQueryMapResult.getMapInfo());
+        log.info(
+                "Last Query: {} Current Query: {}, Rewritten Query: {}",
+                lastQuery.getQueryText(),
+                currentMapResult.getQueryText(),
+                rewrittenQuery);
+    }
+
+    private String rewriteErrorMessage(
+            ChatLanguageModel chatLanguageModel,
+            String userQuestion,
+            String errMsg,
+            List<Text2SQLExemplar> similarExemplars,
+            List<String> agentExamples) {
+        Map<String, Object> variables = new HashMap<>();
+        variables.put("user_question", userQuestion);
+        variables.put("system_message", errMsg);
+
+        StringBuilder exampleStr = new StringBuilder();
+        similarExemplars.forEach(
+                e ->
+                        exampleStr.append(
+                                String.format(
+                                        "<Question:{%s},Schema:{%s}> ",
+                                        e.getQuestion(), e.getDbSchema())));
+        agentExamples.forEach(e -> exampleStr.append(String.format("<Question:{%s}> ", e)));
+        variables.put("examples", exampleStr);
+
+        Prompt prompt = PromptTemplate.from(REWRITE_ERROR_MESSAGE_INSTRUCTION).apply(variables);
+        keyPipelineLog.info("NL2SQLParser reqPrompt:{}", prompt.text());
+        Response<AiMessage> response = chatLanguageModel.generate(prompt.toUserMessage());
+
+        String rewrittenMsg = response.content().text();
+        keyPipelineLog.info("NL2SQLParser modelResp:{}", rewrittenMsg);
+
+        return rewrittenMsg;
+    }
+
+    private String generateSchemaPrompt(List<SchemaElementMatch> elementMatches) {
+        List<String> metrics = new ArrayList<>();
+        List<String> dimensions = new ArrayList<>();
+        List<String> values = new ArrayList<>();
+
+        for (SchemaElementMatch match : elementMatches) {
+            if (match.getElement().getType().equals(SchemaElementType.METRIC)) {
+                metrics.add(match.getWord());
+            } else if (match.getElement().getType().equals(SchemaElementType.DIMENSION)) {
+                dimensions.add(match.getWord());
+            } else if (match.getElement().getType().equals(SchemaElementType.VALUE)) {
+                values.add(match.getWord());
+            }
+        }
+
+        StringBuilder prompt = new StringBuilder();
+        prompt.append(String.format("'metrics:':[%s]", String.join(",", metrics)));
+        prompt.append(",");
+        prompt.append(String.format("'dimensions:':[%s]", String.join(",", dimensions)));
+        prompt.append(",");
+        prompt.append(String.format("'values:':[%s]", String.join(",", values)));
+
+        return prompt.toString();
+    }
+
+    private List<QueryResp> getHistoryQueries(int chatId, int multiNum) {
+        ChatManageService chatManageService = ContextUtils.getBean(ChatManageService.class);
+        List<QueryResp> contextualParseInfoList =
+                chatManageService.getChatQueries(chatId).stream()
+                        .filter(
+                                q ->
+                                        Objects.nonNull(q.getQueryResult())
+                                                && q.getQueryResult().getQueryState()
+                                                        == QueryState.SUCCESS)
+                        .collect(Collectors.toList());
+
+        List<QueryResp> contextualList =
+                contextualParseInfoList.subList(
+                        0, Math.min(multiNum, contextualParseInfoList.size()));
+        Collections.reverse(contextualList);
+        return contextualList;
+    }
+
+    private void addDynamicExemplars(Integer agentId, QueryNLReq queryNLReq) {
+        ExemplarServiceImpl exemplarManager = ContextUtils.getBean(ExemplarServiceImpl.class);
+        EmbeddingConfig embeddingConfig = ContextUtils.getBean(EmbeddingConfig.class);
+        String memoryCollectionName = embeddingConfig.getMemoryCollectionName(agentId);
+        List<Text2SQLExemplar> exemplars =
+                exemplarManager.recallExemplars(memoryCollectionName, queryNLReq.getQueryText(), 5);
+        queryNLReq.getDynamicExemplars().addAll(exemplars);
+    }
 }

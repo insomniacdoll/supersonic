@@ -9,7 +9,9 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
 
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import static com.tencent.supersonic.common.pojo.Constants.UNDERLINE;
 
@@ -35,27 +37,49 @@ public class SemanticSchemaResp {
             return String.format("%s_%s", schemaType, StringUtils.join(modelIds, UNDERLINE));
         }
         return String.format("%s_%s", schemaType, dataSetId);
-
     }
 
     public MetricSchemaResp getMetric(String bizName) {
-        return metrics.stream().filter(metric -> bizName.equalsIgnoreCase(metric.getBizName()))
-                .findFirst().orElse(null);
+        return metrics.stream()
+                .filter(metric -> bizName.equalsIgnoreCase(metric.getBizName()))
+                .findFirst()
+                .orElse(null);
     }
 
     public MetricSchemaResp getMetric(Long id) {
-        return metrics.stream().filter(metric -> id.equals(metric.getId()))
-                .findFirst().orElse(null);
+        return metrics.stream()
+                .filter(metric -> id.equals(metric.getId()))
+                .findFirst()
+                .orElse(null);
     }
 
     public DimSchemaResp getDimension(String bizName) {
-        return dimensions.stream().filter(dimension -> bizName.equalsIgnoreCase(dimension.getBizName()))
-                .findFirst().orElse(null);
+        return dimensions.stream()
+                .filter(dimension -> bizName.equalsIgnoreCase(dimension.getBizName()))
+                .findFirst()
+                .orElse(null);
     }
 
     public DimSchemaResp getDimension(Long id) {
-        return dimensions.stream().filter(dimension -> id.equals(dimension.getId()))
-                .findFirst().orElse(null);
+        return dimensions.stream()
+                .filter(dimension -> id.equals(dimension.getId()))
+                .findFirst()
+                .orElse(null);
     }
 
+    public Set<String> getNameFromBizNames(Set<String> bizNames) {
+        Set<String> names = new HashSet<>();
+        for (String bizName : bizNames) {
+            DimSchemaResp dimSchemaResp = getDimension(bizName);
+            if (dimSchemaResp != null) {
+                names.add(dimSchemaResp.getName());
+                continue;
+            }
+            MetricSchemaResp metricSchemaResp = getMetric(bizName);
+            if (metricSchemaResp != null) {
+                names.add(metricSchemaResp.getName());
+            }
+        }
+        return names;
+    }
 }

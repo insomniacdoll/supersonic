@@ -1,6 +1,9 @@
 package com.tencent.supersonic.auth.authentication.interceptor;
 
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 
+import com.tencent.supersonic.auth.api.authentication.annotation.AuthenticationIgnore;
 import com.tencent.supersonic.auth.api.authentication.config.AuthenticationConfig;
 import com.tencent.supersonic.auth.api.authentication.pojo.User;
 import com.tencent.supersonic.auth.api.authentication.pojo.UserWithPassword;
@@ -13,15 +16,15 @@ import com.tencent.supersonic.common.util.ThreadContext;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.web.method.HandlerMethod;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+
 import java.lang.reflect.Method;
 
 @Slf4j
 public class DefaultAuthenticationInterceptor extends AuthenticationInterceptor {
 
     @Override
-    public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler)
+    public boolean preHandle(
+            HttpServletRequest request, HttpServletResponse response, Object handler)
             throws AccessException {
         authenticationConfig = ContextUtils.getBean(AuthenticationConfig.class);
         userServiceImpl = ContextUtils.getBean(UserServiceImpl.class);
@@ -66,17 +69,17 @@ public class DefaultAuthenticationInterceptor extends AuthenticationInterceptor 
     }
 
     private void setFakerUser(HttpServletRequest request) {
-        String token = userTokenUtils.generateAdminToken();
-        reflectSetparam(request, authenticationConfig.getTokenHttpHeaderKey(), token);
+        String token = userTokenUtils.generateAdminToken(request);
+        reflectSetParam(request, authenticationConfig.getTokenHttpHeaderKey(), token);
         setContext(User.getFakeUser().getName(), request);
     }
 
     private void setContext(String userName, HttpServletRequest request) {
-        ThreadContext threadContext = ThreadContext.builder()
-                .token(request.getHeader(authenticationConfig.getTokenHttpHeaderKey()))
-                .userName(userName)
-                .build();
+        ThreadContext threadContext =
+                ThreadContext.builder()
+                        .token(request.getHeader(authenticationConfig.getTokenHttpHeaderKey()))
+                        .userName(userName)
+                        .build();
         s2ThreadContext.set(threadContext);
     }
-
 }

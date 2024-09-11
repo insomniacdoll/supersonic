@@ -1,15 +1,17 @@
 package com.tencent.supersonic.chat.server.persistence.repository.impl;
 
 import com.alibaba.fastjson.JSONObject;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.github.pagehelper.PageHelper;
 import com.github.pagehelper.PageInfo;
 import com.tencent.supersonic.chat.api.pojo.request.ChatParseReq;
 import com.tencent.supersonic.chat.api.pojo.request.PageQueryInfoReq;
+import com.tencent.supersonic.chat.api.pojo.response.QueryResp;
+import com.tencent.supersonic.chat.api.pojo.response.QueryResult;
 import com.tencent.supersonic.chat.api.pojo.response.SimilarQueryRecallResp;
 import com.tencent.supersonic.chat.server.persistence.dataobject.ChatParseDO;
 import com.tencent.supersonic.chat.server.persistence.dataobject.ChatQueryDO;
-import com.tencent.supersonic.chat.server.persistence.dataobject.ChatQueryDOExample;
-import com.tencent.supersonic.chat.server.persistence.dataobject.ChatQueryDOExample.Criteria;
 import com.tencent.supersonic.chat.server.persistence.mapper.ChatParseMapper;
 import com.tencent.supersonic.chat.server.persistence.mapper.ChatQueryDOMapper;
 import com.tencent.supersonic.chat.server.persistence.mapper.custom.ShowCaseCustomMapper;
@@ -18,11 +20,11 @@ import com.tencent.supersonic.common.util.JsonUtil;
 import com.tencent.supersonic.common.util.PageUtils;
 import com.tencent.supersonic.headless.api.pojo.SemanticParseInfo;
 import com.tencent.supersonic.headless.api.pojo.response.ParseResp;
-import com.tencent.supersonic.chat.api.pojo.response.QueryResp;
-import com.tencent.supersonic.headless.api.pojo.response.QueryResult;
+import com.tencent.supersonic.headless.api.pojo.response.ParseTimeCostResp;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Repository;
 import org.springframework.util.CollectionUtils;
@@ -38,42 +40,37 @@ import java.util.stream.Collectors;
 @Slf4j
 public class ChatQueryRepositoryImpl implements ChatQueryRepository {
 
-    private final ChatQueryDOMapper chatQueryDOMapper;
+    @Autowired private ChatQueryDOMapper chatQueryDOMapper;
 
-    private final ChatParseMapper chatParseMapper;
+    @Autowired private ChatParseMapper chatParseMapper;
 
-    private final ShowCaseCustomMapper showCaseCustomMapper;
-
-    public ChatQueryRepositoryImpl(ChatQueryDOMapper chatQueryDOMapper,
-                                   ChatParseMapper chatParseMapper,
-                                   ShowCaseCustomMapper showCaseCustomMapper) {
-        this.chatQueryDOMapper = chatQueryDOMapper;
-        this.chatParseMapper = chatParseMapper;
-        this.showCaseCustomMapper = showCaseCustomMapper;
-    }
+    @Autowired private ShowCaseCustomMapper showCaseCustomMapper;
 
     @Override
     public PageInfo<QueryResp> getChatQuery(PageQueryInfoReq pageQueryInfoReq, Long chatId) {
-        ChatQueryDOExample example = new ChatQueryDOExample();
-        example.setOrderByClause("question_id desc");
-        Criteria criteria = example.createCriteria();
+        QueryWrapper<ChatQueryDO> queryWrapper = new QueryWrapper<>();
         if (chatId != null) {
-            criteria.andChatIdEqualTo(chatId);
+            queryWrapper.lambda().eq(ChatQueryDO::getChatId, chatId);
         }
         if (StringUtils.isNotBlank(pageQueryInfoReq.getUserName())) {
-            criteria.andUserNameEqualTo(pageQueryInfoReq.getUserName());
+            queryWrapper.lambda().eq(ChatQueryDO::getUserName, pageQueryInfoReq.getUserName());
         }
         if (!CollectionUtils.isEmpty(pageQueryInfoReq.getIds())) {
-            criteria.andQuestionIdIn(pageQueryInfoReq.getIds());
+            queryWrapper.lambda().in(ChatQueryDO::getQuestionId, pageQueryInfoReq.getIds());
         }
-        PageInfo<ChatQueryDO> pageInfo = PageHelper.startPage(pageQueryInfoReq.getCurrent(),
-                        pageQueryInfoReq.getPageSize())
-                .doSelectPageInfo(() -> chatQueryDOMapper.selectByExampleWithBLOBs(example));
+        queryWrapper.lambda().isNotNull(ChatQueryDO::getQueryResult);
+        queryWrapper.lambda().ne(ChatQueryDO::getQueryResult, "");
+        queryWrapper.lambda().orderByDesc(ChatQueryDO::getQuestionId);
+
+        PageInfo<ChatQueryDO> pageInfo =
+                PageHelper.startPage(pageQueryInfoReq.getCurrent(), pageQueryInfoReq.getPageSize())
+                        .doSelectPageInfo(() -> chatQueryDOMapper.selectList(queryWrapper));
 
         PageInfo<QueryResp> chatQueryVOPageInfo = PageUtils.pageInfo2PageInfoVo(pageInfo);
         chatQueryVOPageInfo.setList(
-                pageInfo.getList().stream().filter(o -> !StringUtils.isEmpty(o.getQueryResult())).map(this::convertTo)
+                pageInfo.getList().stream()
                         .sorted(Comparator.comparingInt(o -> o.getQuestionId().intValue()))
+                        .map(this::convertTo)
                         .collect(Collectors.toList()));
         return chatQueryVOPageInfo;
     }
@@ -89,27 +86,46 @@ public class ChatQueryRepositoryImpl implements ChatQueryRepository {
 
     @Override
     public ChatQueryDO getChatQueryDO(Long queryId) {
-        return chatQueryDOMapper.selectByPrimaryKey(queryId);
+        return chatQueryDOMapper.selectById(queryId);
+    }
+
+    @Override
+    public List<QueryResp> getChatQueries(Integer chatId) {
+        QueryWrapper<ChatQueryDO> queryWrapper = new QueryWrapper<>();
+        queryWrapper.lambda().eq(ChatQueryDO::getChatId, chatId);
+        queryWrapper.lambda().orderByDesc(ChatQueryDO::getQuestionId);
+        return chatQueryDOMapper.selectList(queryWrapper).stream()
+                .map(q -> convertTo(q))
+                .collect(Collectors.toList());
     }
 
     @Override
     public List<QueryResp> queryShowCase(PageQueryInfoReq pageQueryInfoReq, int agentId) {
-        return showCaseCustomMapper.queryShowCase(pageQueryInfoReq.getLimitStart(),
-                        pageQueryInfoReq.getPageSize(), agentId, pageQueryInfoReq.getUserName())
-                .stream().map(this::convertTo)
+        return showCaseCustomMapper
+                .queryShowCase(
+                        pageQueryInfoReq.getLimitStart(),
+                        pageQueryInfoReq.getPageSize(),
+                        agentId,
+                        pageQueryInfoReq.getUserName())
+                .stream()
+                .map(this::convertTo)
                 .collect(Collectors.toList());
     }
 
     private QueryResp convertTo(ChatQueryDO chatQueryDO) {
         QueryResp queryResp = new QueryResp();
         BeanUtils.copyProperties(chatQueryDO, queryResp);
-        QueryResult queryResult = JsonUtil.toObject(chatQueryDO.getQueryResult(), QueryResult.class);
+        QueryResult queryResult =
+                JsonUtil.toObject(chatQueryDO.getQueryResult(), QueryResult.class);
         if (queryResult != null) {
             queryResult.setQueryId(chatQueryDO.getQuestionId());
             queryResp.setQueryResult(queryResult);
         }
-        queryResp.setSimilarQueries(JSONObject.parseArray(chatQueryDO.getSimilarQueries(),
-                SimilarQueryRecallResp.class));
+        queryResp.setSimilarQueries(
+                JSONObject.parseArray(
+                        chatQueryDO.getSimilarQueries(), SimilarQueryRecallResp.class));
+        queryResp.setParseTimeCost(
+                JsonUtil.toObject(chatQueryDO.getParseTimeCost(), ParseTimeCostResp.class));
         return queryResp;
     }
 
@@ -131,8 +147,10 @@ public class ChatQueryRepositoryImpl implements ChatQueryRepository {
     }
 
     @Override
-    public List<ChatParseDO> batchSaveParseInfo(ChatParseReq chatParseReq,
-                                                ParseResp parseResult, List<SemanticParseInfo> candidateParses) {
+    public List<ChatParseDO> batchSaveParseInfo(
+            ChatParseReq chatParseReq,
+            ParseResp parseResult,
+            List<SemanticParseInfo> candidateParses) {
         List<ChatParseDO> chatParseDOList = new ArrayList<>();
         getChatParseDO(chatParseReq, parseResult.getQueryId(), candidateParses, chatParseDOList);
         if (!CollectionUtils.isEmpty(candidateParses)) {
@@ -141,11 +159,14 @@ public class ChatQueryRepositoryImpl implements ChatQueryRepository {
         return chatParseDOList;
     }
 
-    public void getChatParseDO(ChatParseReq chatParseReq, Long queryId,
-                               List<SemanticParseInfo> parses, List<ChatParseDO> chatParseDOList) {
+    public void getChatParseDO(
+            ChatParseReq chatParseReq,
+            Long queryId,
+            List<SemanticParseInfo> parses,
+            List<ChatParseDO> chatParseDOList) {
         for (int i = 0; i < parses.size(); i++) {
             ChatParseDO chatParseDO = new ChatParseDO();
-            chatParseDO.setChatId(Long.valueOf(chatParseReq.getChatId()));
+            chatParseDO.setChatId(chatParseReq.getChatId());
             chatParseDO.setQuestionId(queryId);
             chatParseDO.setQueryText(chatParseReq.getQueryText());
             chatParseDO.setParseInfo(JsonUtil.toString(parses.get(i)));
@@ -161,23 +182,13 @@ public class ChatQueryRepositoryImpl implements ChatQueryRepository {
     }
 
     @Override
-    public ChatQueryDO getLastChatQuery(long chatId) {
-        ChatQueryDOExample example = new ChatQueryDOExample();
-        example.setOrderByClause("question_id desc");
-        example.setLimitEnd(1);
-        example.setLimitStart(0);
-        Criteria criteria = example.createCriteria();
-        criteria.andChatIdEqualTo(chatId);
-        List<ChatQueryDO> chatQueryDOS = chatQueryDOMapper.selectByExampleWithBLOBs(example);
-        if (!CollectionUtils.isEmpty(chatQueryDOS)) {
-            return chatQueryDOS.get(0);
-        }
-        return null;
+    public int updateChatQuery(ChatQueryDO chatQueryDO) {
+        return chatQueryDOMapper.updateById(chatQueryDO);
     }
 
     @Override
-    public int updateChatQuery(ChatQueryDO chatQueryDO) {
-        return chatQueryDOMapper.updateByPrimaryKeyWithBLOBs(chatQueryDO);
+    public void updateChatQuery(ChatQueryDO chatQueryDO, UpdateWrapper<ChatQueryDO> updateWrapper) {
+        chatQueryDOMapper.update(chatQueryDO, updateWrapper);
     }
 
     public ChatParseDO getParseInfo(Long questionId, int parseId) {
@@ -188,23 +199,4 @@ public class ChatQueryRepositoryImpl implements ChatQueryRepository {
     public List<ChatParseDO> getParseInfoList(List<Long> questionIds) {
         return chatParseMapper.getParseInfoList(questionIds);
     }
-
-    @Override
-    public Boolean deleteChatQuery(Long questionId) {
-        return chatQueryDOMapper.deleteByPrimaryKey(questionId);
-    }
-
-    @Override
-    public List<ParseResp> getContextualParseInfo(Integer chatId) {
-        List<ChatParseDO> chatParseDOList = chatParseMapper.getContextualParseInfo(chatId);
-        List<ParseResp> semanticParseInfoList = chatParseDOList.stream().map(parseInfo -> {
-            ParseResp parseResp = new ParseResp(chatId, parseInfo.getQueryText());
-            List<SemanticParseInfo> selectedParses = new ArrayList<>();
-            selectedParses.add(JSONObject.parseObject(parseInfo.getParseInfo(), SemanticParseInfo.class));
-            parseResp.setSelectedParses(selectedParses);
-            return parseResp;
-        }).collect(Collectors.toList());
-        return semanticParseInfoList;
-    }
-
 }

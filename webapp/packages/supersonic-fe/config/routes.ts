@@ -17,6 +17,14 @@ const ROUTES = [
     envEnableList: [ENV_KEY.CHAT],
   },
   {
+    path: '/chat/external',
+    name: 'chat',
+    component: './ChatPage',
+    hideInMenu: true,
+    layout: false,
+    envEnableList: [ENV_KEY.CHAT],
+  },
+  {
     path: '/chat',
     name: 'chat',
     component: './ChatPage',
@@ -41,11 +49,39 @@ const ROUTES = [
     envEnableList: [ENV_KEY.CHAT],
   },
   {
-    path: '/model/:domainId?/:modelId?/:menuKey?',
+    path: '/model/metric/edit/:metricId',
+    name: 'metricEdit',
+    hideInMenu: true,
+    component: './SemanticModel/Metric/Edit',
+    envEnableList: [ENV_KEY.SEMANTIC],
+  },
+  {
+    path: '/model/',
     component: './SemanticModel/DomainManager',
     name: 'semanticModel',
     envEnableList: [ENV_KEY.SEMANTIC],
+    routes: [
+      {
+        path: '/model/:domainId/:modelId',
+        component: './SemanticModel/DomainManager',
+        // name: 'semanticModel',
+        envEnableList: [ENV_KEY.SEMANTIC],
+      },
+      {
+        path: '/model/:domainId/:modelId/:menuKey',
+        component: './SemanticModel/DomainManager',
+        // name: 'semanticModel',
+        envEnableList: [ENV_KEY.SEMANTIC],
+      },
+    ],
   },
+
+  // {
+  //   path: '/model/:domainId/:modelId/:menuKey',
+  //   component: './SemanticModel/DomainManager',
+  //   name: 'semanticModel',
+  //   envEnableList: [ENV_KEY.SEMANTIC],
+  // },
 
   {
     path: '/metric',
@@ -68,6 +104,13 @@ const ROUTES = [
         name: 'metricDetail',
         hideInMenu: true,
         component: './SemanticModel/Metric/Detail',
+        envEnableList: [ENV_KEY.SEMANTIC],
+      },
+      {
+        path: '/metric/detail/edit/:metricId',
+        name: 'metricDetail',
+        hideInMenu: true,
+        component: './SemanticModel/Metric/Edit',
         envEnableList: [ENV_KEY.SEMANTIC],
       },
     ],

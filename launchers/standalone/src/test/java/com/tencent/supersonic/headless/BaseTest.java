@@ -12,9 +12,11 @@ import com.tencent.supersonic.headless.api.pojo.request.QuerySqlReq;
 import com.tencent.supersonic.headless.api.pojo.request.QueryStructReq;
 import com.tencent.supersonic.headless.api.pojo.request.SemanticQueryReq;
 import com.tencent.supersonic.headless.api.pojo.response.SemanticQueryResp;
-import com.tencent.supersonic.headless.server.service.QueryService;
+import com.tencent.supersonic.headless.server.facade.service.SemanticLayerService;
+import com.tencent.supersonic.headless.server.persistence.dataobject.DomainDO;
+import com.tencent.supersonic.headless.server.persistence.repository.DomainRepository;
 import com.tencent.supersonic.util.DataUtils;
-import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.collections.CollectionUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 
 import java.util.ArrayList;
@@ -25,15 +27,16 @@ import static java.time.LocalDate.now;
 
 public class BaseTest extends BaseApplication {
 
-    @Autowired
-    protected QueryService queryService;
+    @Autowired protected SemanticLayerService semanticLayerService;
+
+    @Autowired private DomainRepository domainRepository;
 
     protected SemanticQueryResp queryBySql(String sql) throws Exception {
         return queryBySql(sql, User.getFakeUser());
     }
 
     protected SemanticQueryResp queryBySql(String sql, User user) throws Exception {
-        return queryService.queryByReq(buildQuerySqlReq(sql), user);
+        return semanticLayerService.queryByReq(buildQuerySqlReq(sql), user);
     }
 
     protected SemanticQueryReq buildQuerySqlReq(String sql) {
@@ -76,8 +79,7 @@ public class BaseTest extends BaseApplication {
         return queryStructReq;
     }
 
-    protected QueryStructReq buildQueryStructReq(List<String> groups,
-                                                 Aggregator aggregator) {
+    protected QueryStructReq buildQueryStructReq(List<String> groups, Aggregator aggregator) {
         QueryStructReq queryStructReq = new QueryStructReq();
         for (Long modelId : DataUtils.getMetricAgentIModelIds()) {
             queryStructReq.addModelId(modelId);
@@ -97,4 +99,10 @@ public class BaseTest extends BaseApplication {
         return queryStructReq;
     }
 
+    protected void setDomainNotOpenToAll() {
+        Long s2Domain = 1L;
+        DomainDO domainDO = domainRepository.getDomainById(s2Domain);
+        domainDO.setIsOpen(0);
+        domainRepository.updateDomain(domainDO);
+    }
 }

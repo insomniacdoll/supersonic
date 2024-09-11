@@ -6,18 +6,18 @@ import com.tencent.supersonic.chat.api.pojo.request.ChatExecuteReq;
 import com.tencent.supersonic.chat.api.pojo.request.ChatParseReq;
 import com.tencent.supersonic.chat.api.pojo.request.PageQueryInfoReq;
 import com.tencent.supersonic.chat.api.pojo.response.QueryResp;
+import com.tencent.supersonic.chat.api.pojo.response.QueryResult;
 import com.tencent.supersonic.chat.api.pojo.response.ShowCaseResp;
 import com.tencent.supersonic.chat.server.persistence.dataobject.ChatDO;
 import com.tencent.supersonic.chat.server.persistence.dataobject.ChatParseDO;
 import com.tencent.supersonic.chat.server.persistence.dataobject.ChatQueryDO;
 import com.tencent.supersonic.headless.api.pojo.SemanticParseInfo;
 import com.tencent.supersonic.headless.api.pojo.response.ParseResp;
-import com.tencent.supersonic.headless.api.pojo.response.QueryResult;
 
 import java.util.List;
 
 public interface ChatManageService {
-    Boolean addChat(User user, String chatName, Integer agentId);
+    Long addChat(User user, String chatName, Integer agentId);
 
     List<ChatDO> getAll(String userName, Integer agentId);
 
@@ -35,11 +35,15 @@ public interface ChatManageService {
 
     QueryResp getChatQuery(Long queryId);
 
+    List<QueryResp> getChatQueries(Integer chatId);
+
     ShowCaseResp queryShowCase(PageQueryInfoReq pageQueryInfoReq, int agentId);
 
     ChatQueryDO saveQueryResult(ChatExecuteReq chatExecuteReq, QueryResult queryResult);
 
     int updateQuery(ChatQueryDO chatQueryDO);
+
+    void updateParseCostTime(ParseResp parseResp);
 
     List<ChatParseDO> batchAddParse(ChatParseReq chatParseReq, ParseResp parseResult);
 

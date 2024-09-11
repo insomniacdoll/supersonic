@@ -1,7 +1,5 @@
 package com.tencent.supersonic.util;
 
-import static java.time.LocalDate.now;
-
 import com.alibaba.fastjson.JSONObject;
 import com.google.common.collect.Lists;
 import com.tencent.supersonic.auth.api.authentication.pojo.User;
@@ -15,13 +13,17 @@ import com.tencent.supersonic.common.pojo.DateConf;
 import com.tencent.supersonic.common.pojo.enums.FilterOperatorEnum;
 import com.tencent.supersonic.headless.api.pojo.SchemaElement;
 import com.tencent.supersonic.headless.api.pojo.request.QueryFilter;
+
 import java.util.HashSet;
 import java.util.Set;
+
+import static java.time.LocalDate.now;
 
 public class DataUtils {
 
     public static final Integer metricAgentId = 1;
     public static final Integer tagAgentId = 2;
+    public static final Integer ONE_TURNS_CHAT_ID = 10;
     public static final Integer MULTI_TURNS_CHAT_ID = 11;
     private static final User user_test = User.getFakeUser();
 
@@ -59,13 +61,15 @@ public class DataUtils {
     }
 
     public static SchemaElement getSchemaElement(String name) {
-        return SchemaElement.builder()
-                .name(name)
-                .build();
+        return SchemaElement.builder().name(name).build();
     }
 
-    public static QueryFilter getFilter(String bizName, FilterOperatorEnum filterOperatorEnum,
-            Object value, String name, Long elementId) {
+    public static QueryFilter getFilter(
+            String bizName,
+            FilterOperatorEnum filterOperatorEnum,
+            Object value,
+            String name,
+            Long elementId) {
         QueryFilter filter = new QueryFilter();
         filter.setBizName(bizName);
         filter.setOperator(filterOperatorEnum);
@@ -85,8 +89,12 @@ public class DataUtils {
         return dateInfo;
     }
 
-    public static DateConf getDateConf(DateConf.DateMode dateMode, Integer unit,
-            String period, String startDate, String endDate) {
+    public static DateConf getDateConf(
+            DateConf.DateMode dateMode,
+            Integer unit,
+            String period,
+            String startDate,
+            String endDate) {
         DateConf dateInfo = new DateConf();
         dateInfo.setUnit(unit);
         dateInfo.setDateMode(dateMode);
@@ -96,7 +104,8 @@ public class DataUtils {
         return dateInfo;
     }
 
-    public static DateConf getDateConf(DateConf.DateMode dateMode, String startDate, String endDate) {
+    public static DateConf getDateConf(
+            DateConf.DateMode dateMode, String startDate, String endDate) {
         DateConf dateInfo = new DateConf();
         dateInfo.setDateMode(dateMode);
         dateInfo.setStartDate(startDate);
@@ -104,7 +113,8 @@ public class DataUtils {
         return dateInfo;
     }
 
-    public static DateConf getDateConf(DateConf.DateMode dateMode, String startDate, String endDate, int unit) {
+    public static DateConf getDateConf(
+            DateConf.DateMode dateMode, String startDate, String endDate, int unit) {
         DateConf dateInfo = new DateConf();
         dateInfo.setDateMode(dateMode);
         dateInfo.setStartDate(startDate);
@@ -139,8 +149,14 @@ public class DataUtils {
         RuleParserTool ruleQueryTool = new RuleParserTool();
         ruleQueryTool.setType(AgentToolType.NL2SQL_RULE);
         ruleQueryTool.setDataSetIds(Lists.newArrayList(-1L));
-        ruleQueryTool.setQueryModes(Lists.newArrayList("METRIC_ID", "METRIC_FILTER", "METRIC_MODEL",
-                "TAG_DETAIL", "TAG_LIST_FILTER", "TAG_ID"));
+        ruleQueryTool.setQueryModes(
+                Lists.newArrayList(
+                        "METRIC_ID",
+                        "METRIC_FILTER",
+                        "METRIC_MODEL",
+                        "TAG_DETAIL",
+                        "TAG_LIST_FILTER",
+                        "TAG_ID"));
         return ruleQueryTool;
     }
 

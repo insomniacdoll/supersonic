@@ -1,10 +1,10 @@
 package com.tencent.supersonic.headless.server.pojo;
 
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.List;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Service;
 
 @Service
 @Slf4j
@@ -30,13 +30,6 @@ public class PostgresqlParametersBuilder implements DbParametersBuilder {
         password.setName("password");
         password.setPlaceholder("请输入密码");
         databaseParameters.add(password);
-
-        DatabaseParameter database = new DatabaseParameter();
-        database.setComment("数据库名称");
-        database.setName("database");
-        database.setPlaceholder("请输入数据库名称");
-        database.setRequire(false);
-        databaseParameters.add(database);
         return databaseParameters;
     }
 }

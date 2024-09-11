@@ -13,15 +13,14 @@ import java.util.List;
 
 public class TagObjectTest extends BaseTest {
 
-    @Autowired
-    private TagObjectService tagObjectService;
+    @Autowired private TagObjectService tagObjectService;
 
     @Test
     void testCreateTagObject() throws Exception {
         User user = User.getFakeUser();
         TagObjectReq tagObjectReq = newTagObjectReq();
         TagObjectResp tagObjectResp = tagObjectService.create(tagObjectReq, user);
-        tagObjectService.delete(tagObjectResp.getId(), user);
+        tagObjectService.delete(tagObjectResp.getId(), user, false);
     }
 
     @Test
@@ -32,8 +31,9 @@ public class TagObjectTest extends BaseTest {
         BeanUtils.copyProperties(tagObjectResp, tagObjectReqUpdate);
         tagObjectReqUpdate.setName("艺人1");
         tagObjectService.update(tagObjectReqUpdate, User.getFakeUser());
-        TagObjectResp tagObject = tagObjectService.getTagObject(tagObjectReqUpdate.getId(), User.getFakeUser());
-        tagObjectService.delete(tagObject.getId(), User.getFakeUser());
+        TagObjectResp tagObject =
+                tagObjectService.getTagObject(tagObjectReqUpdate.getId(), User.getFakeUser());
+        tagObjectService.delete(tagObject.getId(), User.getFakeUser(), false);
     }
 
     @Test
@@ -43,7 +43,7 @@ public class TagObjectTest extends BaseTest {
         TagObjectFilter filter = new TagObjectFilter();
         List<TagObjectResp> tagObjects = tagObjectService.getTagObjects(filter, User.getFakeUser());
         tagObjects.size();
-        tagObjectService.delete(tagObjectResp.getId(), User.getFakeUser());
+        tagObjectService.delete(tagObjectResp.getId(), User.getFakeUser(), false);
     }
 
     private TagObjectReq newTagObjectReq() {
@@ -53,5 +53,4 @@ public class TagObjectTest extends BaseTest {
         tagObjectReq.setBizName("new_singer");
         return tagObjectReq;
     }
-
 }

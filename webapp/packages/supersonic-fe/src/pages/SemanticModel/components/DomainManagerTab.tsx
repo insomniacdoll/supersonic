@@ -1,26 +1,18 @@
-import { Tabs, Breadcrumb, Space } from 'antd';
-import React, { useRef, useEffect } from 'react';
-import { connect, history } from 'umi';
-
+import { Tabs, Breadcrumb, Space, Radio } from 'antd';
+import React, { useRef, useEffect, useState } from 'react';
+import { history, useModel } from '@umijs/max';
 import ClassDimensionTable from './ClassDimensionTable';
 import ClassMetricTable from './ClassMetricTable';
 import PermissionSection from './Permission/PermissionSection';
-// import ClassTagTable from '../Insights/components/ClassTagTable';
 import TagObjectTable from '../Insights/components/TagObjectTable';
 import TermTable from '../components/Term/TermTable';
 import OverView from './OverView';
 import styles from './style.less';
-import type { StateType } from '../model';
 import { HomeOutlined, FundViewOutlined } from '@ant-design/icons';
 import { ISemantic } from '../data';
 import SemanticGraphCanvas from '../SemanticGraphCanvas';
-// import HeadlessFlows from '../HeadlessFlows';
-// import SemanticFlows from '../SemanticFlows';
 import RecommendedQuestionsSection from '../components/Entity/RecommendedQuestionsSection';
 import View from '../View';
-// import DatabaseTable from '../components/Database/DatabaseTable';
-
-import type { Dispatch } from 'umi';
 
 type Props = {
   isModel: boolean;
@@ -29,31 +21,29 @@ type Props = {
   handleModelChange: (model?: ISemantic.IModelItem) => void;
   onBackDomainBtnClick?: () => void;
   onMenuChange?: (menuKey: string) => void;
-  domainManger: StateType;
-  dispatch: Dispatch;
 };
 const DomainManagerTab: React.FC<Props> = ({
   isModel,
   activeKey,
   modelList,
-  domainManger,
   handleModelChange,
   onBackDomainBtnClick,
   onMenuChange,
 }) => {
   const initState = useRef<boolean>(false);
   const defaultTabKey = 'metric';
-  const {
-    selectDomainId,
-    selectModelId,
-    selectModelName,
-    selectDomainName,
-    domainData,
-    domainList,
-  } = domainManger;
+
+  const domainModel = useModel('SemanticModel.domainData');
+  const modelModel = useModel('SemanticModel.modelData');
+
+  const { selectDomainId, selectDomainName, selectDomain: domainData, domainList } = domainModel;
+  const { selectModelId, selectModelName } = modelModel;
+
   useEffect(() => {
     initState.current = false;
   }, [selectModelId]);
+
+  const [showModelType, setShowModelType] = useState<string>('list');
 
   const domainListParentIdList: number[] = Array.isArray(domainList)
     ? Array.from(new Set(domainList.map((item) => item.parentId)))
@@ -63,16 +53,21 @@ const DomainManagerTab: React.FC<Props> = ({
     {
       label: '模型管理',
       key: 'overview',
-      hidden: domainData && domainListParentIdList.includes(domainData.id),
-      children: (
-        <OverView
-          key={selectDomainId}
-          modelList={modelList}
-          onModelChange={(model) => {
-            handleModelChange(model);
-          }}
-        />
-      ),
+      // hidden: domainData && domainListParentIdList.includes(domainData.id),
+      children:
+        showModelType === 'list' ? (
+          <OverView
+            modelList={modelList}
+            onModelChange={(model) => {
+              handleModelChange(model);
+            }}
+          />
+        ) : (
+          <div style={{ width: '100%' }} key={selectDomainId}>
+            <SemanticGraphCanvas />
+            {/* <HeadlessFlows /> */}
+          </div>
+        ),
     },
     {
       label: '数据集管理',
@@ -99,17 +94,17 @@ const DomainManagerTab: React.FC<Props> = ({
       hidden: !!domainData?.parentId,
       children: <TermTable />,
     },
-    {
-      label: '画布',
-      key: 'xflow',
-      hidden: domainData && domainListParentIdList.includes(domainData.id),
-      children: (
-        <div style={{ width: '100%' }}>
-          <SemanticGraphCanvas />
-          {/* <HeadlessFlows /> */}
-        </div>
-      ),
-    },
+    // {
+    //   label: '画布',
+    //   key: 'xflow',
+    //   hidden: domainData && domainListParentIdList.includes(domainData.id),
+    //   children: (
+    //     <div style={{ width: '100%' }}>
+    //       <SemanticGraphCanvas />
+    //       {/* <HeadlessFlows /> */}
+    //     </div>
+    //   ),
+    // },
     {
       label: '权限管理',
       key: 'permissonSetting',
@@ -169,7 +164,7 @@ const DomainManagerTab: React.FC<Props> = ({
   };
 
   return (
-    <>
+    <div>
       <Breadcrumb
         className={styles.breadcrumb}
         separator=""
@@ -210,18 +205,34 @@ const DomainManagerTab: React.FC<Props> = ({
       />
       <Tabs
         className={styles.tab}
-        items={!isModel ? tabItem : isModelItem}
+        items={!isModel ? tabItem : selectModelId ? isModelItem : []}
         activeKey={getActiveKey()}
-        destroyInactiveTabPane
+        tabBarExtraContent={{
+          right:
+            getActiveKey() === 'overview' ? (
+              <Radio.Group
+                buttonStyle="solid"
+                value={showModelType}
+                size="small"
+                style={{ marginRight: 25 }}
+                onChange={(e) => {
+                  const showType = e.target.value;
+                  setShowModelType(showType);
+                }}
+              >
+                {showModelType}
+                <Radio.Button value="list">列表</Radio.Button>
+                <Radio.Button value="canvas">画布</Radio.Button>
+              </Radio.Group>
+            ) : undefined,
+        }}
         size="large"
         onChange={(menuKey: string) => {
           onMenuChange?.(menuKey);
         }}
       />
-    </>
+    </div>
   );
 };
 
-export default connect(({ domainManger }: { domainManger: StateType }) => ({
-  domainManger,
-}))(DomainManagerTab);
+export default DomainManagerTab;

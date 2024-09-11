@@ -1,71 +1,41 @@
 import type { ActionType, ProColumns } from '@ant-design/pro-components';
 import { ProTable } from '@ant-design/pro-components';
-import { message, Button, Space, Popconfirm, Input, Select } from 'antd';
+import { message, Button, Space, Popconfirm } from 'antd';
 import React, { useRef, useState, useEffect } from 'react';
-import type { Dispatch } from 'umi';
 import { StatusEnum } from '../../enum';
-import { connect } from 'umi';
-import type { StateType } from '../../model';
-import { SENSITIVE_LEVEL_ENUM, SENSITIVE_LEVEL_OPTIONS } from '../../constant';
-import { getTagObjectList, deleteTagObject, batchUpdateTagStatus } from '../../service';
-
+import { useModel } from '@umijs/max';
+import { getTagObjectList, deleteTagObject } from '../../service';
+import dayjs from 'dayjs';
 import TagObjectCreateForm from './TagObjectCreateForm';
-// import BatchCtrlDropDownButton from '@/components/BatchCtrlDropDownButton';
-import TableHeaderFilter from '../../components/TableHeaderFilter';
-import moment from 'moment';
 import styles from '../style.less';
 import { ISemantic } from '../../data';
 import { ColumnsConfig } from '../../components/TableColumnRender';
 import TagValueSettingModal from './TagValueSettingModal';
 
-type Props = {
-  dispatch: Dispatch;
-  domainManger: StateType;
-};
+type Props = {};
 
-const TagObjectTable: React.FC<Props> = ({ domainManger, dispatch }) => {
-  const { selectModelId: modelId, selectDomainId } = domainManger;
+const TagObjectTable: React.FC<Props> = ({}) => {
+  const domainModel = useModel('SemanticModel.domainData');
+  const modelModel = useModel('SemanticModel.modelData');
+  const { selectDomainId } = domainModel;
+  const { selectModelId: modelId } = modelModel;
   const [createModalVisible, setCreateModalVisible] = useState<boolean>(false);
   const [tagItem, setTagItem] = useState<ISemantic.ITagItem>();
-  const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
+
   const [tableData, setTableData] = useState<ISemantic.ITagItem[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
-  const defaultPagination = {
-    current: 1,
-    pageSize: 20,
-    total: 0,
-  };
-  const [pagination, setPagination] = useState(defaultPagination);
-
-  const [filterParams, setFilterParams] = useState<Record<string, any>>({});
 
   const [tagValueSettingModalVisible, setTagValueSettingModalVisible] = useState<boolean>(false);
 
   const actionRef = useRef<ActionType>();
 
-  const queryBatchUpdateStatus = async (ids: React.Key[], status: StatusEnum) => {
-    if (Array.isArray(ids) && ids.length === 0) {
-      return;
-    }
-    const { code, msg } = await batchUpdateTagStatus({
-      ids,
-      status,
-    });
-    if (code === 200) {
-      queryTagList({ ...filterParams, ...defaultPagination });
-      return;
-    }
-    message.error(msg);
-  };
-
   useEffect(() => {
-    queryTagList({ ...filterParams, ...defaultPagination });
-  }, [filterParams]);
+    queryTagList();
+  }, [selectDomainId]);
 
-  const queryTagList = async (params: any) => {
+  const queryTagList = async () => {
     setLoading(true);
     const { code, data, msg } = await getTagObjectList({
-      ...params,
       domainId: selectDomainId,
       status: StatusEnum.ONLINE,
     });
@@ -90,8 +60,6 @@ const TagObjectTable: React.FC<Props> = ({ domainManger, dispatch }) => {
     {
       dataIndex: 'name',
       title: '标签对象',
-      // width: 280,
-      // width: '30%',
       search: false,
     },
 
@@ -113,15 +81,15 @@ const TagObjectTable: React.FC<Props> = ({ domainManger, dispatch }) => {
 
       search: false,
     },
-    // {
-    //   dataIndex: 'updatedAt',
-    //   title: '更新时间',
+    {
+      dataIndex: 'updatedAt',
+      title: '更新时间',
 
-    //   search: false,
-    //   render: (value: any) => {
-    //     return value && value !== '-' ? moment(value).format('YYYY-MM-DD HH:mm:ss') : '-';
-    //   },
-    // },
+      search: false,
+      render: (value: any) => {
+        return value && value !== '-' ? dayjs(value).format('YYYY-MM-DD HH:mm:ss') : '-';
+      },
+    },
     {
       title: '操作',
       dataIndex: 'x',
@@ -148,7 +116,7 @@ const TagObjectTable: React.FC<Props> = ({ domainManger, dispatch }) => {
                 const { code, msg } = await deleteTagObject(record.id);
                 if (code === 200) {
                   setTagItem(undefined);
-                  queryTagList({ ...filterParams, ...defaultPagination });
+                  queryTagList();
                 } else {
                   message.error(msg);
                 }
@@ -170,66 +138,22 @@ const TagObjectTable: React.FC<Props> = ({ domainManger, dispatch }) => {
     },
   ];
 
-  const rowSelection = {
-    onChange: (selectedRowKeys: React.Key[]) => {
-      setSelectedRowKeys(selectedRowKeys);
-    },
-  };
-
   return (
     <>
       <ProTable
         className={`${styles.classTable} ${styles.classTableSelectColumnAlignLeft} ${styles.disabledSearchTable} `}
         actionRef={actionRef}
-        // headerTitle={
-        //   <TableHeaderFilter
-        //     components={[
-        //       {
-        //         label: '标签搜索',
-        //         component: (
-        //           <Input.Search
-        //             style={{ width: 280 }}
-        //             placeholder="请输入ID/标签名称/英文名称"
-        //             onSearch={(value) => {
-        //               setFilterParams((preState) => {
-        //                 return {
-        //                   ...preState,
-        //                   key: value,
-        //                 };
-        //               });
-        //             }}
-        //           />
-        //         ),
-        //       },
-        //     ]}
-        //   />
-        // }
         rowKey="id"
+        size="small"
         loading={loading}
         search={false}
-        rowSelection={{
-          type: 'checkbox',
-          ...rowSelection,
-        }}
         columns={columns}
         params={{ modelId }}
         dataSource={tableData}
-        // pagination={pagination}
         tableAlertRender={() => {
           return false;
         }}
-        onChange={(data: any) => {
-          const { current, pageSize, total } = data;
-          const currentPagin = {
-            current,
-            pageSize,
-            total,
-          };
-          setPagination(currentPagin);
-          queryTagList({ ...filterParams, ...currentPagin });
-        }}
         sticky={{ offsetHeader: 0 }}
-        size="large"
         options={{ reload: false, density: false, fullScreen: false }}
         toolBarRender={() => [
           <Button
@@ -251,7 +175,7 @@ const TagObjectTable: React.FC<Props> = ({ domainManger, dispatch }) => {
           tagItem={tagItem}
           onSubmit={() => {
             setCreateModalVisible(false);
-            queryTagList({ ...filterParams, ...defaultPagination });
+            queryTagList();
           }}
           onCancel={() => {
             setCreateModalVisible(false);
@@ -273,6 +197,4 @@ const TagObjectTable: React.FC<Props> = ({ domainManger, dispatch }) => {
     </>
   );
 };
-export default connect(({ domainManger }: { domainManger: StateType }) => ({
-  domainManger,
-}))(TagObjectTable);
+export default TagObjectTable;

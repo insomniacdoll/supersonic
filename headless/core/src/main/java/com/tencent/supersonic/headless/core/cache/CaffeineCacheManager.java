@@ -1,10 +1,9 @@
 package com.tencent.supersonic.headless.core.cache;
 
-
 import com.github.benmanes.caffeine.cache.Cache;
 import com.google.common.base.Joiner;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.logging.log4j.util.Strings;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
@@ -13,8 +12,7 @@ import org.springframework.stereotype.Component;
 @Slf4j
 public class CaffeineCacheManager implements CacheManager {
 
-    @Autowired
-    private CacheCommonConfig cacheCommonConfig;
+    @Autowired private CacheCommonConfig cacheCommonConfig;
 
     @Autowired
     @Qualifier("caffeineCache")
@@ -36,11 +34,16 @@ public class CaffeineCacheManager implements CacheManager {
 
     @Override
     public String generateCacheKey(String prefix, String body) {
-        if (Strings.isEmpty(prefix)) {
+        if (StringUtils.isEmpty(prefix)) {
             prefix = "-1";
         }
-        return Joiner.on(":").join(cacheCommonConfig.getCacheCommonApp(), cacheCommonConfig.getCacheCommonEnv(),
-                cacheCommonConfig.getCacheCommonVersion(), prefix, body);
+        return Joiner.on(":")
+                .join(
+                        cacheCommonConfig.getCacheCommonApp(),
+                        cacheCommonConfig.getCacheCommonEnv(),
+                        cacheCommonConfig.getCacheCommonVersion(),
+                        prefix,
+                        body);
     }
 
     @Override

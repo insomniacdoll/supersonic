@@ -1,16 +1,17 @@
 package com.tencent.supersonic.headless.server.service.impl;
 
+import com.github.pagehelper.PageInfo;
 import com.tencent.supersonic.auth.api.authentication.pojo.User;
 import com.tencent.supersonic.common.pojo.Constants;
 import com.tencent.supersonic.common.pojo.enums.StatusEnum;
 import com.tencent.supersonic.common.pojo.enums.TaskStatusEnum;
 import com.tencent.supersonic.headless.api.pojo.request.DictItemFilter;
 import com.tencent.supersonic.headless.api.pojo.request.DictSingleTaskReq;
+import com.tencent.supersonic.headless.api.pojo.request.DictValueReq;
 import com.tencent.supersonic.headless.api.pojo.response.DictItemResp;
 import com.tencent.supersonic.headless.api.pojo.response.DictTaskResp;
-import com.tencent.supersonic.headless.core.file.FileHandler;
-import com.tencent.supersonic.headless.core.chat.knowledge.KnowledgeService;
-import com.tencent.supersonic.headless.core.chat.knowledge.helper.HanlpHelper;
+import com.tencent.supersonic.headless.api.pojo.response.DictValueResp;
+import com.tencent.supersonic.headless.chat.knowledge.file.FileHandler;
 import com.tencent.supersonic.headless.server.persistence.dataobject.DictTaskDO;
 import com.tencent.supersonic.headless.server.persistence.repository.DictRepository;
 import com.tencent.supersonic.headless.server.service.DictTaskService;
@@ -21,7 +22,6 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
 
-import java.io.IOException;
 import java.util.List;
 import java.util.Objects;
 
@@ -31,26 +31,32 @@ public class DictTaskServiceImpl implements DictTaskService {
 
     @Value("${dict.flush.enable:true}")
     private Boolean dictFlushEnable;
+
     @Value("${dict.flush.daily.enable:true}")
     private Boolean dictFlushDailyEnable;
+
     @Value("${dict.file.type:txt}")
     private String dictFileType;
+
     private String dimValue = "DimValue_%d_%d";
 
     private final DictRepository dictRepository;
     private final DictUtils dictConverter;
     private final DictUtils dictUtils;
     private final FileHandler fileHandler;
+    private final DictWordService dictWordService;
 
-    public DictTaskServiceImpl(DictRepository dictRepository,
-                               DictUtils dictConverter,
-                               DictUtils dictUtils,
-                               FileHandler fileHandler,
-                               KnowledgeService knowledgeService) {
+    public DictTaskServiceImpl(
+            DictRepository dictRepository,
+            DictUtils dictConverter,
+            DictUtils dictUtils,
+            FileHandler fileHandler,
+            DictWordService dictWordService) {
         this.dictRepository = dictRepository;
         this.dictConverter = dictConverter;
         this.dictUtils = dictUtils;
         this.fileHandler = fileHandler;
+        this.dictWordService = dictWordService;
     }
 
     @Override
@@ -63,7 +69,8 @@ public class DictTaskServiceImpl implements DictTaskService {
     }
 
     private Long handleDictTaskByItemResp(DictItemResp dictItemResp, User user) {
-        DictTaskDO dictTaskDO = dictConverter.generateDictTaskDO(dictItemResp, user, TaskStatusEnum.PENDING);
+        DictTaskDO dictTaskDO =
+                dictConverter.generateDictTaskDO(dictItemResp, user, TaskStatusEnum.PENDING);
         log.info("[addDictTask] dictTaskDO:{}", dictTaskDO);
         dictRepository.addDictTask(dictTaskDO);
         Long idInDb = dictTaskDO.getId();
@@ -73,10 +80,11 @@ public class DictTaskServiceImpl implements DictTaskService {
     }
 
     private DictItemResp fetchDictItemResp(DictSingleTaskReq taskReq) {
-        DictItemFilter dictItemFilter = DictItemFilter.builder()
-                .itemId(taskReq.getItemId())
-                .type(taskReq.getType())
-                .build();
+        DictItemFilter dictItemFilter =
+                DictItemFilter.builder()
+                        .itemId(taskReq.getItemId())
+                        .type(taskReq.getType())
+                        .build();
         List<DictItemResp> dictItemRespList = dictRepository.queryDictConf(dictItemFilter);
         if (!CollectionUtils.isEmpty(dictItemRespList)) {
             return dictItemRespList.get(0);
@@ -102,13 +110,13 @@ public class DictTaskServiceImpl implements DictTaskService {
 
         // 3.Change in-memory dictionary data in real time
         try {
-            HanlpHelper.reloadCustomDictionary();
+            dictWordService.loadDictWord();
+
             dictTaskDO.setStatus(TaskStatusEnum.SUCCESS.getStatus());
             dictRepository.editDictTask(dictTaskDO);
-        } catch (IOException e) {
+        } catch (Exception e) {
             log.error("reloadCustomDictionary error", e);
         }
-
     }
 
     @Override
@@ -118,12 +126,13 @@ public class DictTaskServiceImpl implements DictTaskService {
         fileHandler.deleteDictFile(fileName);
 
         try {
-            HanlpHelper.reloadCustomDictionary();
+            dictWordService.loadDictWord();
         } catch (Exception e) {
             log.error("reloadCustomDictionary error", e);
         }
         // Add a clear dictionary file record
-        DictTaskDO dictTaskDO = dictConverter.generateDictTaskDO(dictItemResp, user, TaskStatusEnum.INITIAL);
+        DictTaskDO dictTaskDO =
+                dictConverter.generateDictTaskDO(dictItemResp, user, TaskStatusEnum.INITIAL);
         log.info("[addDictTask] dictTaskDO:{}", dictTaskDO);
         dictRepository.addDictTask(dictTaskDO);
         return 0L;
@@ -148,4 +157,31 @@ public class DictTaskServiceImpl implements DictTaskService {
         return dictRepository.queryLatestDictTask(taskReq);
     }
 
+    @Override
+    public PageInfo<DictValueResp> queryDictValue(DictValueReq dictValueReq, User user) {
+        String fileName =
+                String.format(
+                                "dic_value_%d_%s_%s",
+                                dictValueReq.getModelId(),
+                                dictValueReq.getType().name(),
+                                dictValueReq.getItemId())
+                        + Constants.DOT
+                        + dictFileType;
+        PageInfo<DictValueResp> dictValueRespList =
+                fileHandler.queryDictValue(fileName, dictValueReq);
+        return dictValueRespList;
+    }
+
+    @Override
+    public String queryDictFilePath(DictValueReq dictValueReq, User user) {
+        String fileName =
+                String.format(
+                                "dic_value_%d_%s_%s",
+                                dictValueReq.getModelId(),
+                                dictValueReq.getType().name(),
+                                dictValueReq.getItemId())
+                        + Constants.DOT
+                        + dictFileType;
+        return fileHandler.queryDictFilePath(fileName);
+    }
 }

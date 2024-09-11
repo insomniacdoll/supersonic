@@ -1,9 +1,9 @@
 package com.tencent.supersonic.headless.server.pojo;
 
 import com.tencent.supersonic.headless.api.pojo.enums.EngineType;
+
 import java.util.LinkedHashMap;
 import java.util.Map;
-
 
 public class DbParameterFactory {
 
@@ -15,6 +15,7 @@ public class DbParameterFactory {
         parametersBuilder.put(EngineType.CLICKHOUSE.getName(), new ClickHouseParametersBuilder());
         parametersBuilder.put(EngineType.MYSQL.getName(), new MysqlParametersBuilder());
         parametersBuilder.put(EngineType.POSTGRESQL.getName(), new PostgresqlParametersBuilder());
+        parametersBuilder.put(EngineType.OTHER.getName(), new OtherParametersBuilder());
     }
 
     public static DbParametersBuilder get(String engineType) {
@@ -24,5 +25,4 @@ public class DbParameterFactory {
     public static Map<String, DbParametersBuilder> getMap() {
         return parametersBuilder;
     }
-
 }

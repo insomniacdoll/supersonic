@@ -1,12 +1,13 @@
 package com.tencent.supersonic.common.util;
 
+import lombok.extern.slf4j.Slf4j;
+
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.Base64;
 
-
+@Slf4j
 public class MD5Util {
-
 
     public static final int BIT16 = 16;
     public static final int BIT32 = 32;
@@ -44,7 +45,7 @@ public class MD5Util {
                 }
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            log.error("", e);
         }
 
         if (isUpper) {

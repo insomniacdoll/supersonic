@@ -11,20 +11,20 @@ import com.tencent.supersonic.chat.server.plugin.build.WebBase;
 import com.tencent.supersonic.chat.server.plugin.event.PluginAddEvent;
 import com.tencent.supersonic.chat.server.plugin.event.PluginDelEvent;
 import com.tencent.supersonic.chat.server.plugin.event.PluginUpdateEvent;
-import com.tencent.supersonic.chat.server.pojo.ChatParseContext;
+import com.tencent.supersonic.chat.server.pojo.ParseContext;
 import com.tencent.supersonic.chat.server.service.PluginService;
 import com.tencent.supersonic.common.config.EmbeddingConfig;
-import com.tencent.supersonic.common.util.ComponentFactory;
+import com.tencent.supersonic.common.service.EmbeddingService;
 import com.tencent.supersonic.common.util.ContextUtils;
-import com.tencent.supersonic.common.util.embedding.EmbeddingQuery;
-import com.tencent.supersonic.common.util.embedding.Retrieval;
-import com.tencent.supersonic.common.util.embedding.RetrieveQuery;
-import com.tencent.supersonic.common.util.embedding.RetrieveQueryResult;
-import com.tencent.supersonic.common.util.embedding.S2EmbeddingStore;
 import com.tencent.supersonic.headless.api.pojo.SchemaElement;
 import com.tencent.supersonic.headless.api.pojo.SchemaElementMatch;
 import com.tencent.supersonic.headless.api.pojo.SchemaElementType;
 import com.tencent.supersonic.headless.api.pojo.SchemaMapInfo;
+import dev.langchain4j.data.segment.TextSegment;
+import dev.langchain4j.store.embedding.Retrieval;
+import dev.langchain4j.store.embedding.RetrieveQuery;
+import dev.langchain4j.store.embedding.RetrieveQueryResult;
+import dev.langchain4j.store.embedding.TextSegmentConvert;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.tuple.Pair;
@@ -46,27 +46,33 @@ import java.util.stream.Collectors;
 @Component
 public class PluginManager {
 
-    @Autowired
-    private EmbeddingConfig embeddingConfig;
+    @Autowired private EmbeddingConfig embeddingConfig;
 
-    private S2EmbeddingStore s2EmbeddingStore = ComponentFactory.getS2EmbeddingStore();
+    @Autowired private EmbeddingService embeddingService;
 
-    public static List<Plugin> getPluginAgentCanSupport(ChatParseContext chatParseContext) {
+    public static List<ChatPlugin> getPluginAgentCanSupport(ParseContext parseContext) {
         PluginService pluginService = ContextUtils.getBean(PluginService.class);
-        Agent agent = chatParseContext.getAgent();
-        List<Plugin> plugins = pluginService.getPluginList();
+        Agent agent = parseContext.getAgent();
+        List<ChatPlugin> plugins = pluginService.getPluginList();
         if (Objects.isNull(agent)) {
             return plugins;
         }
-        List<Long> pluginIds = getPluginTools(agent).stream().map(PluginTool::getPlugins)
-                .flatMap(Collection::stream).collect(Collectors.toList());
+        List<Long> pluginIds =
+                getPluginTools(agent).stream()
+                        .map(PluginTool::getPlugins)
+                        .flatMap(Collection::stream)
+                        .collect(Collectors.toList());
         if (CollectionUtils.isEmpty(pluginIds)) {
             return Lists.newArrayList();
         }
-        plugins = plugins.stream().filter(plugin -> pluginIds.contains(plugin.getId()))
-                .collect(Collectors.toList());
-        log.info("plugins witch can be supported by cur agent :{} {}", agent.getName(),
-                plugins.stream().map(Plugin::getName).collect(Collectors.toList()));
+        plugins =
+                plugins.stream()
+                        .filter(plugin -> pluginIds.contains(plugin.getId()))
+                        .collect(Collectors.toList());
+        log.info(
+                "plugins witch can be supported by cur agent :{} {}",
+                agent.getName(),
+                plugins.stream().map(ChatPlugin::getName).collect(Collectors.toList()));
         return plugins;
     }
 
@@ -78,13 +84,14 @@ public class PluginManager {
         if (CollectionUtils.isEmpty(tools)) {
             return Lists.newArrayList();
         }
-        return tools.stream().map(tool -> JSONObject.parseObject(tool, PluginTool.class))
+        return tools.stream()
+                .map(tool -> JSONObject.parseObject(tool, PluginTool.class))
                 .collect(Collectors.toList());
     }
 
     @EventListener
     public void addPlugin(PluginAddEvent pluginAddEvent) {
-        Plugin plugin = pluginAddEvent.getPlugin();
+        ChatPlugin plugin = pluginAddEvent.getPlugin();
         if (CollectionUtils.isNotEmpty(plugin.getExampleQuestionList())) {
             requestEmbeddingPluginAdd(convert(Lists.newArrayList(plugin)));
         }
@@ -92,8 +99,8 @@ public class PluginManager {
 
     @EventListener
     public void updatePlugin(PluginUpdateEvent pluginUpdateEvent) {
-        Plugin oldPlugin = pluginUpdateEvent.getOldPlugin();
-        Plugin newPlugin = pluginUpdateEvent.getNewPlugin();
+        ChatPlugin oldPlugin = pluginUpdateEvent.getOldPlugin();
+        ChatPlugin newPlugin = pluginUpdateEvent.getNewPlugin();
         if (CollectionUtils.isNotEmpty(oldPlugin.getExampleQuestionList())) {
             requestEmbeddingPluginDelete(getEmbeddingId(Lists.newArrayList(oldPlugin)));
         }
@@ -104,7 +111,7 @@ public class PluginManager {
 
     @EventListener
     public void delPlugin(PluginDelEvent pluginDelEvent) {
-        Plugin plugin = pluginDelEvent.getPlugin();
+        ChatPlugin plugin = pluginDelEvent.getPlugin();
         if (CollectionUtils.isNotEmpty(plugin.getExampleQuestionList())) {
             requestEmbeddingPluginDelete(getEmbeddingId(Lists.newArrayList(plugin)));
         }
@@ -116,41 +123,42 @@ public class PluginManager {
         }
         String presetCollection = embeddingConfig.getPresetCollection();
 
-        List<EmbeddingQuery> queries = new ArrayList<>();
+        List<TextSegment> queries = new ArrayList<>();
         for (String id : queryIds) {
-            EmbeddingQuery embeddingQuery = new EmbeddingQuery();
-            embeddingQuery.setQueryId(id);
-            queries.add(embeddingQuery);
+            TextSegment query = TextSegment.from("");
+            TextSegmentConvert.addQueryId(query, id);
+            queries.add(query);
         }
-        s2EmbeddingStore.deleteQuery(presetCollection, queries);
+        embeddingService.deleteQuery(presetCollection, queries);
     }
 
-    public void requestEmbeddingPluginAdd(List<EmbeddingQuery> queries) {
+    public void requestEmbeddingPluginAdd(List<TextSegment> queries) {
         if (CollectionUtils.isEmpty(queries)) {
             return;
         }
         String presetCollection = embeddingConfig.getPresetCollection();
-        s2EmbeddingStore.addQuery(presetCollection, queries);
-    }
-
-    public void requestEmbeddingPluginAddALL(List<Plugin> plugins) {
-        requestEmbeddingPluginAdd(convert(plugins));
+        embeddingService.addQuery(presetCollection, queries);
     }
 
     public RetrieveQueryResult recognize(String embeddingText) {
 
-        RetrieveQuery retrieveQuery = RetrieveQuery.builder()
-                .queryTextsList(Collections.singletonList(embeddingText))
-                .build();
+        RetrieveQuery retrieveQuery =
+                RetrieveQuery.builder()
+                        .queryTextsList(Collections.singletonList(embeddingText))
+                        .build();
 
-        List<RetrieveQueryResult> resultList = s2EmbeddingStore.retrieveQuery(embeddingConfig.getPresetCollection(),
-                retrieveQuery, embeddingConfig.getNResult());
+        List<RetrieveQueryResult> resultList =
+                embeddingService.retrieveQuery(
+                        embeddingConfig.getPresetCollection(),
+                        retrieveQuery,
+                        embeddingConfig.getNResult());
 
         if (CollectionUtils.isNotEmpty(resultList)) {
             for (RetrieveQueryResult embeddingResp : resultList) {
                 List<Retrieval> embeddingRetrievals = embeddingResp.getRetrieval();
                 for (Retrieval embeddingRetrieval : embeddingRetrievals) {
-                    embeddingRetrieval.setId(getPluginIdFromEmbeddingId(embeddingRetrieval.getId()));
+                    embeddingRetrieval.setId(
+                            getPluginIdFromEmbeddingId(embeddingRetrieval.getId()));
                 }
             }
             return resultList.get(0);
@@ -158,15 +166,15 @@ public class PluginManager {
         throw new RuntimeException("get embedding result failed");
     }
 
-    public List<EmbeddingQuery> convert(List<Plugin> plugins) {
-        List<EmbeddingQuery> queries = Lists.newArrayList();
-        for (Plugin plugin : plugins) {
+    public List<TextSegment> convert(List<ChatPlugin> plugins) {
+        List<TextSegment> queries = Lists.newArrayList();
+        for (ChatPlugin plugin : plugins) {
             List<String> exampleQuestions = plugin.getExampleQuestionList();
             int num = 0;
             for (String pattern : exampleQuestions) {
-                EmbeddingQuery query = new EmbeddingQuery();
-                query.setQueryId(generateUniqueEmbeddingId(num, plugin.getId()));
-                query.setQuery(pattern);
+                TextSegment query = TextSegment.from(pattern);
+                TextSegmentConvert.addQueryId(
+                        query, generateUniqueEmbeddingId(num, plugin.getId()));
                 queries.add(query);
                 num++;
             }
@@ -174,15 +182,15 @@ public class PluginManager {
         return queries;
     }
 
-    private Set<String> getEmbeddingId(List<Plugin> plugins) {
+    private Set<String> getEmbeddingId(List<ChatPlugin> plugins) {
         Set<String> embeddingIdSet = new HashSet<>();
-        for (EmbeddingQuery query : convert(plugins)) {
-            embeddingIdSet.add(query.getQueryId());
+        for (TextSegment query : convert(plugins)) {
+            TextSegmentConvert.addQueryId(query, TextSegmentConvert.getQueryId(query));
         }
         return embeddingIdSet;
     }
 
-    //num can not bigger than 100
+    // num can not bigger than 100
     private String generateUniqueEmbeddingId(int num, Long pluginId) {
         if (num < 10) {
             return String.format("%s00%s", pluginId, num);
@@ -195,28 +203,28 @@ public class PluginManager {
         return String.valueOf(Integer.parseInt(id) / 1000);
     }
 
-    public static Pair<Boolean, Set<Long>> resolve(Plugin plugin, ChatParseContext chatParseContext) {
-        SchemaMapInfo schemaMapInfo = chatParseContext.getMapInfo();
-        Set<Long> pluginMatchedModel = getPluginMatchedModel(plugin, chatParseContext);
-        if (CollectionUtils.isEmpty(pluginMatchedModel) && !plugin.isContainsAllModel()) {
+    public static Pair<Boolean, Set<Long>> resolve(ChatPlugin plugin, ParseContext parseContext) {
+        SchemaMapInfo schemaMapInfo = parseContext.getMapInfo();
+        Set<Long> pluginMatchedDataSet = getPluginMatchedDataSet(plugin, parseContext);
+        if (CollectionUtils.isEmpty(pluginMatchedDataSet) && !plugin.isContainsAllDataSet()) {
             return Pair.of(false, Sets.newHashSet());
         }
         List<ParamOption> paramOptions = getSemanticOption(plugin);
         if (CollectionUtils.isEmpty(paramOptions)) {
-            return Pair.of(true, pluginMatchedModel);
+            return Pair.of(true, pluginMatchedDataSet);
         }
-        Set<Long> matchedModel = Sets.newHashSet();
-        Map<Long, List<ParamOption>> paramOptionMap = paramOptions.stream()
-                .collect(Collectors.groupingBy(ParamOption::getModelId));
-        for (Long modelId : paramOptionMap.keySet()) {
-            List<ParamOption> params = paramOptionMap.get(modelId);
+        Set<Long> matchedDataSet = Sets.newHashSet();
+        Map<Long, List<ParamOption>> paramOptionMap =
+                paramOptions.stream().collect(Collectors.groupingBy(ParamOption::getDataSetId));
+        for (Long dataSetId : paramOptionMap.keySet()) {
+            List<ParamOption> params = paramOptionMap.get(dataSetId);
             if (CollectionUtils.isEmpty(params)) {
-                matchedModel.add(modelId);
+                matchedDataSet.add(dataSetId);
                 continue;
             }
             boolean matched = true;
             for (ParamOption paramOption : params) {
-                Set<Long> elementIdSet = getSchemaElementMatch(modelId, schemaMapInfo);
+                Set<Long> elementIdSet = getSchemaElementMatch(dataSetId, schemaMapInfo);
                 if (CollectionUtils.isEmpty(elementIdSet)) {
                     matched = false;
                     break;
@@ -227,13 +235,13 @@ public class PluginManager {
                 }
             }
             if (matched) {
-                matchedModel.add(modelId);
+                matchedDataSet.add(dataSetId);
             }
         }
-        if (CollectionUtils.isEmpty(matchedModel)) {
+        if (CollectionUtils.isEmpty(matchedDataSet)) {
             return Pair.of(false, Sets.newHashSet());
         }
-        return Pair.of(true, matchedModel);
+        return Pair.of(true, matchedDataSet);
     }
 
     private static Set<Long> getSchemaElementMatch(Long modelId, SchemaMapInfo schemaMapInfo) {
@@ -241,41 +249,46 @@ public class PluginManager {
         if (org.springframework.util.CollectionUtils.isEmpty(schemaElementMatches)) {
             return Sets.newHashSet();
         }
-        return schemaElementMatches.stream().filter(schemaElementMatch ->
-                        SchemaElementType.VALUE.equals(schemaElementMatch.getElement().getType())
-                                || SchemaElementType.ID.equals(schemaElementMatch.getElement().getType()))
+        return schemaElementMatches.stream()
+                .filter(
+                        schemaElementMatch ->
+                                SchemaElementType.VALUE.equals(
+                                                schemaElementMatch.getElement().getType())
+                                        || SchemaElementType.ID.equals(
+                                                schemaElementMatch.getElement().getType()))
                 .map(SchemaElementMatch::getElement)
                 .map(SchemaElement::getId)
                 .collect(Collectors.toSet());
     }
 
-    private static List<ParamOption> getSemanticOption(Plugin plugin) {
+    private static List<ParamOption> getSemanticOption(ChatPlugin plugin) {
         WebBase webBase = JSONObject.parseObject(plugin.getConfig(), WebBase.class);
         if (Objects.isNull(webBase)) {
             return null;
         }
         List<ParamOption> paramOptions = webBase.getParamOptions();
-        if (org.springframework.util.CollectionUtils.isEmpty(paramOptions)) {
+        if (CollectionUtils.isEmpty(paramOptions)) {
             return Lists.newArrayList();
         }
         return paramOptions.stream()
-                .filter(paramOption -> ParamOption.ParamType.SEMANTIC.equals(paramOption.getParamType()))
+                .filter(
+                        paramOption ->
+                                ParamOption.ParamType.SEMANTIC.equals(paramOption.getParamType()))
                 .collect(Collectors.toList());
     }
 
-    private static Set<Long> getPluginMatchedModel(Plugin plugin, ChatParseContext chatParseContext) {
-        Set<Long> matchedDataSets = chatParseContext.getMapInfo().getMatchedDataSetInfos();
-        if (plugin.isContainsAllModel()) {
+    private static Set<Long> getPluginMatchedDataSet(ChatPlugin plugin, ParseContext parseContext) {
+        Set<Long> matchedDataSets = parseContext.getMapInfo().getMatchedDataSetInfos();
+        if (plugin.isContainsAllDataSet()) {
             return Sets.newHashSet(plugin.getDefaultMode());
         }
-        List<Long> modelIds = plugin.getDataSetList();
-        Set<Long> pluginMatchedModel = Sets.newHashSet();
-        for (Long modelId : modelIds) {
-            if (matchedDataSets.contains(modelId)) {
-                pluginMatchedModel.add(modelId);
+        List<Long> dataSetList = plugin.getDataSetList();
+        Set<Long> pluginMatchedDataSet = Sets.newHashSet();
+        for (Long dataSetId : dataSetList) {
+            if (matchedDataSets.contains(dataSetId)) {
+                pluginMatchedDataSet.add(dataSetId);
             }
         }
-        return pluginMatchedModel;
+        return pluginMatchedDataSet;
     }
-
 }

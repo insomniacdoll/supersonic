@@ -13,7 +13,7 @@
     position: relative;
     .sider {
       flex: 0 0 auto;
-      width: 285px;
+      width: 250px;
       border-right: 5px solid #eee;
       position: relative;
       transition: all 0.2s,background 0s;
@@ -81,40 +81,35 @@
         }
       }
       .search {
-        width: 205px;
+        width: 175px;
         margin: 10px 0 10px 16px;
       }
-    
-      .tree {
-        flex: 1;
-        padding: 10px;
-        padding-right: 18px;
-        .projectItem {
-          display: flex;
-          width: 100%;
-          cursor: auto;
-          line-height: 25px;
-          height: 25px;
-          color: rgb(95, 116, 141);
-          font-weight: 500;
-          .projectItemTitle {
-            font-size: 15px;
-            flex: 1;
+      .projectItem {
+        display: flex;
+        width: 100%;
+        cursor: auto;
+        line-height: 25px;
+        height: 25px;
+        color: rgb(95, 116, 141);
+        font-weight: 500;
+        .projectItemTitle {
+          font-size: 15px;
+          flex: 1;
+          cursor: pointer;
+        }
+        .operation {
+          .icon {
+            margin-left: 6px;
             cursor: pointer;
           }
-          .operation {
-            .icon {
-              margin-left: 6px;
-              cursor: pointer;
-            }
-          }
+        }
+        .rowHover {
+          display: none;
+        }
+        &:hover {
           .rowHover {
-            display: none;
-          }
-          &:hover {
-            .rowHover {
-              display: block;
-            }
+            display: block;
+            color: var(--tme-primary-color);
           }
         }
       }
@@ -235,7 +230,7 @@
   width: 100%;
   overflow: hidden;
   .searchContainer {
-    width: 280px;
+    width: 250px;
     padding:3px 0;
     border-bottom: 1px solid #eee;
   }
@@ -369,12 +364,12 @@
 
 .desc {
   margin: 0;
-  padding: 25px;
+  // padding: 25px;
   color: #667085;
   font-size: 14px;
-  border-bottom: 1px solid #eee;
-  border-top: 1px solid #eee;
-  margin-bottom: 10px;
+  // border-bottom: 1px solid #eee;
+  // border-top: 1px solid #eee;
+  // margin-bottom: 10px;
   .markerTag {
     color: #2499ef;
     font-size: 14px;
@@ -399,3 +394,51 @@
     display: flex;
   }
 }
+
+
+.infoCard {
+    min-height: 100%;
+    background-color: rgb(255, 255, 255);
+    color: rgb(38, 38, 38);
+    transition: box-shadow 300ms cubic-bezier(0.4, 0, 0.2, 1) 0ms;
+    position: relative;
+    border: 1px solid rgb(230, 235, 241);
+    border-radius: 4px;
+    box-shadow: inherit;
+    .infoCardTitle {
+      display: flex;
+      border-bottom: 1px solid #e6ebf1;
+      padding: 20px 20px 20px 40px;
+      align-items: center;
+      color: rgb(38, 38, 38);
+      margin: 0px;
+      font-size: 16px;
+      font-weight: 600;
+      line-height: 1.57;
+      font-family: "tencentFont", sans-serif;
+    }
+    .infoCardContainer {
+      padding: 20px;
+      height: calc(100vh - 260px);
+      overflow: scroll;
+    }
+    .infoCardFooter {
+      border-top: 1px solid #e6ebf1;
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      flex: 0 0 auto;
+      padding: 20px;
+      .infoCardFooterContainer {
+        box-sizing: border-box;
+        display: flex;
+        flex-flow: wrap;
+        // width: 100%;
+        justify-content: space-between;
+        align-items: center;
+      }
+    }
+}
+
+
+

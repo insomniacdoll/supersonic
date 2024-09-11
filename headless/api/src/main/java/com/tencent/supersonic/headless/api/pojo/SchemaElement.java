@@ -1,14 +1,20 @@
 package com.tencent.supersonic.headless.api.pojo;
 
 import com.google.common.base.Objects;
+import com.tencent.supersonic.common.pojo.DimensionConstants;
+import com.tencent.supersonic.headless.api.pojo.enums.DimensionType;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.apache.commons.collections4.MapUtils;
+import org.apache.commons.lang3.StringUtils;
 
 import java.io.Serializable;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Data
 @Getter
@@ -17,7 +23,7 @@ import java.util.List;
 @NoArgsConstructor
 public class SchemaElement implements Serializable {
 
-    private Long dataSet;
+    private Long dataSetId;
     private String dataSetName;
     private Long model;
     private Long id;
@@ -33,6 +39,8 @@ public class SchemaElement implements Serializable {
     private double order;
     private int isTag;
     private String description;
+    private boolean descriptionMapped;
+    @Builder.Default private Map<String, Object> extInfo = new HashMap<>();
 
     @Override
     public boolean equals(Object o) {
@@ -43,15 +51,45 @@ public class SchemaElement implements Serializable {
             return false;
         }
         SchemaElement schemaElement = (SchemaElement) o;
-        return Objects.equal(dataSet, schemaElement.dataSet) && Objects.equal(id,
-                schemaElement.id) && Objects.equal(name, schemaElement.name)
+        return Objects.equal(dataSetId, schemaElement.dataSetId)
+                && Objects.equal(id, schemaElement.id)
+                && Objects.equal(name, schemaElement.name)
                 && Objects.equal(bizName, schemaElement.bizName)
                 && Objects.equal(type, schemaElement.type);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hashCode(dataSet, id, name, bizName, type);
+        return Objects.hashCode(dataSetId, id, name, bizName, type);
     }
 
+    public boolean containsPartitionTime() {
+        if (MapUtils.isEmpty(extInfo)) {
+            return false;
+        }
+        Object o = extInfo.get(DimensionConstants.DIMENSION_TYPE);
+        DimensionType dimensionTYpe = null;
+        if (o instanceof DimensionType) {
+            dimensionTYpe = (DimensionType) o;
+        }
+        if (o instanceof String) {
+            dimensionTYpe = DimensionType.valueOf((String) o);
+        }
+        return DimensionType.isPartitionTime(dimensionTYpe);
+    }
+
+    public String getTimeFormat() {
+        if (MapUtils.isEmpty(extInfo)) {
+            return null;
+        }
+        return (String) extInfo.get(DimensionConstants.DIMENSION_TIME_FORMAT);
+    }
+
+    public String getPartitionTimeFormat() {
+        String timeFormat = getTimeFormat();
+        if (StringUtils.isNotBlank(timeFormat) && containsPartitionTime()) {
+            return timeFormat;
+        }
+        return "";
+    }
 }

@@ -1,12 +1,21 @@
 package com.tencent.supersonic.headless.api.pojo;
 
 import lombok.Data;
+import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.lang3.StringUtils;
+
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 @Data
 public class DataSetSchema {
+
     private SchemaElement dataSet;
     private Set<SchemaElement> metrics = new HashSet<>();
     private Set<SchemaElement> dimensions = new HashSet<>();
@@ -51,6 +60,16 @@ public class DataSetSchema {
         }
     }
 
+    public Map<String, String> getBizNameToName() {
+        List<SchemaElement> allElements = new ArrayList<>();
+        allElements.addAll(getDimensions());
+        allElements.addAll(getMetrics());
+        return allElements.stream()
+                .collect(
+                        Collectors.toMap(
+                                SchemaElement::getBizName, SchemaElement::getName, (k1, k2) -> k1));
+    }
+
     public TimeDefaultConfig getTagTypeTimeDefaultConfig() {
         if (queryConfig == null) {
             return null;
@@ -78,4 +97,63 @@ public class DataSetSchema {
         return queryConfig.getTagTypeDefaultConfig();
     }
 
+    public List<SchemaElement> getTagDefaultDimensions() {
+        TagTypeDefaultConfig tagTypeDefaultConfig = getTagTypeDefaultConfig();
+        if (Objects.isNull(tagTypeDefaultConfig)
+                || Objects.isNull(tagTypeDefaultConfig.getDefaultDisplayInfo())) {
+            return new ArrayList<>();
+        }
+        if (CollectionUtils.isNotEmpty(
+                tagTypeDefaultConfig.getDefaultDisplayInfo().getMetricIds())) {
+            return tagTypeDefaultConfig.getDefaultDisplayInfo().getMetricIds().stream()
+                    .map(
+                            id -> {
+                                SchemaElement metric = getElement(SchemaElementType.METRIC, id);
+                                return metric;
+                            })
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toList());
+        }
+        return new ArrayList<>();
+    }
+
+    public List<SchemaElement> getTagDefaultMetrics() {
+        TagTypeDefaultConfig tagTypeDefaultConfig = getTagTypeDefaultConfig();
+        if (Objects.isNull(tagTypeDefaultConfig)
+                || Objects.isNull(tagTypeDefaultConfig.getDefaultDisplayInfo())) {
+            return new ArrayList<>();
+        }
+        if (CollectionUtils.isNotEmpty(
+                tagTypeDefaultConfig.getDefaultDisplayInfo().getDimensionIds())) {
+            return tagTypeDefaultConfig.getDefaultDisplayInfo().getDimensionIds().stream()
+                    .map(id -> getElement(SchemaElementType.DIMENSION, id))
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toList());
+        }
+        return new ArrayList<>();
+    }
+
+    public boolean containsPartitionDimensions() {
+        return dimensions.stream().anyMatch(SchemaElement::containsPartitionTime);
+    }
+
+    public SchemaElement getPartitionDimension() {
+        for (SchemaElement dimension : dimensions) {
+            String partitionTimeFormat = dimension.getPartitionTimeFormat();
+            if (StringUtils.isNotBlank(partitionTimeFormat)) {
+                return dimension;
+            }
+        }
+        return null;
+    }
+
+    public String getPartitionTimeFormat() {
+        for (SchemaElement dimension : dimensions) {
+            String partitionTimeFormat = dimension.getPartitionTimeFormat();
+            if (StringUtils.isNotBlank(partitionTimeFormat)) {
+                return partitionTimeFormat;
+            }
+        }
+        return null;
+    }
 }

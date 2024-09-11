@@ -1,6 +1,10 @@
 package com.tencent.supersonic.common.util;
 
+import com.google.common.collect.Lists;
 import com.tencent.supersonic.common.pojo.Constants;
+import com.tencent.supersonic.common.pojo.enums.DatePeriodEnum;
+import lombok.extern.slf4j.Slf4j;
+
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.time.LocalDate;
@@ -16,7 +20,6 @@ import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
 import java.util.Objects;
-import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 public class DateUtils {
@@ -78,7 +81,8 @@ public class DateUtils {
         return getBeforeDate(currentDate, intervalDay, datePeriodEnum);
     }
 
-    public static String getBeforeDate(String date, int intervalDay, DatePeriodEnum datePeriodEnum) {
+    public static String getBeforeDate(
+            String date, int intervalDay, DatePeriodEnum datePeriodEnum) {
         DateTimeFormatter dateTimeFormatter = DateTimeFormatter.ofPattern(DATE_FORMAT);
         LocalDate currentDate = LocalDate.parse(date, dateTimeFormatter);
         LocalDate result = null;
@@ -89,7 +93,9 @@ public class DateUtils {
             case WEEK:
                 result = currentDate.minusWeeks(intervalDay);
                 if (intervalDay == 0) {
-                    result = result.with(TemporalAdjusters.previousOrSame(java.time.DayOfWeek.MONDAY));
+                    result =
+                            result.with(
+                                    TemporalAdjusters.previousOrSame(java.time.DayOfWeek.MONDAY));
                 }
                 break;
             case MONTH:
@@ -101,13 +107,14 @@ public class DateUtils {
             case QUARTER:
                 result = currentDate.minusMonths(intervalDay * 3L);
                 if (intervalDay == 0) {
-                    TemporalAdjuster firstDayOfQuarter = temporal -> {
-                        LocalDate tempDate = LocalDate.from(temporal);
-                        int month = tempDate.get(ChronoField.MONTH_OF_YEAR);
-                        int firstMonthOfQuarter = ((month - 1) / 3) * 3 + 1;
-                        return tempDate.with(ChronoField.MONTH_OF_YEAR, firstMonthOfQuarter)
-                                .with(TemporalAdjusters.firstDayOfMonth());
-                    };
+                    TemporalAdjuster firstDayOfQuarter =
+                            temporal -> {
+                                LocalDate tempDate = LocalDate.from(temporal);
+                                int month = tempDate.get(ChronoField.MONTH_OF_YEAR);
+                                int firstMonthOfQuarter = ((month - 1) / 3) * 3 + 1;
+                                return tempDate.with(ChronoField.MONTH_OF_YEAR, firstMonthOfQuarter)
+                                        .with(TemporalAdjusters.firstDayOfMonth());
+                            };
                     result = result.with(firstDayOfQuarter);
                 }
                 break;
@@ -147,25 +154,29 @@ public class DateUtils {
     }
 
     public static List<String> getDateList(String startDateStr, String endDateStr, String period) {
-        LocalDate startDate = LocalDate.parse(startDateStr);
-        LocalDate endDate = LocalDate.parse(endDateStr);
-
-        List<String> datesInRange = new ArrayList<>();
-        LocalDate currentDate = startDate;
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM");
-        while (!currentDate.isAfter(endDate)) {
-            if (Constants.MONTH.equals(period)) {
-                datesInRange.add(currentDate.format(formatter));
-                currentDate = currentDate.plusMonths(1);
-            } else if (Constants.WEEK.equals(period)) {
-                datesInRange.add(currentDate.format(DateTimeFormatter.ISO_DATE));
-                currentDate = currentDate.plusWeeks(1);
-            } else {
-                datesInRange.add(currentDate.format(DateTimeFormatter.ISO_DATE));
-                currentDate = currentDate.plusDays(1);
+        try {
+            LocalDate startDate = LocalDate.parse(startDateStr);
+            LocalDate endDate = LocalDate.parse(endDateStr);
+            List<String> datesInRange = new ArrayList<>();
+            LocalDate currentDate = startDate;
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM");
+            while (!currentDate.isAfter(endDate)) {
+                if (Constants.MONTH.equals(period)) {
+                    datesInRange.add(currentDate.format(formatter));
+                    currentDate = currentDate.plusMonths(1);
+                } else if (Constants.WEEK.equals(period)) {
+                    datesInRange.add(currentDate.format(DateTimeFormatter.ISO_DATE));
+                    currentDate = currentDate.plusWeeks(1);
+                } else {
+                    datesInRange.add(currentDate.format(DateTimeFormatter.ISO_DATE));
+                    currentDate = currentDate.plusDays(1);
+                }
             }
+            return datesInRange;
+        } catch (Exception e) {
+            log.info("parse date failed, startDate:{}, endDate:{}", startDateStr, endDateStr, e);
         }
-        return datesInRange;
+        return Lists.newArrayList();
     }
 
     public static boolean isAnyDateString(String value) {

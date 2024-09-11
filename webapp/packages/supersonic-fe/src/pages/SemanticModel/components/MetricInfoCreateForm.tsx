@@ -17,7 +17,6 @@ import {
   Tooltip,
   Tag,
 } from 'antd';
-import { StatusEnum } from '../enum';
 import { InfoCircleOutlined } from '@ant-design/icons';
 import MetricMeasuresFormTable from './MetricMeasuresFormTable';
 import { SENSITIVE_LEVEL_OPTIONS, METRIC_DEFINE_TYPE, TAG_DEFINE_TYPE } from '../constant';
@@ -37,14 +36,14 @@ import DimensionAndMetricRelationModal from './DimensionAndMetricRelationModal';
 import TableTitleTooltips from '../components/TableTitleTooltips';
 import { createMetric, updateMetric, mockMetricAlias, getMetricTags } from '../service';
 import { ISemantic } from '../data';
-import { history } from 'umi';
+import { history } from '@umijs/max';
 
 export type CreateFormProps = {
   datasourceId?: number;
-  domainId: number;
-  modelId: number;
+  domainId?: number;
+  modelId?: number;
   createModalVisible: boolean;
-  metricItem: any;
+  metricItem?: ISemantic.IMetricItem;
   onCancel?: () => void;
   onSubmit?: (values: any) => void;
 };

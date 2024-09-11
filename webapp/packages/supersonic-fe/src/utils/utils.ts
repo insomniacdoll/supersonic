@@ -3,6 +3,7 @@ import { message } from 'antd';
 import numeral from 'numeral';
 import copy from 'copy-to-clipboard';
 import { isString } from 'lodash';
+import CryptoJS from 'crypto-js';
 
 /* eslint no-useless-escape:0  */
 const reg =
@@ -470,3 +471,30 @@ export const objToArray = (_obj: ObjToArrayParams, keyType: string = 'string') =
     };
   });
 };
+
+const encryptKey = CryptoJS.enc.Hex.parse(
+  '9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08',
+);
+
+export const encryptPassword = (password: string, key?: string) => {
+  if (!password) {
+    return password;
+  }
+  const srcs = CryptoJS.enc.Utf8.parse(password);
+  const encrypted = CryptoJS.AES.encrypt(srcs, key || encryptKey, {
+    mode: CryptoJS.mode.ECB,
+    padding: CryptoJS.pad.Pkcs7,
+  });
+  return encrypted.toString();
+};
+
+export function decryptPassword(encryptPassword: string) {
+  if (!encryptPassword) {
+    return encryptPassword;
+  }
+  const decrypt = CryptoJS.AES.decrypt(encryptPassword, encryptKey, {
+    mode: CryptoJS.mode.ECB,
+    padding: CryptoJS.pad.Pkcs7,
+  });
+  return CryptoJS.enc.Utf8.stringify(decrypt).toString();
+}

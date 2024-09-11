@@ -22,6 +22,10 @@ public class TermDO {
 
     private String alias;
 
+    private String relatedMetrics;
+
+    private String relatedDimensions;
+
     private Date createdAt;
 
     private String createdBy;
@@ -29,5 +33,4 @@ public class TermDO {
     private Date updatedAt;
 
     private String updatedBy;
-
 }

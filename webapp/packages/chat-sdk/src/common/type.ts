@@ -1,3 +1,5 @@
+import { Dayjs } from 'dayjs';
+
 export type SearchRecommendItem = {
   complete: boolean;
   modelId: number;
@@ -73,8 +75,8 @@ export type EntityDimensionType = {
 };
 
 export type SqlInfoType = {
-  s2SQL: string;
-  correctS2SQL: string;
+  parsedS2SQL: string;
+  correctedS2SQL: string;
   querySQL: string;
 };
 
@@ -93,10 +95,11 @@ export type ChatContextType = {
   elementMatches: any[];
   nativeQuery: boolean;
   queryMode: string;
-  queryType: 'METRIC' | 'METRIC_ID' | 'ID' | 'TAG' | 'OTHER';
+  queryType: 'METRIC' | 'METRIC_TAG' | 'ID' | 'DETAIL' | 'OTHER';
   dimensionFilters: FilterItemType[];
   properties: any;
   sqlInfo: SqlInfoType;
+  textInfo: string;
 };
 
 export enum MsgValidTypeEnum {
@@ -143,6 +146,7 @@ export type MsgDataType = {
   queryTimeCost?: number;
   similarQueries: SimilarQuestionType[];
   recommendedDimensions: DrillDownDimensionType[];
+  textResult: string;
 };
 
 export enum ParseStateEnum {
@@ -255,3 +259,5 @@ export type ParseTimeCostType = {
   parseTime: number;
   sqlTime: number;
 };
+
+export type RangeValue = [Dayjs, Dayjs];

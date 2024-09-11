@@ -359,35 +359,48 @@ type ExcuteSqlParams = {
 };
 
 // 执行脚本
-export async function excuteSql(params: ExcuteSqlParams) {
+export async function executeSql(params: ExcuteSqlParams) {
   const data = { ...params };
   return request.post(`${process.env.API_BASE_URL}database/executeSql`, { data });
 }
 
+export async function getColumnsBySql(params: { databaseId: number; sql: string }) {
+  return request.get(`${process.env.API_BASE_URL}database/getColumnsBySql`, {
+    params,
+  });
+}
+
 export function getDbNames(dbId: number): Promise<any> {
-  return request(`${process.env.API_BASE_URL}database/getDbNames/${dbId}`, {
+  return request(`${process.env.API_BASE_URL}database/getDbNames`, {
     method: 'GET',
+    params: {
+      id: dbId,
+    },
   });
 }
 
-export function getTables(dbId: number, dbName: string): Promise<any> {
-  return request(`${process.env.API_BASE_URL}database/getTables/${dbId}/${dbName}`, {
+export function getTables(databaseId: number, dbName: string): Promise<any> {
+  return request(`${process.env.API_BASE_URL}database/getTables`, {
     method: 'GET',
+    params: {
+      databaseId,
+      db: dbName,
+    },
   });
 }
 
-export function getColumns(dbId: number, dbName: string, tableName: string): Promise<any> {
-  return request(`${process.env.API_BASE_URL}database/getColumns/${dbId}/${dbName}/${tableName}`, {
+export function getColumns(databaseId: number, dbName: string, tableName: string): Promise<any> {
+  return request(`${process.env.API_BASE_URL}database/getColumnsByName`, {
     method: 'GET',
+    params: {
+      databaseId,
+      db: dbName,
+      table: tableName,
+    },
   });
 }
 
 export function getModelList(domainId: number): Promise<any> {
-  if (getRunningEnv() === 'chat') {
-    return request(`${process.env.CHAT_API_BASE_URL}conf/modelList/${domainId}`, {
-      method: 'GET',
-    });
-  }
   return request(`${process.env.API_BASE_URL}model/getModelList/${domainId}`, {
     method: 'GET',
   });
@@ -401,6 +414,13 @@ export function createModel(data: any): Promise<any> {
 }
 export function updateModel(data: any): Promise<any> {
   return request(`${process.env.API_BASE_URL}model/updateModel`, {
+    method: 'POST',
+    data,
+  });
+}
+
+export function batchUpdateModelStatus(data: any): Promise<any> {
+  return request(`${process.env.API_BASE_URL}model/batchUpdateStatus`, {
     method: 'POST',
     data,
   });
@@ -726,6 +746,20 @@ export function batchUpdateClassifications(data: any): Promise<any> {
   });
 }
 
+export function batchUpdateDimensionSensitiveLevel(data: any): Promise<any> {
+  return request(`${process.env.API_BASE_URL}dimension/batchUpdateSensitiveLevel`, {
+    method: 'POST',
+    data: { ...data },
+  });
+}
+
+export function batchUpdateMetricSensitiveLevel(data: any): Promise<any> {
+  return request(`${process.env.API_BASE_URL}metric/batchUpdateSensitiveLevel`, {
+    method: 'POST',
+    data: { ...data },
+  });
+}
+
 export function getTermList(domainId: number): Promise<any> {
   return request(`${process.env.API_BASE_URL}term`, {
     method: 'GET',
@@ -739,5 +773,11 @@ export function saveOrUpdate(data: any): Promise<any> {
   return request(`${process.env.API_BASE_URL}term/saveOrUpdate`, {
     method: 'POST',
     data: { ...data },
+  });
+}
+
+export function deleteTerm(id: number): Promise<any> {
+  return request(`${process.env.API_BASE_URL}term/${id}`, {
+    method: 'DELETE',
   });
 }

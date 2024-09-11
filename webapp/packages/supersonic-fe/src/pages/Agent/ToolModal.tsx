@@ -89,6 +89,7 @@ const ToolModal: React.FC<Props> = ({ editTool, onSaveTool, onCancel }) => {
       title={editTool ? '编辑工具' : '新建工具'}
       confirmLoading={saveLoading}
       width={800}
+      maskClosable={false}
       onOk={onOk}
       onCancel={onCancel}
     >

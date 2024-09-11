@@ -2,23 +2,20 @@ import type { ActionType, ProColumns } from '@ant-design/pro-components';
 import { ProTable } from '@ant-design/pro-components';
 import { message, Button, Space, Popconfirm, Typography } from 'antd';
 import React, { useRef, useState, useEffect } from 'react';
-import { connect } from 'umi';
-import type { StateType } from '../../model';
-import { getTermList, saveOrUpdate } from '../../service';
-
+import { useModel } from '@umijs/max';
+import { getTermList, saveOrUpdate, deleteTerm } from '../../service';
+import dayjs from 'dayjs';
 import styles from '../style.less';
 import { ISemantic } from '../../data';
-import { ColumnsConfig } from '../../components/TableColumnRender';
 import TermCreateForm from './TermCreateForm';
 
 const { Paragraph } = Typography;
 
-type Props = {
-  domainManger: StateType;
-};
+type Props = {};
 
-const TermTable: React.FC<Props> = ({ domainManger }) => {
-  const { selectDomainId } = domainManger;
+const TermTable: React.FC<Props> = ({}) => {
+  const domainModel = useModel('SemanticModel.domainData');
+  const { selectDomainId } = domainModel;
   const [createModalVisible, setCreateModalVisible] = useState<boolean>(false);
   const [termItem, setTermItem] = useState<ISemantic.ITermItem>();
 
@@ -28,59 +25,42 @@ const TermTable: React.FC<Props> = ({ domainManger }) => {
   const actionRef = useRef<ActionType>();
 
   useEffect(() => {
-    queryTagList();
-  }, []);
+    queryTermList();
+  }, [selectDomainId]);
 
-  const queryTagList = async () => {
+  const queryTermList = async () => {
     setLoading(true);
     const { code, data, msg } = await getTermList(selectDomainId);
     setLoading(false);
     if (code === 200) {
-      setTableData(data?.terms || []);
+      setTableData(data || []);
     } else {
       message.error(msg);
       setTableData([]);
     }
   };
 
-  const queryTermConfig = async (terms: ISemantic.ITermItem[]) => {
+  const queryTermConfig = async (terms: ISemantic.ITermItem) => {
     const { code, msg } = await saveOrUpdate({
       domainId: selectDomainId,
-      terms,
+      ...terms,
     });
     setLoading(false);
     if (code === 200) {
-      setTableData(terms);
+      queryTermList();
     } else {
       message.error(msg);
     }
   };
 
-  const saveTermConfig = (termItem: ISemantic.ITermItem) => {
-    const hasTerm = tableData.find((item) => item.name === termItem.name);
-    let terms = [];
-    if (hasTerm) {
-      terms = tableData.map((item) => {
-        if (item.name === termItem.name) {
-          return {
-            ...item,
-            ...termItem,
-          };
-        }
-        return item;
-      });
+  const deleteTermConfig = async (termItem: ISemantic.ITermItem) => {
+    const { code, msg } = await deleteTerm(termItem.id);
+    if (code === 200) {
+      queryTermList();
     } else {
-      terms = [...tableData, termItem];
+      message.error(msg);
     }
-    queryTermConfig(terms);
   };
-
-  const deleteTermConfig = (termItem: ISemantic.ITermItem) => {
-    const terms = tableData.filter((item) => item.name !== termItem.name);
-    queryTermConfig(terms);
-  };
-
-  const columnsConfig = ColumnsConfig();
 
   const columns: ProColumns[] = [
     {
@@ -89,19 +69,30 @@ const TermTable: React.FC<Props> = ({ domainManger }) => {
       search: false,
     },
     {
-      dataIndex: 'similarTerms',
+      dataIndex: 'alias',
       title: '近义词',
       search: false,
-      render: (_: string[]) => {
-        const similarTerms = Array.isArray(_) ? _.join(',') : '-';
+      render: (_) => {
+        const alias = Array.isArray(_) ? _.join(',') : '-';
         return (
-          <Paragraph
-            ellipsis={{ tooltip: similarTerms, rows: 3 }}
-            style={{ width: 350, marginBottom: 0 }}
-          >
-            {similarTerms}
+          <Paragraph ellipsis={{ tooltip: alias, rows: 3 }} style={{ width: 350, marginBottom: 0 }}>
+            {alias}
           </Paragraph>
         );
+      },
+    },
+
+    {
+      dataIndex: 'createdBy',
+      title: '创建人',
+      search: false,
+    },
+    {
+      dataIndex: 'updatedAt',
+      title: '更新时间',
+      search: false,
+      render: (value: any) => {
+        return value && value !== '-' ? dayjs(value).format('YYYY-MM-DD HH:mm:ss') : '-';
       },
     },
 
@@ -109,7 +100,6 @@ const TermTable: React.FC<Props> = ({ domainManger }) => {
       dataIndex: 'description',
       title: '描述',
       search: false,
-      render: columnsConfig.description.render,
     },
 
     {
@@ -154,6 +144,7 @@ const TermTable: React.FC<Props> = ({ domainManger }) => {
         className={`${styles.classTable}  ${styles.disabledSearchTable} `}
         actionRef={actionRef}
         rowKey="id"
+        size="small"
         loading={loading}
         search={false}
         columns={columns}
@@ -162,7 +153,6 @@ const TermTable: React.FC<Props> = ({ domainManger }) => {
           return false;
         }}
         sticky={{ offsetHeader: 0 }}
-        size="large"
         options={false}
         toolBarRender={() => [
           <Button
@@ -182,7 +172,7 @@ const TermTable: React.FC<Props> = ({ domainManger }) => {
           createModalVisible={createModalVisible}
           termItem={termItem}
           onSubmit={(termData) => {
-            saveTermConfig(termData);
+            queryTermConfig(termData);
             setCreateModalVisible(false);
           }}
           onCancel={() => {
@@ -193,6 +183,4 @@ const TermTable: React.FC<Props> = ({ domainManger }) => {
     </>
   );
 };
-export default connect(({ domainManger }: { domainManger: StateType }) => ({
-  domainManger,
-}))(TermTable);
+export default TermTable;

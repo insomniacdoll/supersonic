@@ -2,10 +2,8 @@ import type { ActionType, ProColumns } from '@ant-design/pro-components';
 import { ProTable } from '@ant-design/pro-components';
 import { message, Button, Space, Popconfirm, Input, Tag, Select } from 'antd';
 import React, { useRef, useState, useEffect } from 'react';
-import type { Dispatch } from 'umi';
-import { connect } from 'umi';
-import type { StateType } from '../model';
-import { StatusEnum } from '../enum';
+import { useModel } from '@umijs/max';
+import { StatusEnum, SemanticNodeType } from '../enum';
 import { SENSITIVE_LEVEL_ENUM, SENSITIVE_LEVEL_OPTIONS, TAG_DEFINE_TYPE } from '../constant';
 import {
   getModelList,
@@ -20,15 +18,18 @@ import { ISemantic, IDataSource } from '../data';
 import TableHeaderFilter from './TableHeaderFilter';
 import BatchCtrlDropDownButton from '@/components/BatchCtrlDropDownButton';
 import { ColumnsConfig } from './TableColumnRender';
+import BatchSensitiveLevelModal from '@/components/BatchCtrlDropDownButton/BatchSensitiveLevelModal';
 import styles from './style.less';
 
-type Props = {
-  dispatch: Dispatch;
-  domainManger: StateType;
-};
+type Props = {};
 
-const ClassDimensionTable: React.FC<Props> = ({ domainManger, dispatch }) => {
-  const { selectModelId: modelId, selectDomainId: domainId } = domainManger;
+const ClassDimensionTable: React.FC<Props> = ({}) => {
+  const domainModel = useModel('SemanticModel.domainData');
+  const modelModel = useModel('SemanticModel.modelData');
+  const dimensionModel = useModel('SemanticModel.dimensionData');
+  const { selectDomainId: domainId } = domainModel;
+  const { selectModelId: modelId } = modelModel;
+  const { MrefreshDimensionList } = dimensionModel;
   const [createModalVisible, setCreateModalVisible] = useState<boolean>(false);
   const [dimensionItem, setDimensionItem] = useState<ISemantic.IDimensionItem>();
   const [dataSourceList, setDataSourceList] = useState<IDataSource.IDataSourceItem[]>([]);
@@ -36,6 +37,7 @@ const ClassDimensionTable: React.FC<Props> = ({ domainManger, dispatch }) => {
   const [filterParams, setFilterParams] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState<boolean>(false);
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
+  const [batchSensitiveLevelOpenState, setBatchSensitiveLevelOpenState] = useState<boolean>(false);
   const [dimensionValueSettingList, setDimensionValueSettingList] = useState<
     ISemantic.IDimensionValueSettingItem[]
   >([]);
@@ -52,6 +54,9 @@ const ClassDimensionTable: React.FC<Props> = ({ domainManger, dispatch }) => {
   const actionRef = useRef<ActionType>();
 
   const queryDimensionList = async (params: any) => {
+    if (!modelId) {
+      return;
+    }
     setLoading(true);
     const { code, data, msg } = await getDimensionList({
       ...pagination,
@@ -85,7 +90,7 @@ const ClassDimensionTable: React.FC<Props> = ({ domainManger, dispatch }) => {
 
   useEffect(() => {
     queryDimensionList({ ...filterParams, ...defaultPagination });
-  }, [filterParams]);
+  }, [filterParams, modelId]);
 
   useEffect(() => {
     queryDataSourceList();
@@ -103,12 +108,7 @@ const ClassDimensionTable: React.FC<Props> = ({ domainManger, dispatch }) => {
     setLoading(false);
     if (code === 200) {
       queryDimensionList({ ...filterParams, ...pagination });
-      dispatch({
-        type: 'domainManger/queryDimensionList',
-        payload: {
-          modelId,
-        },
-      });
+      MrefreshDimensionList({ modelId });
       return;
     }
     message.error(msg);
@@ -131,12 +131,7 @@ const ClassDimensionTable: React.FC<Props> = ({ domainManger, dispatch }) => {
     setLoading(false);
     if (code === 200) {
       queryDimensionList({ ...filterParams, ...pagination });
-      dispatch({
-        type: 'domainManger/queryDimensionList',
-        payload: {
-          modelId,
-        },
-      });
+      MrefreshDimensionList({ modelId });
       return;
     }
     message.error(msg);
@@ -310,6 +305,9 @@ const ClassDimensionTable: React.FC<Props> = ({ domainManger, dispatch }) => {
       case 'exportTagButton':
         queryBatchExportTag(selectedRowKeys);
         break;
+      case 'batchSensitiveLevel':
+        setBatchSensitiveLevelOpenState(true);
+        break;
       default:
         break;
     }
@@ -427,7 +425,7 @@ const ClassDimensionTable: React.FC<Props> = ({ domainManger, dispatch }) => {
           </Button>,
           <BatchCtrlDropDownButton
             key="ctrlBtnList"
-            extenderList={['exportTagButton']}
+            extenderList={['batchSensitiveLevel', 'exportTagButton']}
             onDeleteConfirm={() => {
               queryBatchUpdateStatus(selectedRowKeys, StatusEnum.DELETED);
             }}
@@ -447,12 +445,7 @@ const ClassDimensionTable: React.FC<Props> = ({ domainManger, dispatch }) => {
           onSubmit={() => {
             setCreateModalVisible(false);
             queryDimensionList({ ...filterParams, ...defaultPagination });
-            dispatch({
-              type: 'domainManger/queryDimensionList',
-              payload: {
-                modelId,
-              },
-            });
+            MrefreshDimensionList({ modelId });
             return;
           }}
           onCancel={() => {
@@ -466,29 +459,32 @@ const ClassDimensionTable: React.FC<Props> = ({ domainManger, dispatch }) => {
           open={dimensionValueSettingModalVisible}
           dimensionItem={dimensionItem}
           onCancel={() => {
-            dispatch({
-              type: 'domainManger/queryDimensionList',
-              payload: {
-                modelId,
-              },
-            });
+            MrefreshDimensionList({ modelId });
+
             setDimensionValueSettingModalVisible(false);
           }}
           onSubmit={() => {
             queryDimensionList({ ...filterParams, ...defaultPagination });
-            dispatch({
-              type: 'domainManger/queryDimensionList',
-              payload: {
-                modelId,
-              },
-            });
+            MrefreshDimensionList({ modelId });
             setDimensionValueSettingModalVisible(false);
+          }}
+        />
+      )}
+      {batchSensitiveLevelOpenState && (
+        <BatchSensitiveLevelModal
+          ids={selectedRowKeys as number[]}
+          open={batchSensitiveLevelOpenState}
+          type={SemanticNodeType.DIMENSION}
+          onCancel={() => {
+            setBatchSensitiveLevelOpenState(false);
+          }}
+          onSubmit={() => {
+            queryDimensionList({ ...filterParams, ...pagination });
+            setBatchSensitiveLevelOpenState(false);
           }}
         />
       )}
     </>
   );
 };
-export default connect(({ domainManger }: { domainManger: StateType }) => ({
-  domainManger,
-}))(ClassDimensionTable);
+export default ClassDimensionTable;

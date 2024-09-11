@@ -10,7 +10,9 @@ import jwt
 
 def get_authorization():
     exp = time.time() + 100000
-    token= jwt.encode({"token_user_name": "admin","exp": exp}, "secret", algorithm="HS512")
+    # secret 请和 com.tencent.supersonic.auth.api.authentication.config.AuthenticationConfig.tokenAppSecret 保持一致
+    secret = "WIaO9YRRVt+7QtpPvyWsARFngnEcbaKBk783uGFwMrbJBaochsqCH62L4Kijcb0sZCYoSsiKGV/zPml5MnZ3uQ=="
+    token= jwt.encode({"token_user_name": "admin","exp": exp}, secret, algorithm="HS512")
     return "Bearer "+token
 
 def get_url_pre():
@@ -258,7 +260,7 @@ def build_dataSet(domain_id,model_id1,model_id2,model_id3,model_id4):
                    {"id":model_id3,"includesAll":False,"metrics":metric_list3,"dimensions":dimension_list3},
                    {"id":model_id4,"includesAll":False,"metrics":metric_list4,"dimensions":dimension_list4}
                ]},
-               "queryConfig":{"tagTypeDefaultConfig":{},"metricTypeDefaultConfig":{"timeDefaultConfig":{"unit":1,"period":"DAY","timeMode":"RECENT"}}},"admins":["admin"],"admin":"admin"}
+               "queryConfig":{"tagTypeDefaultConfig":{},"metricTypeDefaultConfig":{"timeDefaultConfig":{"unit":0,"period":"DAY","timeMode":"RECENT"}}},"admins":["admin"],"admin":"admin"}
     url=get_url_pre()+"/api/semantic/dataSet"
     authorization=get_authorization()
     header = {}

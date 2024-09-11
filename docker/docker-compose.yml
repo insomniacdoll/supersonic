@@ -1,0 +1,118 @@
+services:
+  chroma:
+    image: chromadb/chroma:0.5.3
+    privileged: true
+    container_name: supersonic_chroma
+    ports:
+      - "8000:8000"
+    volumes:
+      - chroma_data:/chroma
+    networks:
+      - supersonic_network
+    dns:
+      - 114.114.114.114
+      - 8.8.8.8
+      - 8.8.4.4
+    healthcheck:
+      test: ["CMD", "curl", "http://0.0.0.0:8000"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  mysql:
+    image: mysql:8.0
+    privileged: true
+    container_name: supersonic_mysql
+    environment:
+      LANG: 'C.UTF-8'  # 设置环境变量
+      MYSQL_ROOT_PASSWORD: root_password
+      MYSQL_DATABASE: supersonic_db
+      MYSQL_USER: supersonic_user
+      MYSQL_PASSWORD: supersonic_password
+    ports:
+      - "13306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - supersonic_network
+    dns:
+      - 114.114.114.114
+      - 8.8.8.8
+      - 8.8.4.4
+    depends_on:
+      chroma:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  db_init:
+    image: supersonicbi/supersonic:${SUPERSONIC_VERSION:-latest}
+    privileged: true
+    container_name: supersonic_db_init
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - supersonic_network
+    command: >
+      sh -c "
+      sleep 15 &&
+      if ! mysql -h supersonic_mysql -usupersonic_user -psupersonic_password -e 'use supersonic_db; show tables;' | grep -q 's2_database'; then
+        mysql -h supersonic_mysql -usupersonic_user -psupersonic_password supersonic_db < /usr/src/app/supersonic-standalone-${SUPERSONIC_VERSION:-latest}/conf/db/schema-mysql.sql &&
+        mysql -h supersonic_mysql -usupersonic_user -psupersonic_password supersonic_db < /usr/src/app/supersonic-standalone-${SUPERSONIC_VERSION:-latest}/conf/db/data-mysql.sql
+      else
+        echo 'Database already initialized.'
+      fi
+      "
+    dns:
+      - 114.114.114.114
+      - 8.8.8.8
+      - 8.8.4.4
+
+  supersonic_standalone:
+    image: supersonicbi/supersonic:${SUPERSONIC_VERSION:-latest}
+    privileged: true
+    container_name: supersonic_standalone
+    environment:
+      DB_HOST: supersonic_mysql
+      DB_NAME: supersonic_db
+      DB_USERNAME: supersonic_user
+      DB_PASSWORD: supersonic_password
+      CHROMA_HOST: supersonic_chroma
+    ports:
+      - "9080:9080"
+    depends_on:
+      chroma:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
+      db_init:
+        condition: service_completed_successfully
+    networks:
+      - supersonic_network
+    dns:
+      - 114.114.114.114
+      - 8.8.8.8
+      - 8.8.4.4
+    volumes:
+      #1.Named Volumes are best for persistent data managed by Docker.
+      - supersonic_data:/usr/src/app/supersonic-standalone-${SUPERSONIC_VERSION:-latest}
+      #2.Bind Mounts are suitable for frequent modifications and debugging.
+      #      - ./conf/application-prd.yaml:/usr/src/app/supersonic-standalone-${SUPERSONIC_VERSION:-latest}/conf/application-prd.yaml
+      #3.Detailed Bind Mounts offer more control over the mount behavior.
+      #      - type: bind
+      #        source: ./supersonic-standalone-${SUPERSONIC_VERSION:-latest}/logs
+      #        target: /usr/src/app/supersonic-standalone-${SUPERSONIC_VERSION:-latest}/logs
+      #        bind:
+      #          propagation: rprivate
+      #          create_host_path: true
+volumes:
+  mysql_data:
+  chroma_data:
+  supersonic_data:
+
+networks:
+  supersonic_network:

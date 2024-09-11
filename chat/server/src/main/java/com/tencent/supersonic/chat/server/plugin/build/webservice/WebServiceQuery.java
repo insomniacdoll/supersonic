@@ -1,7 +1,8 @@
 package com.tencent.supersonic.chat.server.plugin.build.webservice;
 
 import com.alibaba.fastjson.JSON;
-import com.tencent.supersonic.chat.server.plugin.Plugin;
+import com.tencent.supersonic.chat.api.pojo.response.QueryResult;
+import com.tencent.supersonic.chat.server.plugin.ChatPlugin;
 import com.tencent.supersonic.chat.server.plugin.PluginParseResult;
 import com.tencent.supersonic.chat.server.plugin.PluginQueryManager;
 import com.tencent.supersonic.chat.server.plugin.build.ParamOption;
@@ -11,7 +12,6 @@ import com.tencent.supersonic.common.pojo.Constants;
 import com.tencent.supersonic.common.pojo.QueryColumn;
 import com.tencent.supersonic.common.util.ContextUtils;
 import com.tencent.supersonic.common.util.JsonUtil;
-import com.tencent.supersonic.headless.api.pojo.response.QueryResult;
 import com.tencent.supersonic.headless.api.pojo.response.QueryState;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpEntity;
@@ -27,7 +27,6 @@ import java.net.URI;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
 
 @Slf4j
 @Component
@@ -46,17 +45,25 @@ public class WebServiceQuery extends PluginSemanticQuery {
         QueryResult queryResult = new QueryResult();
         queryResult.setQueryMode(QUERY_MODE);
         Map<String, Object> properties = parseInfo.getProperties();
-        PluginParseResult pluginParseResult = JsonUtil.toObject(
-                JsonUtil.toString(properties.get(Constants.CONTEXT)), PluginParseResult.class);
+        PluginParseResult pluginParseResult =
+                JsonUtil.toObject(
+                        JsonUtil.toString(properties.get(Constants.CONTEXT)),
+                        PluginParseResult.class);
         WebServiceResp webServiceResponse = buildResponse(pluginParseResult);
         Object object = webServiceResponse.getResult();
         // in order to show webServiceQuery result int frontend conveniently,
         // webServiceResponse result format is consistent with queryByStruct result.
         log.info("webServiceResponse result:{}", JsonUtil.toString(object));
         try {
-            Map<String, Object> data = JsonUtil.toMap(JsonUtil.toString(object), String.class, Object.class);
-            queryResult.setQueryResults((List<Map<String, Object>>) data.get("resultList"));
-            queryResult.setQueryColumns((List<QueryColumn>) data.get("columns"));
+            Map<String, Object> data =
+                    JsonUtil.toMap(JsonUtil.toString(object), String.class, Object.class);
+            if (data.get("resultList") != null) {
+                queryResult.setQueryResults((List<Map<String, Object>>) data.get("resultList"));
+            }
+            if (data.get("columns") != null) {
+                queryResult.setQueryColumns((List<QueryColumn>) data.get("columns"));
+            }
+            queryResult.setTextResult(String.valueOf(data.get("data")));
             queryResult.setQueryState(QueryState.SUCCESS);
         } catch (Exception e) {
             log.info("webServiceResponse result has an exception:{}", e.getMessage());
@@ -66,8 +73,10 @@ public class WebServiceQuery extends PluginSemanticQuery {
 
     protected WebServiceResp buildResponse(PluginParseResult pluginParseResult) {
         WebServiceResp webServiceResponse = new WebServiceResp();
-        Plugin plugin = pluginParseResult.getPlugin();
-        WebBase webBase = fillWebBaseResult(JsonUtil.toObject(plugin.getConfig(), WebBase.class), pluginParseResult);
+        ChatPlugin plugin = pluginParseResult.getPlugin();
+        WebBase webBase =
+                fillWebBaseResult(
+                        JsonUtil.toObject(plugin.getConfig(), WebBase.class), pluginParseResult);
         webServiceResponse.setWebBase(webBase);
         List<ParamOption> paramOptions = webBase.getParamOptions();
         Map<String, Object> params = new HashMap<>();
@@ -75,12 +84,14 @@ public class WebServiceQuery extends PluginSemanticQuery {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         HttpEntity<String> entity = new HttpEntity<>(JSON.toJSONString(params), headers);
-        URI requestUrl = UriComponentsBuilder.fromHttpUrl(webBase.getUrl()).build().encode().toUri();
+        String url = webBase.getUrl() + "?queryText=" + pluginParseResult.getQueryText();
+        URI requestUrl = UriComponentsBuilder.fromHttpUrl(url).build().encode().toUri();
         ResponseEntity responseEntity = null;
         Object objectResponse = null;
         restTemplate = ContextUtils.getBean(RestTemplate.class);
         try {
-            responseEntity = restTemplate.exchange(requestUrl, HttpMethod.POST, entity, Object.class);
+            responseEntity =
+                    restTemplate.exchange(requestUrl, HttpMethod.POST, entity, Object.class);
             objectResponse = responseEntity.getBody();
             log.info("objectResponse:{}", objectResponse);
             Map<String, Object> response = JsonUtil.objectToMap(objectResponse);
@@ -90,5 +101,4 @@ public class WebServiceQuery extends PluginSemanticQuery {
         }
         return webServiceResponse;
     }
-
 }

@@ -3,7 +3,7 @@ import { Form, Button, Modal, Steps, message } from 'antd';
 import ModelBasicForm from './ModelBasicForm';
 import ModelFieldForm from './ModelFieldForm';
 import { formLayout } from '@/components/FormHelper/utils';
-import { EnumDataSourceType } from '../constants';
+import { EnumDataSourceType, EnumModelDataType } from '../constants';
 import styles from '../style.less';
 import {
   updateModel,
@@ -12,23 +12,19 @@ import {
   getUnAvailableItem,
   getTagObjectList,
 } from '../../service';
-import type { Dispatch } from 'umi';
-import type { StateType } from '../../model';
-import { connect } from 'umi';
+import { useModel } from '@umijs/max';
 import { ISemantic, IDataSource } from '../../data';
 import { isArrayOfValues } from '@/utils/utils';
 import EffectDimensionAndMetricTipsModal from './EffectDimensionAndMetricTipsModal';
 
 export type CreateFormProps = {
-  domainManger: StateType;
-  dispatch: Dispatch;
   createModalVisible: boolean;
   sql?: string;
   sqlParams?: IDataSource.ISqlParamsItem[];
   databaseId?: number;
   modelItem: ISemantic.IModelItem;
   onCancel?: () => void;
-  onSubmit?: (dataSourceInfo: any) => void;
+  onSubmit?: (modelItem: ISemantic.IModelItem) => void;
   scriptColumns?: any[] | undefined;
   basicInfoFormMode?: 'normal' | 'fast';
   onDataBaseTableChange?: (tableName: string) => void;
@@ -44,7 +40,6 @@ const initFormVal = {
 };
 
 const ModelCreateForm: React.FC<CreateFormProps> = ({
-  domainManger,
   onCancel,
   createModalVisible,
   scriptColumns,
@@ -63,7 +58,7 @@ const ModelCreateForm: React.FC<CreateFormProps> = ({
   const [fields, setFields] = useState<any[]>([]);
   const [currentStep, setCurrentStep] = useState(0);
   const [saveLoading, setSaveLoading] = useState(false);
-  // const [hasEmptyNameField, setHasEmptyNameField] = useState<boolean>(false);
+
   const [formDatabaseId, setFormDatabaseId] = useState<number>();
   const [queryParamsState, setQueryParamsState] = useState({});
   const [effectTipsModalOpenState, setEffectTipsModalOpenState] = useState<boolean>(false);
@@ -74,21 +69,18 @@ const ModelCreateForm: React.FC<CreateFormProps> = ({
   const [tagObjectIdState, setTagObjectIdState] = useState(modelItem?.tagObjectId);
   const formValRef = useRef(initFormVal as any);
   const [form] = Form.useForm();
-  const { databaseConfigList, selectModelId: modelId, selectDomainId, domainData } = domainManger;
+  const domainModel = useModel('SemanticModel.domainData');
+  const modelModel = useModel('SemanticModel.modelData');
+  const { selectDomainId, selectDomain: domainData } = domainModel;
+  const { selectModelId: modelId } = modelModel;
+
+  const databaseModel = useModel('SemanticModel.databaseData');
+  const { databaseConfigList } = databaseModel;
+
   const updateFormVal = (val: any) => {
     formValRef.current = val;
   };
   const [sqlFilter, setSqlFilter] = useState<string>('');
-  // useEffect(() => {
-  //   const hasEmpty = fields.some((item) => {
-  //     const { name, isCreateDimension, isCreateMetric } = item;
-  //     if ((isCreateMetric || isCreateDimension) && !name) {
-  //       return true;
-  //     }
-  //     return false;
-  //   });
-  //   setHasEmptyNameField(hasEmpty);
-  // }, [fields]);
 
   const [fieldColumns, setFieldColumns] = useState<IDataSource.IExecuteSqlColumn[]>(
     scriptColumns || [],
@@ -155,8 +147,8 @@ const ModelCreateForm: React.FC<CreateFormProps> = ({
 
   const saveModel = async (queryParams: any) => {
     setSaveLoading(true);
-    const queryDatasource = isEdit ? updateModel : createModel;
-    const { code, msg, data } = await queryDatasource(queryParams);
+    const querySaveModel = isEdit ? updateModel : createModel;
+    const { code, msg, data } = await querySaveModel(queryParams);
     setSaveLoading(false);
     if (code === 200) {
       message.success('保存模型成功！');
@@ -211,6 +203,19 @@ const ModelCreateForm: React.FC<CreateFormProps> = ({
               },
             });
             break;
+          case EnumDataSourceType.PARTITION_TIME:
+            fieldsClassify.dimensions.push({
+              bizName: fieldName,
+              type,
+              isCreateDimension,
+              name,
+              dateFormat,
+              typeParams: {
+                isPrimary: true,
+                timeGranularity: timeGranularity || '',
+              },
+            });
+            break;
           case EnumDataSourceType.FOREIGN:
           case EnumDataSourceType.PRIMARY:
             fieldsClassify.identifiers.push({
@@ -218,7 +223,6 @@ const ModelCreateForm: React.FC<CreateFormProps> = ({
               isCreateDimension,
               name,
               type,
-              // entityNames,
               tagObjectId: modelItem?.tagObjectId,
             });
             break;
@@ -294,6 +298,7 @@ const ModelCreateForm: React.FC<CreateFormProps> = ({
       setFields(fieldsClassifyList || []);
       return;
     }
+
     const columnFields: any[] = columns.map((item: IDataSource.IExecuteSqlColumn) => {
       const { type, nameEn, comment } = item;
       const oldItem =
@@ -311,11 +316,21 @@ const ModelCreateForm: React.FC<CreateFormProps> = ({
     setFields(columnFields || []);
   };
 
+  const formatterIdentifiers = (identifiersList: any[] = []) => {
+    return identifiersList.map((identifiers: any) => {
+      return {
+        ...identifiers,
+        classType: EnumModelDataType.IDENTIFIERS,
+      };
+    });
+  };
+
   const formatterMeasures = (measuresList: any[] = []) => {
     return measuresList.map((measures: any) => {
       return {
         ...measures,
         type: EnumDataSourceType.MEASURES,
+        classType: EnumModelDataType.MEASURES,
       };
     });
   };
@@ -325,6 +340,7 @@ const ModelCreateForm: React.FC<CreateFormProps> = ({
       return {
         ...dimension,
         timeGranularity: typeParams?.timeGranularity || '',
+        classType: EnumModelDataType.DIMENSION,
       };
     });
   };
@@ -346,26 +362,10 @@ const ModelCreateForm: React.FC<CreateFormProps> = ({
   };
 
   const formatterInitData = (columns: any[], extendParams: Record<string, any> = {}) => {
-    const {
-      id,
-      name,
-      bizName,
-      description,
-      modelDetail,
-      databaseId,
-      filterSql,
-      alias,
-      drillDownDimensions = [],
-    } = modelItem;
+    const { modelDetail, filterSql, drillDownDimensions = [] } = modelItem;
     const { dimensions, identifiers, measures } = modelDetail || {};
     const initValue = {
-      id,
-      name,
-      bizName,
-      description,
-      databaseId,
-      filterSql,
-      alias,
+      ...modelItem,
       drillDownDimensions: Array.isArray(drillDownDimensions)
         ? drillDownDimensions.map((item) => {
             return item.dimensionId;
@@ -382,7 +382,7 @@ const ModelCreateForm: React.FC<CreateFormProps> = ({
     form.setFieldsValue(initValue);
     const formatFields = [
       ...formatterDimensions(dimensions || []),
-      ...(identifiers || []),
+      ...formatterIdentifiers(identifiers || []),
       ...formatterMeasures(measures || []),
     ];
     initFields(formatFields, columns);
@@ -429,12 +429,12 @@ const ModelCreateForm: React.FC<CreateFormProps> = ({
   const queryTableColumnList = async (databaseId: number, dbName: string, tableName: string) => {
     const { code, data, msg } = await getColumns(databaseId, dbName, tableName);
     if (code === 200) {
-      const list = data?.resultList || [];
+      const list = data || [];
       const columns = list.map((item: any, index: number) => {
-        const { dataType, name } = item;
+        const { dataType, columnName, comment } = item;
         return {
-          ...item,
-          nameEn: name,
+          comment,
+          nameEn: columnName,
           type: dataType,
         };
       });
@@ -502,7 +502,6 @@ const ModelCreateForm: React.FC<CreateFormProps> = ({
             onClick={() => {
               handleNext(true);
             }}
-            // disabled={hasEmptyNameField}
           >
             保 存
           </Button>
@@ -542,7 +541,7 @@ const ModelCreateForm: React.FC<CreateFormProps> = ({
   return (
     <Modal
       forceRender
-      width={currentStep ? 1300 : 800}
+      width={currentStep ? 1400 : 800}
       destroyOnClose
       title={`${isEdit ? '编辑' : '新建'}模型`}
       maskClosable={false}
@@ -590,6 +589,4 @@ const ModelCreateForm: React.FC<CreateFormProps> = ({
   );
 };
 
-export default connect(({ domainManger }: { domainManger: StateType }) => ({
-  domainManger,
-}))(ModelCreateForm);
+export default ModelCreateForm;

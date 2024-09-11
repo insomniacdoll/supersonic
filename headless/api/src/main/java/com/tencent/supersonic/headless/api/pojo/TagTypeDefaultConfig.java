@@ -7,7 +7,6 @@ public class TagTypeDefaultConfig {
 
     private DefaultDisplayInfo defaultDisplayInfo;
 
-    //default time to filter tag selection results
-    private TimeDefaultConfig timeDefaultConfig;
-
+    // default time to filter tag selection results
+    private TimeDefaultConfig timeDefaultConfig = new TimeDefaultConfig();
 }

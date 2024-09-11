@@ -7,13 +7,12 @@ import com.tencent.supersonic.headless.server.persistence.mapper.TagCustomMapper
 import com.tencent.supersonic.headless.server.persistence.mapper.TagMapper;
 import com.tencent.supersonic.headless.server.persistence.repository.TagRepository;
 import com.tencent.supersonic.headless.server.pojo.TagFilter;
-
-import java.util.List;
-import java.util.Objects;
-
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections.CollectionUtils;
 import org.springframework.stereotype.Repository;
+
+import java.util.List;
+import java.util.Objects;
 
 @Slf4j
 @Repository
@@ -21,8 +20,7 @@ public class TagRepositoryImpl implements TagRepository {
     private final TagMapper mapper;
     private final TagCustomMapper tagCustomMapper;
 
-    public TagRepositoryImpl(TagMapper mapper,
-                             TagCustomMapper tagCustomMapper) {
+    public TagRepositoryImpl(TagMapper mapper, TagCustomMapper tagCustomMapper) {
         this.mapper = mapper;
         this.tagCustomMapper = tagCustomMapper;
     }
@@ -63,8 +61,10 @@ public class TagRepositoryImpl implements TagRepository {
         if (CollectionUtils.isNotEmpty(tagDeleteReq.getIds())) {
             tagCustomMapper.deleteBatchByIds(tagDeleteReq.getIds());
         }
-        if (Objects.nonNull(tagDeleteReq.getTagDefineType()) && CollectionUtils.isNotEmpty(tagDeleteReq.getItemIds())) {
-            tagCustomMapper.deleteBatchByType(tagDeleteReq.getItemIds(), tagDeleteReq.getTagDefineType().name());
+        if (Objects.nonNull(tagDeleteReq.getTagDefineType())
+                && CollectionUtils.isNotEmpty(tagDeleteReq.getItemIds())) {
+            tagCustomMapper.deleteBatchByType(
+                    tagDeleteReq.getItemIds(), tagDeleteReq.getTagDefineType().name());
         }
     }
 }

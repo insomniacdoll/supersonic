@@ -1,9 +1,11 @@
 package com.tencent.supersonic.chat.server.agent;
 
-
 import com.alibaba.fastjson.JSONObject;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
+import com.tencent.supersonic.common.config.PromptConfig;
+import com.tencent.supersonic.common.config.VisualConfig;
+import com.tencent.supersonic.common.pojo.ChatModelConfig;
 import com.tencent.supersonic.common.pojo.RecordInfo;
 import lombok.Data;
 import org.springframework.util.CollectionUtils;
@@ -21,15 +23,19 @@ public class Agent extends RecordInfo {
 
     private Integer id;
     private Integer enableSearch;
+    private Integer enableMemoryReview;
     private String name;
     private String description;
 
-    /**
-     * 0 offline, 1 online
-     */
+    /** 0 offline, 1 online */
     private Integer status;
+
     private List<String> examples;
     private String agentConfig;
+    private ChatModelConfig modelConfig;
+    private PromptConfig promptConfig;
+    private MultiTurnConfig multiTurnConfig;
+    private VisualConfig visualConfig;
 
     public List<String> getTools(AgentToolType type) {
         Map map = JSONObject.parseObject(agentConfig, Map.class);
@@ -38,19 +44,23 @@ public class Agent extends RecordInfo {
         }
         List<Map> toolList = (List) map.get("tools");
         return toolList.stream()
-                .filter(tool -> {
+                .filter(
+                        tool -> {
                             if (Objects.isNull(type)) {
                                 return true;
                             }
                             return type.name().equals(tool.get("type"));
-                        }
-                )
+                        })
                 .map(JSONObject::toJSONString)
                 .collect(Collectors.toList());
     }
 
     public boolean enableSearch() {
         return enableSearch != null && enableSearch == 1;
+    }
+
+    public boolean enableMemoryReview() {
+        return enableMemoryReview != null && enableMemoryReview == 1;
     }
 
     public static boolean containsAllModel(Set<Long> detectViewIds) {
@@ -62,8 +72,13 @@ public class Agent extends RecordInfo {
         if (CollectionUtils.isEmpty(tools)) {
             return Lists.newArrayList();
         }
-        return tools.stream().map(tool -> JSONObject.parseObject(tool, NL2SQLTool.class))
+        return tools.stream()
+                .map(tool -> JSONObject.parseObject(tool, NL2SQLTool.class))
                 .collect(Collectors.toList());
+    }
+
+    public boolean containsPluginTool() {
+        return !CollectionUtils.isEmpty(getParserTools(AgentToolType.PLUGIN));
     }
 
     public boolean containsLLMParserTool() {
@@ -79,6 +94,19 @@ public class Agent extends RecordInfo {
                 || !CollectionUtils.isEmpty(getParserTools(AgentToolType.NL2SQL_RULE));
     }
 
+    public boolean containsAnyTool() {
+        Map map = JSONObject.parseObject(agentConfig, Map.class);
+        if (CollectionUtils.isEmpty(map)) {
+            return false;
+        }
+        List<Map> toolList = (List) map.get("tools");
+        if (CollectionUtils.isEmpty(toolList)) {
+            return false;
+        }
+
+        return true;
+    }
+
     public Set<Long> getDataSetIds() {
         Set<Long> dataSetIds = getDataSetIds(null);
         if (containsAllModel(dataSetIds)) {
@@ -92,7 +120,8 @@ public class Agent extends RecordInfo {
         if (CollectionUtils.isEmpty(commonAgentTools)) {
             return new HashSet<>();
         }
-        return commonAgentTools.stream().map(NL2SQLTool::getDataSetIds)
+        return commonAgentTools.stream()
+                .map(NL2SQLTool::getDataSetIds)
                 .filter(modelIds -> !CollectionUtils.isEmpty(modelIds))
                 .flatMap(Collection::stream)
                 .collect(Collectors.toSet());

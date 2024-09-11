@@ -5,6 +5,7 @@ import com.tencent.supersonic.auth.api.authentication.pojo.User;
 import com.tencent.supersonic.common.pojo.DataEvent;
 import com.tencent.supersonic.common.pojo.enums.EventType;
 import com.tencent.supersonic.headless.api.pojo.DrillDownDimension;
+import com.tencent.supersonic.headless.api.pojo.MetaFilter;
 import com.tencent.supersonic.headless.api.pojo.MetricQueryDefaultConfig;
 import com.tencent.supersonic.headless.api.pojo.request.MetaBatchReq;
 import com.tencent.supersonic.headless.api.pojo.request.MetricBaseReq;
@@ -14,7 +15,6 @@ import com.tencent.supersonic.headless.api.pojo.request.QueryMetricReq;
 import com.tencent.supersonic.headless.api.pojo.request.QueryStructReq;
 import com.tencent.supersonic.headless.api.pojo.response.MetricResp;
 import com.tencent.supersonic.headless.api.pojo.response.ModelResp;
-import com.tencent.supersonic.headless.server.pojo.MetaFilter;
 import com.tencent.supersonic.headless.server.pojo.MetricsFilter;
 
 import java.util.List;
@@ -35,6 +35,8 @@ public interface MetricService {
     void batchUnPublish(List<Long> metricIds, User user);
 
     void batchUpdateClassifications(MetaBatchReq metaBatchReq, User user);
+
+    void batchUpdateSensitiveLevel(MetaBatchReq metaBatchReq, User user);
 
     void deleteMetric(Long id, User user) throws Exception;
 

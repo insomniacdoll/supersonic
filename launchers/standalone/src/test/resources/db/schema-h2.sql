@@ -38,13 +38,14 @@ CREATE TABLE IF NOT EXISTS `s2_chat_query`
     `score`             int DEFAULT '0',
     `feedback`          varchar(1024) DEFAULT '',
     `similar_queries`          varchar(1024) DEFAULT '',
+    `parse_time_cost` varchar(1024) DEFAULT '',
     PRIMARY KEY (`question_id`)
 );
 
 CREATE TABLE IF NOT EXISTS `s2_chat_parse`
 (
-    `question_id`             BIGINT  NOT NULL,
-    `chat_id`           BIGINT NOT NULL ,
+    `question_id`       BIGINT  NOT NULL,
+    `chat_id`           INT NOT NULL ,
     `parse_id`          INT NOT NULL ,
     `create_time`       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     `query_text`          varchar(500),
@@ -66,9 +67,9 @@ CREATE TABLE IF NOT EXISTS `s2_chat_statistics`
 );
 
 CREATE TABLE IF NOT EXISTS `s2_chat_config` (
-                                                `id` INT NOT NULL AUTO_INCREMENT,
-                                                `model_id` INT DEFAULT NULL ,
-                                                `chat_detail_config` varchar(655) ,
+    `id` INT NOT NULL AUTO_INCREMENT,
+    `model_id` INT DEFAULT NULL ,
+    `chat_detail_config` varchar(655) ,
     `chat_agg_config` varchar(655)    ,
     `recommended_questions`  varchar(1500)    ,
     `created_at` TIMESTAMP  NOT NULL   ,
@@ -82,12 +83,33 @@ CREATE TABLE IF NOT EXISTS `s2_chat_config` (
 COMMENT ON TABLE s2_chat_config IS 'chat config information table ';
 
 
+CREATE TABLE IF NOT EXISTS `s2_chat_memory` (
+    `id` INT NOT NULL AUTO_INCREMENT,
+    `question` varchar(655)    ,
+    `agent_id`  INT    ,
+    `db_schema`  TEXT    ,
+    `s2_sql` TEXT   ,
+    `side_info` TEXT    ,
+    `status` char(10)   ,
+    `llm_review` char(10)   ,
+    `llm_comment`   TEXT,
+    `human_review` char(10) ,
+    `human_comment` TEXT    ,
+    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP  ,
+    `updated_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP ,
+    `created_by` varchar(100)  ,
+    `updated_by` varchar(100)  ,
+    PRIMARY KEY (`id`)
+    ) ;
+COMMENT ON TABLE s2_chat_memory IS 'chat memory table ';
+
 create table IF NOT EXISTS s2_user
 (
     id       INT AUTO_INCREMENT,
     name     varchar(100) not null,
     display_name varchar(100) null,
-    password varchar(100) null,
+    password varchar(256) null,
+    salt varchar(256)  NULL,
     email varchar(100) null,
     is_admin INT null,
     PRIMARY KEY (`id`)
@@ -140,25 +162,26 @@ CREATE TABLE IF NOT EXISTS `s2_model` (
     `depends` varchar(500) DEFAULT NULL ,
     `source_type` varchar(128) DEFAULT NULL ,
     `filter_sql` varchar(1000) DEFAULT NULL ,
+    `ext` varchar(1000) DEFAULT NULL,
     PRIMARY KEY (`id`)
     );
 COMMENT ON TABLE s2_model IS 'model information';
 
 
 CREATE TABLE IF NOT EXISTS `s2_database` (
-                               `id` INT NOT NULL AUTO_INCREMENT,
-                               `name` varchar(255) NOT  NULL ,
-                               `description` varchar(500) DEFAULT  NULL ,
-                               `version` varchar(64) DEFAULT  NULL ,
-                               `type` varchar(20) NOT  NULL , -- type: mysql,clickhouse,tdw
-                               `config` varchar(655) NOT  NULL ,
-                               `created_at` TIMESTAMP NOT  NULL ,
-                               `created_by` varchar(100) NOT  NULL ,
-                               `updated_at` TIMESTAMP NOT  NULL ,
-                               `updated_by` varchar(100) NOT  NULL,
-                               `admin` varchar(500) NOT  NULL,
-                               `viewer` varchar(500) DEFAULT  NULL,
-                               PRIMARY KEY (`id`)
+   `id` INT NOT NULL AUTO_INCREMENT,
+   `name` varchar(255) NOT  NULL ,
+   `description` varchar(500) DEFAULT  NULL ,
+   `version` varchar(64) DEFAULT  NULL ,
+   `type` varchar(20) NOT  NULL , -- type: mysql,clickhouse,tdw
+   `config` varchar(655) NOT  NULL ,
+   `created_at` TIMESTAMP NOT  NULL ,
+   `created_by` varchar(100) NOT  NULL ,
+   `updated_at` TIMESTAMP NOT  NULL ,
+   `updated_by` varchar(100) NOT  NULL,
+   `admin` varchar(500) NOT  NULL,
+   `viewer` varchar(500) DEFAULT  NULL,
+   PRIMARY KEY (`id`)
 );
 COMMENT ON TABLE s2_database IS 'database instance table';
 
@@ -197,9 +220,9 @@ COMMENT ON TABLE s2_metric IS 'metric information table';
 
 
 CREATE TABLE IF NOT EXISTS `s2_dimension` (
-                                              `id` INT NOT NULL  AUTO_INCREMENT ,
-                                              `model_id` INT NOT NULL ,
-                                              `name` varchar(255) NOT NULL ,
+  `id` INT NOT NULL  AUTO_INCREMENT ,
+  `model_id` INT NOT NULL ,
+  `name` varchar(255) NOT NULL ,
     `biz_name` varchar(255)  NOT NULL ,
     `description` varchar(500) NOT NULL ,
     `status` INT NOT NULL , -- status, 0 is off the shelf, 1 is normal
@@ -248,46 +271,46 @@ COMMENT ON TABLE s2_canvas IS 'canvas table';
 
 
 CREATE TABLE IF NOT EXISTS `s2_query_stat_info` (
-                                      `id` INT NOT NULL AUTO_INCREMENT,
-                                      `trace_id` varchar(200) DEFAULT NULL, -- query unique identifier
-                                      `model_id` INT DEFAULT NULL,
-                                      `data_set_id` INT DEFAULT NULL,
-                                      `user`    varchar(200) DEFAULT NULL,
-                                      `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ,
-                                      `query_type` varchar(200) DEFAULT NULL, -- the corresponding scene
-                                      `query_type_back` INT DEFAULT '0' , -- query type, 0-normal query, 1-pre-refresh type
-                                      `query_sql_cmd`LONGVARCHAR , -- sql type request parameter
-                                      `sql_cmd_md5` varchar(200) DEFAULT NULL, -- sql type request parameter md5
-                                      `query_struct_cmd`LONGVARCHAR , -- struct type request parameter
-                                      `struct_cmd_md5` varchar(200) DEFAULT NULL, -- struct type request parameter md5值
-                                      `sql`LONGVARCHAR ,
-                                      `sql_md5` varchar(200) DEFAULT NULL, -- sql md5
-                                      `query_engine` varchar(20) DEFAULT NULL,
-                                      `elapsed_ms` bigINT DEFAULT NULL,
-                                      `query_state` varchar(20) DEFAULT NULL,
-                                      `native_query` INT DEFAULT NULL, -- 1-detail query, 0-aggregation query
-                                      `start_date` varchar(50) DEFAULT NULL,
-                                      `end_date` varchar(50) DEFAULT NULL,
-                                      `dimensions`LONGVARCHAR , -- dimensions involved in sql
-                                      `metrics`LONGVARCHAR , -- metric  involved in sql
-                                      `select_cols`LONGVARCHAR ,
-                                      `agg_cols`LONGVARCHAR ,
-                                      `filter_cols`LONGVARCHAR ,
-                                      `group_by_cols`LONGVARCHAR ,
-                                      `order_by_cols`LONGVARCHAR ,
-                                      `use_result_cache` TINYINT DEFAULT '-1' , -- whether to hit the result cache
-                                      `use_sql_cache` TINYINT DEFAULT '-1' , -- whether to hit the sql cache
-                                      `sql_cache_key`LONGVARCHAR , -- sql cache key
-                                      `result_cache_key`LONGVARCHAR , -- result cache key
-                                      `query_opt_mode` varchar(50) DEFAULT NULL ,
-                                      PRIMARY KEY (`id`)
+  `id` INT NOT NULL AUTO_INCREMENT,
+  `trace_id` varchar(200) DEFAULT NULL, -- query unique identifier
+  `model_id` INT DEFAULT NULL,
+  `data_set_id` INT DEFAULT NULL,
+  `user`    varchar(200) DEFAULT NULL,
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ,
+  `query_type` varchar(200) DEFAULT NULL, -- the corresponding scene
+  `query_type_back` INT DEFAULT '0' , -- query type, 0-normal query, 1-pre-refresh type
+  `query_sql_cmd`LONGVARCHAR , -- sql type request parameter
+  `sql_cmd_md5` varchar(200) DEFAULT NULL, -- sql type request parameter md5
+  `query_struct_cmd`LONGVARCHAR , -- struct type request parameter
+  `struct_cmd_md5` varchar(200) DEFAULT NULL, -- struct type request parameter md5值
+  `sql`LONGVARCHAR ,
+  `sql_md5` varchar(200) DEFAULT NULL, -- sql md5
+  `query_engine` varchar(20) DEFAULT NULL,
+  `elapsed_ms` bigINT DEFAULT NULL,
+  `query_state` varchar(20) DEFAULT NULL,
+  `native_query` INT DEFAULT NULL, -- 1-detail query, 0-aggregation query
+  `start_date` varchar(50) DEFAULT NULL,
+  `end_date` varchar(50) DEFAULT NULL,
+  `dimensions`LONGVARCHAR , -- dimensions involved in sql
+  `metrics`LONGVARCHAR , -- metric  involved in sql
+  `select_cols`LONGVARCHAR ,
+  `agg_cols`LONGVARCHAR ,
+  `filter_cols`LONGVARCHAR ,
+  `group_by_cols`LONGVARCHAR ,
+  `order_by_cols`LONGVARCHAR ,
+  `use_result_cache` TINYINT DEFAULT '-1' , -- whether to hit the result cache
+  `use_sql_cache` TINYINT DEFAULT '-1' , -- whether to hit the sql cache
+  `sql_cache_key`LONGVARCHAR , -- sql cache key
+  `result_cache_key`LONGVARCHAR , -- result cache key
+  `query_opt_mode` varchar(50) DEFAULT NULL ,
+  PRIMARY KEY (`id`)
 ) ;
 COMMENT ON TABLE s2_query_stat_info IS 'query statistics table';
 
 
 CREATE TABLE IF NOT EXISTS `s2_semantic_pasre_info` (
-                                                        `id` INT NOT NULL AUTO_INCREMENT,
-                                                        `trace_id` varchar(200) NOT NULL  ,
+    `id` INT NOT NULL AUTO_INCREMENT,
+    `trace_id` varchar(200) NOT NULL  ,
     `model_id` INT  NOT NULL ,
     `dimensions`LONGVARCHAR ,
     `metrics`LONGVARCHAR ,
@@ -307,9 +330,9 @@ COMMENT ON TABLE s2_semantic_pasre_info IS 'semantic layer sql parsing informati
 
 
 CREATE TABLE IF NOT EXISTS `s2_available_date_info` (
-                                                        `id` INT NOT NULL  AUTO_INCREMENT ,
-                                                        `item_id` INT NOT NULL ,
-                                                        `type`    varchar(255) NOT NULL ,
+    `id` INT NOT NULL  AUTO_INCREMENT ,
+    `item_id` INT NOT NULL ,
+    `type`    varchar(255) NOT NULL ,
     `date_format` varchar(64)  NOT NULL ,
     `start_date`  varchar(64) ,
     `end_date`  varchar(64) ,
@@ -351,11 +374,17 @@ CREATE TABLE IF NOT EXISTS s2_agent
     status       int null,
     examples    varchar(500) null,
     config      varchar(2000)  null,
+    llm_config varchar(2000)  null,
+    model_config varchar(6000) null,
+    prompt_config varchar(5000)  null,
+    multi_turn_config varchar(2000)  null,
+    visual_config varchar(2000)  null,
     created_by  varchar(100) null,
     created_at  TIMESTAMP  null,
     updated_by  varchar(100) null,
     updated_at  TIMESTAMP null,
     enable_search int null,
+    enable_memory_review int null,
     PRIMARY KEY (`id`)
 ); COMMENT ON TABLE s2_agent IS 'agent information table';
 
@@ -384,7 +413,6 @@ CREATE TABLE IF NOT EXISTS `s2_stay_time_statis` (
 COMMENT ON TABLE s2_stay_time_statis IS 's2_stay_time_statis_info';
 
 CREATE TABLE IF NOT EXISTS `singer` (
-    `imp_date` varchar(200) NOT NULL,
     `singer_name` varchar(200) NOT NULL,
     `act_area` varchar(200) NOT NULL,
     `song_name` varchar(200) NOT NULL,
@@ -392,7 +420,7 @@ CREATE TABLE IF NOT EXISTS `singer` (
     `js_play_cnt` bigINT DEFAULT NULL,
     `down_cnt` bigINT DEFAULT NULL,
     `favor_cnt` bigINT DEFAULT NULL,
-     PRIMARY KEY (`imp_date`, `singer_name`)
+     PRIMARY KEY (`singer_name`)
     );
 COMMENT ON TABLE singer IS 'singer_info';
 
@@ -437,10 +465,10 @@ COMMENT ON TABLE genre IS 'genre';
 
 CREATE TABLE IF NOT EXISTS `artist` (
     `artist_name` varchar(50) NOT NULL , -- genre name
-    `country` varchar(20) ,
+    `citizenship` varchar(20) ,
     `gender` varchar(20) ,
     `g_name` varchar(50),
-    PRIMARY KEY (`artist_name`,`country`)
+    PRIMARY KEY (`artist_name`,`citizenship`)
     );
 COMMENT ON TABLE artist IS 'artist';
 
@@ -514,7 +542,7 @@ CREATE TABLE IF NOT EXISTS `company_brand_revenue` (
 
 
 
-CREATE TABLE IF NOT EXISTS s2_sys_parameter
+CREATE TABLE IF NOT EXISTS s2_system_config
 (
     id  INT PRIMARY KEY AUTO_INCREMENT,
     admin varchar(500),
@@ -633,6 +661,8 @@ CREATE TABLE IF NOT EXISTS `s2_term` (
     `name` varchar(255)  NOT NULL ,
     `description` varchar(500) DEFAULT NULL ,
     `alias` varchar(1000)  NOT NULL ,
+    `related_metrics` varchar(1000)  DEFAULT NULL ,
+    `related_dimensions` varchar(1000)  DEFAULT NULL,
     `created_at` TIMESTAMP NOT NULL ,
     `created_by` varchar(100) NOT NULL ,
     `updated_at` TIMESTAMP DEFAULT NULL ,

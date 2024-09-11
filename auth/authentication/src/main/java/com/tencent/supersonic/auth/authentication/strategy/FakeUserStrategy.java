@@ -1,10 +1,10 @@
 package com.tencent.supersonic.auth.authentication.strategy;
 
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 
 import com.tencent.supersonic.auth.api.authentication.pojo.User;
 import com.tencent.supersonic.auth.api.authentication.service.UserStrategy;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -20,4 +20,8 @@ public class FakeUserStrategy implements UserStrategy {
         return User.getFakeUser();
     }
 
+    @Override
+    public User findUser(String token, String appKey) {
+        return User.getFakeUser();
+    }
 }

@@ -1,143 +1,111 @@
 #!/usr/bin/env bash
 
-set -x
 sbinDir=$(cd "$(dirname "$0")"; pwd)
-chmod +x $sbinDir/supersonic-common.sh
 source $sbinDir/supersonic-common.sh
-
-# 1.init environment parameters
-if [ ! -d "$runtimeDir" ]; then
-    echo "the runtime dir does not exist move all to runtime"
-    moveAllToRuntime
-fi
-set +x
 
 command=$1
 service=$2
+profile=$3
+
 if [ -z "$service"  ]; then
   service=${STANDALONE_SERVICE}
 fi
 
-app_name=$STANDALONE_APP_NAME
-main_class="com.tencent.supersonic.StandaloneLauncher"
-model_name=$service
-
-if [ "$service" == "pyllm" ]; then
-  model_name=${STANDALONE_SERVICE}
-  export llmProxy=PythonLLMProxy
+if [ -z "$profile" ]; then
+  profile="local"
 fi
 
+model_name=$service
 cd $baseDir
 
-# 2.set main class
 function setMainClass {
   if [ "$service" == $CHAT_SERVICE ]; then
     main_class="com.tencent.supersonic.ChatLauncher"
   elif [ "$service" == $HEADLESS_SERVICE ]; then
     main_class="com.tencent.supersonic.HeadlessLauncher"
+  else
+    main_class="com.tencent.supersonic.StandaloneLauncher"
   fi
 }
-setMainClass
-# 3.set app name
+
 function setAppName {
   if [ "$service" == $CHAT_SERVICE ]; then
     app_name=$CHAT_APP_NAME
   elif [ "$service" == $HEADLESS_SERVICE ]; then
     app_name=$HEADLESS_APP_NAME
-  elif [ "$service" == $PYLLM_SERVICE ]; then
-    app_name=$PYLLM_APP_NAME
+  else
+    app_name=$STANDALONE_APP_NAME
   fi
 }
-setAppName
 
-function reloadExamples {
-  pythonRunDir=${runtimeDir}/supersonic-${model_name}/pyllm
-  cd $pythonRunDir/sql
-  ${python_path} examples_reload_run.py
+function runJavaService {
+  javaRunDir=$baseDir
+  local_app_name=$1
+  libDir=$baseDir/lib
+  confDir=$baseDir/conf
+
+  CLASSPATH=""
+  CLASSPATH=$CLASSPATH:$confDir
+
+  for jarPath in $libDir/*.jar; do
+   CLASSPATH=$CLASSPATH:$jarPath
+  done
+
+  export CLASSPATH
+  export LANG="zh_CN.UTF-8"
+
+  cd $javaRunDir
+  if [[ "$JAVA_HOME" == "" ]]; then
+    JAVA_HOME=$(ls /usr/jdk64/jdk* -d 2>/dev/null | xargs | awk '{print "'$local_app_name'"}')
+  fi
+  export PATH=$JAVA_HOME/bin:$PATH
+  command="-Dfile.encoding=UTF-8 -Duser.language=Zh -Duser.region=CN -Duser.timezone=GMT+08 -Dapp_name=${local_app_name} -Xms1024m -Xmx1024m $main_class"
+
+  mkdir -p $javaRunDir/logs
+  java -Dspring.profiles.active="$profile" $command >/dev/null 2>$javaRunDir/logs/error.log &
 }
 
-
-function start()
-{
+function start() {
   local_app_name=$1
-  pid=$(ps aux |grep ${local_app_name} | grep -v grep | awk '{print $2}')
+  echo "Starting ${local_app_name}"
+  pid=$(ps aux | grep ${local_app_name} | grep -v grep | awk '{print $2}')
   if [[ "$pid" == "" ]]; then
-    if [[ ${local_app_name} == $PYLLM_APP_NAME ]]; then
-      runPythonService ${local_app_name}
-    else
-      runJavaService ${local_app_name}
-    fi
+    runJavaService ${local_app_name}
   else
     echo "Process (PID = $pid) is running."
     return 1
   fi
+  echo "Start success"
 }
 
-function stop()
-{
+function stop() {
+  echo "Stopping $1"
   pid=$(ps aux | grep $1 | grep -v grep | awk '{print $2}')
   if [[ "$pid" == "" ]]; then
-    echo "Process $1 is not running !"
+    echo "Process $1 is not running!"
     return 1
   else
     kill -9 $pid
-    echo "Process (PID = $pid) is killed !"
+    echo "Process (PID = $pid) is killed!"
     return 0
   fi
+  echo "Stop success"
 }
 
-function reload()
-{
-  if [[ $1 == $PYLLM_APP_NAME ]]; then
-    reloadExamples
-  fi
-}
-
-# 4. execute command operation
+setMainClass
+setAppName
 case "$command" in
   start)
-        if [ "$service" == $PYLLM_SERVICE ]; then
-          echo  "Starting $app_name"
-          start $app_name
-          echo  "Starting $STANDALONE_APP_NAME"
-          start $STANDALONE_APP_NAME
-        else
-          echo  "Starting $app_name"
-          start $app_name
-        fi
-        echo  "Start success"
-        ;;
+    start ${app_name}
+    ;;
   stop)
-        echo  "Stopping $app_name"
-        stop $app_name
-        echo  "Stopping $PYLLM_APP_NAME"
-        stop $PYLLM_APP_NAME
-        echo  "Stop success"
-        ;;
-  reload)
-        echo  "Reloading ${app_name}"
-        reload ${app_name}
-        echo  "Reload success"
-        ;;
+    stop $app_name
+    ;;
   restart)
-        if [ "$service" == $PYLLM_SERVICE ]; then
-          echo  "Stopping ${app_name}"
-          stop ${app_name}
-          echo  "Stopping ${STANDALONE_APP_NAME}"
-          stop $STANDALONE_APP_NAME
-          echo  "Starting ${app_name}"
-          start ${app_name}
-          echo  "Starting ${STANDALONE_APP_NAME}"
-          start $STANDALONE_APP_NAME
-        else
-          echo  "Stopping ${app_name}"
-          stop ${app_name}
-          echo  "Starting ${app_name}"
-          start ${app_name}
-        fi
-        echo  "Restart success"
-        ;;
+    stop ${app_name}
+    start ${app_name}
+    ;;
   *)
-        echo "Use command {start|stop|restart} to run."
-        exit 1
+    echo "Use command {start|stop|restart} to run."
+    exit 1
 esac

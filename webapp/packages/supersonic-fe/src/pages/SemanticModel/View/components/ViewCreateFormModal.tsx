@@ -52,7 +52,7 @@ const ViewCreateFormModal: React.FC<ModelCreateFormModalProps> = ({
 
   const [dimensionList, setDimensionList] = useState<ISemantic.IDimensionItem[]>();
   const [metricList, setMetricList] = useState<ISemantic.IMetricItem[]>();
-  const [tagList, setTagList] = useState<ISemantic.ITagItem[]>();
+  // const [tagList, setTagList] = useState<ISemantic.ITagItem[]>();
 
   useEffect(() => {
     if (selectedModelItem?.id) {
@@ -167,19 +167,6 @@ const ViewCreateFormModal: React.FC<ModelCreateFormModalProps> = ({
     return (
       <>
         <div style={{ display: currentStep === 1 ? 'block' : 'none' }}>
-          {/* <div style={{ marginBottom: 10, paddingLeft: 12 }}>
-            <Radio.Group
-              buttonStyle="solid"
-              value={queryType}
-              onChange={(e) => {
-                setQueryType(e.target.value);
-              }}
-            >
-              <Radio.Button value="METRIC">指标模式</Radio.Button>
-              <Radio.Button value="TAG">标签模式</Radio.Button>
-            </Radio.Group>
-          </div> */}
-
           <ViewModelConfigTransfer
             key={queryType}
             queryType={queryType}
@@ -207,7 +194,7 @@ const ViewCreateFormModal: React.FC<ModelCreateFormModalProps> = ({
             }
             dimensionList={dimensionList}
             metricList={metricList}
-            tagList={tagList}
+            // tagList={tagList}
             modelItem={selectedModelItem}
             viewItem={viewItem}
             ref={configTableRef}

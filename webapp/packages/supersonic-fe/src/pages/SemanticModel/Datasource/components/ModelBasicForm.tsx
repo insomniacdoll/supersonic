@@ -4,7 +4,6 @@ import type { FormInstance } from 'antd/lib/form';
 import { getDbNames, getTables, getDimensionList } from '../../service';
 import { ISemantic } from '../../data';
 import FormItemTitle from '@/components/FormHelper/FormItemTitle';
-import { isString } from 'lodash';
 
 const FormItem = Form.Item;
 const { TextArea } = Input;
@@ -24,7 +23,7 @@ const ModelBasicForm: React.FC<Props> = ({
   mode = 'normal',
 }) => {
   const [currentDbLinkConfigId, setCurrentDbLinkConfigId] = useState<number>();
-  const [dbNameList, setDbNameList] = useState<any[]>([]);
+  const [dbNameList, setDbNameList] = useState<string[]>([]);
   const [tableNameList, setTableNameList] = useState<any[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [dimensionOptions, setDimensionOptions] = useState<{ label: string; value: number }[]>([]);
@@ -56,7 +55,7 @@ const ModelBasicForm: React.FC<Props> = ({
     const { code, data, msg } = await getDbNames(databaseId);
     setLoading(false);
     if (code === 200) {
-      const list = data?.resultList || [];
+      const list = data || [];
       setDbNameList(list);
     } else {
       message.error(msg);
@@ -70,7 +69,7 @@ const ModelBasicForm: React.FC<Props> = ({
     const { code, data, msg } = await getTables(currentDbLinkConfigId, databaseName);
     setLoading(false);
     if (code === 200) {
-      const list = data?.resultList || [];
+      const list = data || [];
       setTableNameList(list);
     } else {
       message.error(msg);
@@ -116,8 +115,8 @@ const ModelBasicForm: React.FC<Props> = ({
               }}
             >
               {dbNameList.map((item) => (
-                <Select.Option key={item.name} value={item.name}>
-                  {item.name}
+                <Select.Option key={item} value={item}>
+                  {item}
                 </Select.Option>
               ))}
             </Select>
@@ -129,8 +128,8 @@ const ModelBasicForm: React.FC<Props> = ({
           >
             <Select placeholder="请选择数据库/表" disabled={isEdit} showSearch>
               {tableNameList.map((item) => (
-                <Select.Option key={item.name} value={item.name}>
-                  {item.name}
+                <Select.Option key={item} value={item}>
+                  {item}
                 </Select.Option>
               ))}
             </Select>
@@ -190,6 +189,14 @@ const ModelBasicForm: React.FC<Props> = ({
       </FormItem>
       <FormItem name="description" label="模型描述">
         <TextArea placeholder="请输入模型描述" />
+      </FormItem>
+      <FormItem name={['ext', 'usId']} label="调度任务ID">
+        <Select
+          mode="tags"
+          placeholder="输入ID后回车确认，多ID输入、复制粘贴支持英文逗号自动分隔"
+          tokenSeparators={[',']}
+          maxTagCount={9}
+        />
       </FormItem>
     </Spin>
   );

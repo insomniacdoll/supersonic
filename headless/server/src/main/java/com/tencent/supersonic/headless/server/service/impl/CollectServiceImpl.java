@@ -1,5 +1,7 @@
 package com.tencent.supersonic.headless.server.service.impl;
 
+import javax.annotation.Resource;
+
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.tencent.supersonic.auth.api.authentication.pojo.User;
 import com.tencent.supersonic.common.pojo.enums.TypeEnums;
@@ -8,25 +10,21 @@ import com.tencent.supersonic.headless.server.persistence.mapper.CollectMapper;
 import com.tencent.supersonic.headless.server.service.CollectService;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.logging.log4j.util.Strings;
 import org.springframework.stereotype.Service;
 
-import javax.annotation.Resource;
 import java.util.List;
-
 
 @Slf4j
 @Service
 public class CollectServiceImpl implements CollectService {
 
     public static final String type = "metric";
-    @Resource
-    private CollectMapper collectMapper;
+    @Resource private CollectMapper collectMapper;
 
     @Override
-    public Boolean createCollectionIndicators(User user, CollectDO collectReq) {
+    public Boolean collect(User user, CollectDO collectReq) {
         CollectDO collect = new CollectDO();
-        collect.setType(Strings.isEmpty(collectReq.getType()) ? type : collectReq.getType());
+        collect.setType(StringUtils.isEmpty(collectReq.getType()) ? type : collectReq.getType());
         collect.setUsername(user.getName());
         collect.setCollectId(collectReq.getCollectId());
         collectMapper.insert(collect);
@@ -34,7 +32,7 @@ public class CollectServiceImpl implements CollectService {
     }
 
     @Override
-    public Boolean deleteCollectionIndicators(User user, Long id) {
+    public Boolean unCollect(User user, Long id) {
         QueryWrapper<CollectDO> collectDOQueryWrapper = new QueryWrapper<>();
         collectDOQueryWrapper.lambda().eq(CollectDO::getUsername, user.getName());
         collectDOQueryWrapper.lambda().eq(CollectDO::getId, id);
@@ -44,7 +42,7 @@ public class CollectServiceImpl implements CollectService {
     }
 
     @Override
-    public Boolean deleteCollectionIndicators(User user, CollectDO collectReq) {
+    public Boolean unCollect(User user, CollectDO collectReq) {
         QueryWrapper<CollectDO> collectDOQueryWrapper = new QueryWrapper<>();
         collectDOQueryWrapper.lambda().eq(CollectDO::getUsername, user.getName());
         collectDOQueryWrapper.lambda().eq(CollectDO::getCollectId, collectReq.getCollectId());
@@ -54,7 +52,7 @@ public class CollectServiceImpl implements CollectService {
     }
 
     @Override
-    public List<CollectDO> getCollectList(String username) {
+    public List<CollectDO> getCollectionList(String username) {
         QueryWrapper<CollectDO> queryWrapper = new QueryWrapper<>();
         if (!StringUtils.isEmpty(username)) {
             queryWrapper.lambda().eq(CollectDO::getUsername, username);
@@ -63,7 +61,7 @@ public class CollectServiceImpl implements CollectService {
     }
 
     @Override
-    public List<CollectDO> getCollectList(String username, TypeEnums typeEnums) {
+    public List<CollectDO> getCollectionList(String username, TypeEnums typeEnums) {
         QueryWrapper<CollectDO> queryWrapper = new QueryWrapper<>();
         if (!StringUtils.isEmpty(username)) {
             queryWrapper.lambda().eq(CollectDO::getUsername, username);
@@ -71,5 +69,4 @@ public class CollectServiceImpl implements CollectService {
         queryWrapper.lambda().eq(CollectDO::getType, typeEnums.name().toLowerCase());
         return collectMapper.selectList(queryWrapper);
     }
-
 }

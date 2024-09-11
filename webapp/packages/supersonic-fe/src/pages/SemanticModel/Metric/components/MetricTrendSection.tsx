@@ -13,7 +13,7 @@ import { ColumnConfig } from '../data';
 import dayjs from 'dayjs';
 import { ISemantic } from '../../data';
 import { DateFieldMap } from '@/pages/SemanticModel/constant';
-import { ProCard } from  '@ant-design/pro-components';
+import { ProCard } from '@ant-design/pro-components';
 
 import styles from '../style.less';
 
@@ -100,7 +100,7 @@ const MetricTrendSection: React.FC<Props> = ({
     setMetricTrendLoading(false);
     if (code === 200) {
       const { resultList, columns, queryAuthorization } = data;
-      setMetricTrendData(resultList);
+
       setTableColumnConfig(columns);
       const message = queryAuthorization?.message;
       if (message) {
@@ -112,6 +112,22 @@ const MetricTrendSection: React.FC<Props> = ({
       if (targetConfig) {
         setMetricColumnConfig(targetConfig);
       }
+
+      const dateConfig = columns.find((item: ISemantic.IMetricTrendColumn) => {
+        return item.type === 'DATE';
+      });
+
+      if (dateConfig) {
+        const sortDateField = dateConfig.nameEn;
+        setMetricTrendData(
+          [...resultList].sort((a, b) => {
+            return a[sortDateField].localeCompare(b[sortDateField]);
+          }),
+        );
+      } else {
+        setMetricTrendData(resultList);
+      }
+
       setDownloadBtnDisabledState(false);
       if (dimensionGroup[dimensionGroup.length - 1]) {
         setGroupByDimensionFieldName(dimensionGroup[dimensionGroup.length - 1]);
@@ -136,142 +152,148 @@ const MetricTrendSection: React.FC<Props> = ({
 
   return (
     <div className={styles.metricTrendSection}>
-      <div className={styles.sectionBox}>
-        <Row style={{ padding: '10px 10px 0px 10px' }}>
-          <Col flex="1 1 200px">
-            <Form
-              layout="inline"
-              colon={false}
-              onValuesChange={(value, values) => {
-                if (value.key) {
-                  return;
-                }
-              }}
-            >
-              <StandardFormRow key="metricDate" title="日期区间:">
-                <FormItem name="metricDate">
-                  <MDatePicker
-                    initialValues={getDatePickerDynamicInitialValues(7, DateRangeType.DAY)}
-                    showCurrentDataRangeString={false}
-                    onDateRangeChange={(value, config) => {
-                      const [startDate, endDate] = value;
-                      const { dateSettingType, dynamicParams, staticParams } = config;
-                      let dateField = DateFieldMap[DateRangeType.DAY];
-                      let period = DateRangeType.DAY;
-                      if (DateSettingType.DYNAMIC === dateSettingType) {
-                        dateField = DateFieldMap[dynamicParams.dateRangeType];
-                        period = dynamicParams.dateRangeType;
-                      }
-                      if (DateSettingType.STATIC === dateSettingType) {
-                        dateField = DateFieldMap[staticParams.dateRangeType];
-                        period = staticParams.dateRangeType;
-                      }
-                      setPeriodDate({ startDate, endDate, dateField, period });
-                    }}
-                    disabledAdvanceSetting={true}
-                  />
-                </FormItem>
-              </StandardFormRow>
-              <StandardFormRow key="dimensionSelected" title="维度下钻:">
-                <FormItem name="dimensionSelected">
-                  <Select
-                    style={{ minWidth: 150, maxWidth: 200 }}
-                    options={relationDimensionOptions}
-                    showSearch
-                    filterOption={(input, option) =>
-                      ((option?.label ?? '') as string).toLowerCase().includes(input.toLowerCase())
+      {metircData?.containsPartitionDimensions !== false && (
+        <>
+          <div className={styles.sectionBox}>
+            <Row style={{ padding: '10px 10px 0px 10px' }}>
+              <Col flex="1 1 200px">
+                <Form
+                  layout="inline"
+                  colon={false}
+                  onValuesChange={(value, values) => {
+                    if (value.key) {
+                      return;
                     }
-                    mode="multiple"
-                    placeholder="请选择下钻维度"
-                    onChange={(value) => {
-                      const params = { ...queryParams, dimensionGroup: value || [] };
-                      setQueryParams(params);
-                    }}
-                  />
-                </FormItem>
-              </StandardFormRow>
-              <StandardFormRow key="dimensionFilter" title="维度筛选:">
-                <FormItem name="dimensionFilter">
-                  <MetricTrendDimensionFilterContainer
-                    modelId={metircData?.modelId || 0}
-                    dimensionOptions={relationDimensionOptions}
-                    periodDate={periodDate}
-                    onChange={(filterList) => {
-                      const dimensionFilters = filterList.map((item) => {
-                        const { dimensionBizName, dimensionValue, operator } = item;
-                        return {
-                          bizName: dimensionBizName,
-                          value: dimensionValue,
-                          operator,
-                        };
-                      });
-                      const params = {
-                        ...queryParams,
-                        dimensionFilters,
-                      };
-                      setQueryParams(params);
-                    }}
-                    afterSolt={
-                      <Button
-                        type="primary"
-                        icon={<SearchOutlined />}
-                        size="middle"
-                        loading={metricTrendLoading}
-                        onClick={() => {
-                          getMetricTrendData({ ...queryParams });
+                  }}
+                >
+                  <StandardFormRow key="metricDate" title="日期区间:">
+                    <FormItem name="metricDate">
+                      <MDatePicker
+                        initialValues={getDatePickerDynamicInitialValues(7, DateRangeType.DAY)}
+                        showCurrentDataRangeString={false}
+                        onDateRangeChange={(value, config) => {
+                          const [startDate, endDate] = value;
+                          const { dateSettingType, dynamicParams, staticParams } = config;
+                          let dateField = DateFieldMap[DateRangeType.DAY];
+                          let period = DateRangeType.DAY;
+                          if (DateSettingType.DYNAMIC === dateSettingType) {
+                            dateField = DateFieldMap[dynamicParams.dateRangeType];
+                            period = dynamicParams.dateRangeType;
+                          }
+                          if (DateSettingType.STATIC === dateSettingType) {
+                            dateField = DateFieldMap[staticParams.dateRangeType];
+                            period = staticParams.dateRangeType;
+                          }
+                          setPeriodDate({ startDate, endDate, dateField, period });
                         }}
-                      >
-                        查 询
-                      </Button>
-                    }
-                  />
-                </FormItem>
-              </StandardFormRow>
-            </Form>
-          </Col>
-          <Col flex="0 1" />
-        </Row>
-        {/* <Row style={{ paddingLeft: 82, paddingBottom: 8 }}>
+                        disabledAdvanceSetting={true}
+                      />
+                    </FormItem>
+                  </StandardFormRow>
+
+                  <StandardFormRow key="dimensionSelected" title="维度下钻:">
+                    <FormItem name="dimensionSelected">
+                      <Select
+                        style={{ minWidth: 150, maxWidth: 200 }}
+                        options={relationDimensionOptions}
+                        showSearch
+                        filterOption={(input, option) =>
+                          ((option?.label ?? '') as string)
+                            .toLowerCase()
+                            .includes(input.toLowerCase())
+                        }
+                        mode="multiple"
+                        placeholder="请选择下钻维度"
+                        onChange={(value) => {
+                          const params = { ...queryParams, dimensionGroup: value || [] };
+                          setQueryParams(params);
+                        }}
+                      />
+                    </FormItem>
+                  </StandardFormRow>
+                  <StandardFormRow key="dimensionFilter" title="维度筛选:">
+                    <FormItem name="dimensionFilter">
+                      <MetricTrendDimensionFilterContainer
+                        modelId={metircData?.modelId || 0}
+                        dimensionOptions={relationDimensionOptions}
+                        periodDate={periodDate}
+                        onChange={(filterList) => {
+                          const dimensionFilters = filterList.map((item) => {
+                            const { dimensionBizName, dimensionValue, operator } = item;
+                            return {
+                              bizName: dimensionBizName,
+                              value: dimensionValue,
+                              operator,
+                            };
+                          });
+                          const params = {
+                            ...queryParams,
+                            dimensionFilters,
+                          };
+                          setQueryParams(params);
+                        }}
+                        afterSolt={
+                          <Button
+                            type="primary"
+                            icon={<SearchOutlined />}
+                            size="middle"
+                            loading={metricTrendLoading}
+                            onClick={() => {
+                              getMetricTrendData({ ...queryParams });
+                            }}
+                          >
+                            查 询
+                          </Button>
+                        }
+                      />
+                    </FormItem>
+                  </StandardFormRow>
+                </Form>
+              </Col>
+              <Col flex="0 1" />
+            </Row>
+            {/* <Row style={{ paddingLeft: 82, paddingBottom: 8 }}>
 
         </Row> */}
-      </div>
+          </div>
 
-      <div className={styles.sectionBox}>
-        <ProCard
-          size="small"
-          title={
-            <>
-              <span>数据趋势</span>
-              {authMessage && <div style={{ color: '#d46b08' }}>{authMessage}</div>}
-            </>
-          }
-        >
-          <TrendChart
-            data={metricTrendData}
-            isPer={
-              metricColumnConfig?.dataFormatType === 'percent' &&
-              metricColumnConfig?.dataFormat?.needMultiply100 === false
-                ? true
-                : false
-            }
-            isPercent={
-              metricColumnConfig?.dataFormatType === 'percent' &&
-              metricColumnConfig?.dataFormat?.needMultiply100 === true
-                ? true
-                : false
-            }
-            rowNumber={rowNumber}
-            fields={indicatorFields.current}
-            loading={metricTrendLoading}
-            dateFieldName={periodDate.dateField}
-            groupByDimensionFieldName={groupByDimensionFieldName}
-            height={350}
-            renderType="clear"
-            decimalPlaces={metricColumnConfig?.dataFormat?.decimalPlaces || 2}
-          />
-        </ProCard>
-      </div>
-
+          <div className={styles.sectionBox}>
+            <ProCard
+              size="small"
+              title={
+                <>
+                  <span>数据趋势</span>
+                  {authMessage && <div style={{ color: '#d46b08' }}>{authMessage}</div>}
+                </>
+              }
+            >
+              <TrendChart
+                data={metricTrendData}
+                isPer={
+                  metricColumnConfig?.dataFormatType === 'percent' &&
+                  metricColumnConfig?.dataFormat?.needMultiply100 === false
+                    ? true
+                    : false
+                }
+                isPercent={
+                  metricColumnConfig?.dataFormatType === 'percent' &&
+                  metricColumnConfig?.dataFormat?.needMultiply100 === true
+                    ? true
+                    : false
+                }
+                rowNumber={rowNumber}
+                fields={indicatorFields.current}
+                loading={metricTrendLoading}
+                dateFieldName={periodDate.dateField}
+                groupByDimensionFieldName={groupByDimensionFieldName}
+                height={350}
+                renderType="clear"
+                decimalPlaces={metricColumnConfig?.dataFormat?.decimalPlaces || 2}
+              />
+            </ProCard>
+          </div>
+        </>
+      )}
       <div className={styles.sectionBox} style={{ paddingBottom: 0 }}>
         <ProCard
           size="small"

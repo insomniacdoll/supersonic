@@ -285,6 +285,7 @@ export declare namespace ISemantic {
     hasAdminRes: boolean;
     type: string;
     classifications: string[];
+    isTag: 0 | 1;
     // typeParams: IMeasureTypeParams;
     metricDefineType: METRIC_DEFINE_TYPE;
     metricDefineByMeasureParams: IMeasureTypeParams;
@@ -436,6 +437,7 @@ export declare namespace ISemantic {
   }
 
   interface ITermItem {
+    id: number;
     name: string;
     description: string;
     similarTerms: string[];
