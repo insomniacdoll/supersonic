@@ -35,8 +35,7 @@ public class Criterion {
 
     public boolean isNeedApostrophe() {
         return Arrays.stream(StringDataType.values())
-                .filter(value -> this.dataType.equalsIgnoreCase(value.getType()))
-                .findFirst()
+                .filter(value -> this.dataType.equalsIgnoreCase(value.getType())).findFirst()
                 .isPresent();
     }
 
@@ -50,8 +49,8 @@ public class Criterion {
         FLOAT("FLOAT"),
         DOUBLE("DOUBLE"),
         DECIMAL("DECIMAL"),
-        NUMERIC("NUMERIC"),
-        ;
+        NUMERIC("NUMERIC"),;
+
         private String type;
 
         NumericDataType(String type) {
@@ -64,9 +63,8 @@ public class Criterion {
     }
 
     public enum StringDataType {
-        VARCHAR("VARCHAR"),
-        STRING("STRING"),
-        ;
+        VARCHAR("VARCHAR"), STRING("STRING"),;
+
         private String type;
 
         StringDataType(String type) {

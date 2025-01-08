@@ -1,24 +1,32 @@
 package com.tencent.supersonic.headless.server.service.impl;
 
 import com.google.common.collect.Lists;
-import com.tencent.supersonic.auth.api.authentication.pojo.User;
 import com.tencent.supersonic.auth.api.authentication.service.UserService;
+import com.tencent.supersonic.common.config.ChatModel;
 import com.tencent.supersonic.common.pojo.ItemDateResp;
+import com.tencent.supersonic.common.pojo.ModelRela;
+import com.tencent.supersonic.common.pojo.User;
 import com.tencent.supersonic.common.pojo.enums.AuthType;
 import com.tencent.supersonic.common.pojo.enums.EventType;
 import com.tencent.supersonic.common.pojo.enums.StatusEnum;
 import com.tencent.supersonic.common.pojo.exception.InvalidArgumentException;
+import com.tencent.supersonic.common.service.ChatModelService;
 import com.tencent.supersonic.common.util.JsonUtil;
+import com.tencent.supersonic.headless.api.pojo.DBColumn;
+import com.tencent.supersonic.headless.api.pojo.DbSchema;
 import com.tencent.supersonic.headless.api.pojo.Dim;
+import com.tencent.supersonic.headless.api.pojo.FieldSchema;
 import com.tencent.supersonic.headless.api.pojo.Identify;
 import com.tencent.supersonic.headless.api.pojo.ItemDateFilter;
 import com.tencent.supersonic.headless.api.pojo.Measure;
 import com.tencent.supersonic.headless.api.pojo.MetaFilter;
+import com.tencent.supersonic.headless.api.pojo.ModelSchema;
 import com.tencent.supersonic.headless.api.pojo.request.DateInfoReq;
 import com.tencent.supersonic.headless.api.pojo.request.DimensionReq;
 import com.tencent.supersonic.headless.api.pojo.request.FieldRemovedReq;
 import com.tencent.supersonic.headless.api.pojo.request.MetaBatchReq;
 import com.tencent.supersonic.headless.api.pojo.request.MetricReq;
+import com.tencent.supersonic.headless.api.pojo.request.ModelBuildReq;
 import com.tencent.supersonic.headless.api.pojo.request.ModelReq;
 import com.tencent.supersonic.headless.api.pojo.response.DataSetResp;
 import com.tencent.supersonic.headless.api.pojo.response.DatabaseResp;
@@ -27,6 +35,7 @@ import com.tencent.supersonic.headless.api.pojo.response.DomainResp;
 import com.tencent.supersonic.headless.api.pojo.response.MetricResp;
 import com.tencent.supersonic.headless.api.pojo.response.ModelResp;
 import com.tencent.supersonic.headless.api.pojo.response.UnAvailableItemResp;
+import com.tencent.supersonic.headless.server.builder.ModelIntelligentBuilder;
 import com.tencent.supersonic.headless.server.persistence.dataobject.DateInfoDO;
 import com.tencent.supersonic.headless.server.persistence.dataobject.ModelDO;
 import com.tencent.supersonic.headless.server.persistence.repository.DateInfoRepository;
@@ -37,6 +46,7 @@ import com.tencent.supersonic.headless.server.service.DatabaseService;
 import com.tencent.supersonic.headless.server.service.DimensionService;
 import com.tencent.supersonic.headless.server.service.DomainService;
 import com.tencent.supersonic.headless.server.service.MetricService;
+import com.tencent.supersonic.headless.server.service.ModelRelaService;
 import com.tencent.supersonic.headless.server.service.ModelService;
 import com.tencent.supersonic.headless.server.utils.ModelConverter;
 import com.tencent.supersonic.headless.server.utils.NameCheckUtils;
@@ -48,7 +58,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
 
+import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
@@ -56,6 +68,12 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 @Service
@@ -78,15 +96,20 @@ public class ModelServiceImpl implements ModelService {
 
     private DateInfoRepository dateInfoRepository;
 
-    public ModelServiceImpl(
-            ModelRepository modelRepository,
-            DatabaseService databaseService,
-            @Lazy DimensionService dimensionService,
-            @Lazy MetricService metricService,
-            DomainService domainService,
-            UserService userService,
-            DataSetService dataSetService,
-            DateInfoRepository dateInfoRepository) {
+    private ModelIntelligentBuilder modelIntelligentBuilder;
+
+    private ChatModelService chatModelService;
+
+    private ModelRelaService modelRelaService;
+
+    ExecutorService executor =
+            new ThreadPoolExecutor(0, 5, 5L, TimeUnit.SECONDS, new LinkedBlockingQueue<>());
+
+    public ModelServiceImpl(ModelRepository modelRepository, DatabaseService databaseService,
+            @Lazy DimensionService dimensionService, @Lazy MetricService metricService,
+            DomainService domainService, UserService userService, DataSetService dataSetService,
+            DateInfoRepository dateInfoRepository, ModelIntelligentBuilder modelIntelligentBuilder,
+            ChatModelService chatModelService, ModelRelaService modelRelaService) {
         this.modelRepository = modelRepository;
         this.databaseService = databaseService;
         this.dimensionService = dimensionService;
@@ -95,6 +118,9 @@ public class ModelServiceImpl implements ModelService {
         this.userService = userService;
         this.dataSetService = dataSetService;
         this.dateInfoRepository = dateInfoRepository;
+        this.modelIntelligentBuilder = modelIntelligentBuilder;
+        this.chatModelService = chatModelService;
+        this.modelRelaService = modelRelaService;
     }
 
     @Override
@@ -112,6 +138,7 @@ public class ModelServiceImpl implements ModelService {
     @Transactional
     public ModelResp updateModel(ModelReq modelReq, User user) throws Exception {
         checkParams(modelReq);
+        checkRelations(modelReq);
         ModelDO modelDO = modelRepository.getModelById(modelReq.getId());
         ModelConverter.convert(modelDO, modelReq, user);
         modelRepository.updateModel(modelDO);
@@ -185,10 +212,81 @@ public class ModelServiceImpl implements ModelService {
         metaFilter.setFieldsDepend(fieldRemovedReq.getFields());
         List<MetricResp> metricResps = metricService.getMetrics(metaFilter);
         List<DimensionResp> dimensionResps = dimensionService.getDimensions(metaFilter);
-        return UnAvailableItemResp.builder()
-                .dimensionResps(dimensionResps)
-                .metricResps(metricResps)
+        return UnAvailableItemResp.builder().dimensionResps(dimensionResps).metricResps(metricResps)
                 .build();
+    }
+
+    @Override
+    public Map<String, ModelSchema> buildModelSchema(ModelBuildReq modelBuildReq)
+            throws SQLException {
+        if (modelBuildReq.isBuildByLLM() && modelBuildReq.getChatModelConfig() == null) {
+            ChatModel chatModel = chatModelService.getChatModel(modelBuildReq.getChatModelId());
+            modelBuildReq.setChatModelConfig(chatModel.getConfig());
+        }
+        List<DbSchema> dbSchemas = getDbSchemes(modelBuildReq);
+        Map<String, ModelSchema> modelSchemaMap = new ConcurrentHashMap<>();
+        CompletableFuture.allOf(dbSchemas.stream()
+                .map(dbSchema -> CompletableFuture.runAsync(
+                        () -> doBuild(modelBuildReq, dbSchema, dbSchemas, modelSchemaMap),
+                        executor))
+                .toArray(CompletableFuture[]::new)).join();
+        return modelSchemaMap;
+    }
+
+    private void doBuild(ModelBuildReq modelBuildReq, DbSchema curSchema, List<DbSchema> dbSchemas,
+            Map<String, ModelSchema> modelSchemaMap) {
+        if (modelBuildReq.isBuildByLLM()) {
+            List<DbSchema> otherDbSchema = getOtherDbSchema(curSchema, dbSchemas);
+            ModelSchema modelSchema =
+                    modelIntelligentBuilder.build(curSchema, otherDbSchema, modelBuildReq);
+            modelSchemaMap.put(curSchema.getTable(), modelSchema);
+        } else {
+            modelSchemaMap.put(curSchema.getTable(), build(curSchema.getDbColumns()));
+        }
+    }
+
+    private List<DbSchema> getDbSchemes(ModelBuildReq modelBuildReq) throws SQLException {
+        Map<String, List<DBColumn>> dbColumnMap = databaseService.getDbColumns(modelBuildReq);
+        return convert(dbColumnMap, modelBuildReq);
+    }
+
+    private List<DbSchema> getOtherDbSchema(DbSchema curSchema, List<DbSchema> dbSchemas) {
+        return dbSchemas.stream()
+                .filter(dbSchema -> !dbSchema.getTable().equals(curSchema.getTable()))
+                .collect(Collectors.toList());
+    }
+
+    private List<DbSchema> convert(Map<String, List<DBColumn>> dbColumnMap,
+            ModelBuildReq modelSchemaReq) {
+        return dbColumnMap.keySet().stream()
+                .map(key -> convert(modelSchemaReq, key, dbColumnMap.get(key)))
+                .collect(Collectors.toList());
+    }
+
+    private DbSchema convert(ModelBuildReq modelSchemaReq, String key, List<DBColumn> dbColumns) {
+        DbSchema dbSchema = new DbSchema();
+        dbSchema.setDb(modelSchemaReq.getDb());
+        dbSchema.setTable(key);
+        dbSchema.setSql(modelSchemaReq.getSql());
+        dbSchema.setDbColumns(dbColumns);
+        return dbSchema;
+    }
+
+    private FieldSchema convert(DBColumn dbColumn) {
+        FieldSchema fieldSchema = new FieldSchema();
+        fieldSchema.setName(dbColumn.getComment());
+        fieldSchema.setColumnName(dbColumn.getColumnName());
+        fieldSchema.setComment(dbColumn.getComment());
+        fieldSchema.setDataType(dbColumn.getDataType());
+        return fieldSchema;
+    }
+
+    private ModelSchema build(List<DBColumn> dbColumns) {
+        ModelSchema modelSchema = new ModelSchema();
+        List<FieldSchema> fieldSchemas =
+                dbColumns.stream().map(this::convert).collect(Collectors.toList());
+        modelSchema.setFiledSchemas(fieldSchemas);
+        return modelSchema;
     }
 
     private void batchCreateDimension(ModelDO modelDO, User user) throws Exception {
@@ -204,9 +302,8 @@ public class ModelServiceImpl implements ModelService {
     private void checkParams(ModelReq modelReq) {
         String forbiddenCharacters = NameCheckUtils.findForbiddenCharacters(modelReq.getName());
         if (StringUtils.isNotBlank(forbiddenCharacters)) {
-            String message =
-                    String.format(
-                            "模型名称[%s]包含特殊字符(%s), 请修改", modelReq.getName(), forbiddenCharacters);
+            String message = String.format("模型名称[%s]包含特殊字符(%s), 请修改", modelReq.getName(),
+                    forbiddenCharacters);
             throw new InvalidArgumentException(message);
         }
 
@@ -214,7 +311,9 @@ public class ModelServiceImpl implements ModelService {
             String message = String.format("模型英文名[%s]需要为下划线字母数字组合, 请修改", modelReq.getBizName());
             throw new InvalidArgumentException(message);
         }
-
+        if (modelReq.getModelDetail() == null) {
+            return;
+        }
         List<Dim> dims = modelReq.getModelDetail().getDimensions();
         List<Measure> measures = modelReq.getModelDetail().getMeasures();
         List<Identify> identifies = modelReq.getModelDetail().getIdentifiers();
@@ -226,10 +325,8 @@ public class ModelServiceImpl implements ModelService {
                     NameCheckUtils.findForbiddenCharacters(measure.getName());
             if (StringUtils.isNotBlank(measure.getName())
                     && StringUtils.isNotBlank(measureForbiddenCharacters)) {
-                String message =
-                        String.format(
-                                "度量[%s]包含特殊字符(%s), 请修改",
-                                measure.getName(), measureForbiddenCharacters);
+                String message = String.format("度量[%s]包含特殊字符(%s), 请修改", measure.getName(),
+                        measureForbiddenCharacters);
                 throw new InvalidArgumentException(message);
             }
         }
@@ -237,9 +334,8 @@ public class ModelServiceImpl implements ModelService {
             String dimForbiddenCharacters = NameCheckUtils.findForbiddenCharacters(dim.getName());
             if (StringUtils.isNotBlank(dim.getName())
                     && StringUtils.isNotBlank(dimForbiddenCharacters)) {
-                String message =
-                        String.format(
-                                "维度[%s]包含特殊字符(%s), 请修改", dim.getName(), dimForbiddenCharacters);
+                String message = String.format("维度[%s]包含特殊字符(%s), 请修改", dim.getName(),
+                        dimForbiddenCharacters);
                 throw new InvalidArgumentException(message);
             }
         }
@@ -248,11 +344,42 @@ public class ModelServiceImpl implements ModelService {
                     NameCheckUtils.findForbiddenCharacters(identify.getName());
             if (StringUtils.isNotBlank(identify.getName())
                     && StringUtils.isNotBlank(identifyForbiddenCharacters)) {
-                String message =
-                        String.format(
-                                "主键/外键[%s]包含特殊字符(%s), 请修改",
-                                identify.getName(), identifyForbiddenCharacters);
+                String message = String.format("主键/外键[%s]包含特殊字符(%s), 请修改", identify.getName(),
+                        identifyForbiddenCharacters);
                 throw new InvalidArgumentException(message);
+            }
+        }
+    }
+
+    private void checkRelations(ModelReq modelReq) {
+        List<ModelRela> modelRelas = modelRelaService.getModelRela(Arrays.asList(modelReq.getId()));
+        if (CollectionUtils.isEmpty(modelRelas)) {
+            return;
+        }
+        Set<String> relations = new HashSet<>();
+        for (ModelRela modelRela : modelRelas) {
+            if (modelRela.getFromModelId().equals(modelReq.getId())) {
+                modelRela.getJoinConditions().stream()
+                        .forEach(r -> relations.add(r.getLeftField()));
+            }
+            if (modelRela.getToModelId().equals(modelReq.getId())) {
+                modelRela.getJoinConditions().stream()
+                        .forEach(r -> relations.add(r.getRightField()));
+            }
+        }
+        if (relations.isEmpty()) {
+            return;
+        }
+        // any identify in model relation should not be deleted
+        if (modelReq.getModelDetail() == null
+                || CollectionUtils.isEmpty(modelReq.getModelDetail().getIdentifiers())) {
+            throw new InvalidArgumentException(String.format("模型关联中主键/外键不存在, 请检查"));
+        }
+        List<String> modelIdentifiers = modelReq.getModelDetail().getIdentifiers().stream()
+                .map(i -> i.getBizName()).collect(Collectors.toList());
+        for (String rela : relations) {
+            if (!modelIdentifiers.contains(rela)) {
+                throw new InvalidArgumentException(String.format("模型关联中主键/外键(%s)不存在, 请检查", rela));
             }
         }
     }
@@ -302,26 +429,21 @@ public class ModelServiceImpl implements ModelService {
         List<ModelResp> modelRespsAuthInheritDomain =
                 getModelRespAuthInheritDomain(user, domainId, authType);
         modelRespSet.addAll(modelRespsAuthInheritDomain);
-        return modelRespSet.stream()
-                .sorted(Comparator.comparingLong(ModelResp::getId))
+        return modelRespSet.stream().sorted(Comparator.comparingLong(ModelResp::getId))
                 .collect(Collectors.toList());
     }
 
-    public List<ModelResp> getModelRespAuthInheritDomain(
-            User user, Long domainId, AuthType authType) {
+    public List<ModelResp> getModelRespAuthInheritDomain(User user, Long domainId,
+            AuthType authType) {
         List<Long> domainIds =
-                domainService.getDomainAuthSet(user, authType).stream()
-                        .filter(
-                                domainResp -> {
-                                    if (domainId == null) {
-                                        return true;
-                                    } else {
-                                        return domainId.equals(domainResp.getId())
-                                                || domainId.equals(domainResp.getParentId());
-                                    }
-                                })
-                        .map(DomainResp::getId)
-                        .collect(Collectors.toList());
+                domainService.getDomainAuthSet(user, authType).stream().filter(domainResp -> {
+                    if (domainId == null) {
+                        return true;
+                    } else {
+                        return domainId.equals(domainResp.getId())
+                                || domainId.equals(domainResp.getParentId());
+                    }
+                }).map(DomainResp::getId).collect(Collectors.toList());
         if (CollectionUtils.isEmpty(domainIds)) {
             return Lists.newArrayList();
         }
@@ -340,16 +462,14 @@ public class ModelServiceImpl implements ModelService {
         Set<String> orgIds = userService.getUserAllOrgId(user.getName());
         List<ModelResp> modelWithAuth = Lists.newArrayList();
         if (authTypeEnum.equals(AuthType.ADMIN)) {
-            modelWithAuth =
-                    modelResps.stream()
-                            .filter(modelResp -> checkAdminPermission(orgIds, user, modelResp))
-                            .collect(Collectors.toList());
+            modelWithAuth = modelResps.stream()
+                    .filter(modelResp -> checkAdminPermission(orgIds, user, modelResp))
+                    .collect(Collectors.toList());
         }
         if (authTypeEnum.equals(AuthType.VISIBLE)) {
-            modelWithAuth =
-                    modelResps.stream()
-                            .filter(domainResp -> checkDataSetPermission(orgIds, user, domainResp))
-                            .collect(Collectors.toList());
+            modelWithAuth = modelResps.stream()
+                    .filter(domainResp -> checkDataSetPermission(orgIds, user, domainResp))
+                    .collect(Collectors.toList());
         }
         return modelWithAuth;
     }
@@ -366,8 +486,7 @@ public class ModelServiceImpl implements ModelService {
         if (CollectionUtils.isEmpty(modelResps)) {
             return modelResps;
         }
-        return modelResps.stream()
-                .filter(modelResp -> domainIds.contains(modelResp.getDomainId()))
+        return modelResps.stream().filter(modelResp -> domainIds.contains(modelResp.getDomainId()))
                 .collect(Collectors.toList());
     }
 
@@ -432,35 +551,23 @@ public class ModelServiceImpl implements ModelService {
         if (CollectionUtils.isEmpty(modelDOS)) {
             return;
         }
-        modelDOS =
-                modelDOS.stream()
-                        .peek(
-                                modelDO -> {
-                                    modelDO.setStatus(metaBatchReq.getStatus());
-                                    modelDO.setUpdatedAt(new Date());
-                                    modelDO.setUpdatedBy(user.getName());
-                                    if (StatusEnum.OFFLINE
-                                                    .getCode()
-                                                    .equals(metaBatchReq.getStatus())
-                                            || StatusEnum.DELETED
-                                                    .getCode()
-                                                    .equals(metaBatchReq.getStatus())) {
-                                        metricService.sendMetricEventBatch(
-                                                Lists.newArrayList(modelDO.getId()),
-                                                EventType.DELETE);
-                                        dimensionService.sendDimensionEventBatch(
-                                                Lists.newArrayList(modelDO.getId()),
-                                                EventType.DELETE);
-                                    } else if (StatusEnum.ONLINE
-                                            .getCode()
-                                            .equals(metaBatchReq.getStatus())) {
-                                        metricService.sendMetricEventBatch(
-                                                Lists.newArrayList(modelDO.getId()), EventType.ADD);
-                                        dimensionService.sendDimensionEventBatch(
-                                                Lists.newArrayList(modelDO.getId()), EventType.ADD);
-                                    }
-                                })
-                        .collect(Collectors.toList());
+        modelDOS = modelDOS.stream().peek(modelDO -> {
+            modelDO.setStatus(metaBatchReq.getStatus());
+            modelDO.setUpdatedAt(new Date());
+            modelDO.setUpdatedBy(user.getName());
+            if (StatusEnum.OFFLINE.getCode().equals(metaBatchReq.getStatus())
+                    || StatusEnum.DELETED.getCode().equals(metaBatchReq.getStatus())) {
+                metricService.sendMetricEventBatch(Lists.newArrayList(modelDO.getId()),
+                        EventType.DELETE);
+                dimensionService.sendDimensionEventBatch(Lists.newArrayList(modelDO.getId()),
+                        EventType.DELETE);
+            } else if (StatusEnum.ONLINE.getCode().equals(metaBatchReq.getStatus())) {
+                metricService.sendMetricEventBatch(Lists.newArrayList(modelDO.getId()),
+                        EventType.ADD);
+                dimensionService.sendDimensionEventBatch(Lists.newArrayList(modelDO.getId()),
+                        EventType.ADD);
+            }
+        }).collect(Collectors.toList());
         modelRepository.batchUpdate(modelDOS);
     }
 
@@ -470,14 +577,13 @@ public class ModelServiceImpl implements ModelService {
 
     private List<DateInfoReq> convert(List<DateInfoDO> dateInfoDOList) {
         List<DateInfoReq> dateInfoCommendList = new ArrayList<>();
-        dateInfoDOList.forEach(
-                dateInfoDO -> {
-                    DateInfoReq dateInfoCommend = new DateInfoReq();
-                    BeanUtils.copyProperties(dateInfoDO, dateInfoCommend);
-                    dateInfoCommend.setUnavailableDateList(
-                            JsonUtil.toList(dateInfoDO.getUnavailableDateList(), String.class));
-                    dateInfoCommendList.add(dateInfoCommend);
-                });
+        dateInfoDOList.forEach(dateInfoDO -> {
+            DateInfoReq dateInfoCommend = new DateInfoReq();
+            BeanUtils.copyProperties(dateInfoDO, dateInfoCommend);
+            dateInfoCommend.setUnavailableDateList(
+                    JsonUtil.toList(dateInfoDO.getUnavailableDateList(), String.class));
+            dateInfoCommendList.add(dateInfoCommend);
+        });
         return dateInfoCommendList;
     }
 
@@ -502,8 +608,8 @@ public class ModelServiceImpl implements ModelService {
         return false;
     }
 
-    public static boolean checkDataSetPermission(
-            Set<String> orgIds, User user, ModelResp modelResp) {
+    public static boolean checkDataSetPermission(Set<String> orgIds, User user,
+            ModelResp modelResp) {
         if (checkAdminPermission(orgIds, user, modelResp)) {
             return true;
         }

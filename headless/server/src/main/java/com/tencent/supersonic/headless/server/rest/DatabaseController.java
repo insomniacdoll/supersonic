@@ -3,10 +3,11 @@ package com.tencent.supersonic.headless.server.rest;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import com.tencent.supersonic.auth.api.authentication.pojo.User;
 import com.tencent.supersonic.auth.api.authentication.utils.UserHolder;
+import com.tencent.supersonic.common.pojo.User;
 import com.tencent.supersonic.headless.api.pojo.DBColumn;
 import com.tencent.supersonic.headless.api.pojo.request.DatabaseReq;
+import com.tencent.supersonic.headless.api.pojo.request.ModelBuildReq;
 import com.tencent.supersonic.headless.api.pojo.request.SqlExecuteReq;
 import com.tencent.supersonic.headless.api.pojo.response.DatabaseResp;
 import com.tencent.supersonic.headless.api.pojo.response.SemanticQueryResp;
@@ -36,33 +37,29 @@ public class DatabaseController {
     }
 
     @PostMapping("/testConnect")
-    public boolean testConnect(
-            @RequestBody DatabaseReq databaseReq,
-            HttpServletRequest request,
+    public boolean testConnect(@RequestBody DatabaseReq databaseReq, HttpServletRequest request,
             HttpServletResponse response) {
         User user = UserHolder.findUser(request, response);
         return databaseService.testConnect(databaseReq, user);
     }
 
     @PostMapping("/createOrUpdateDatabase")
-    public DatabaseResp createOrUpdateDatabase(
-            @RequestBody DatabaseReq databaseReq,
-            HttpServletRequest request,
-            HttpServletResponse response) {
+    public DatabaseResp createOrUpdateDatabase(@RequestBody DatabaseReq databaseReq,
+            HttpServletRequest request, HttpServletResponse response) {
         User user = UserHolder.findUser(request, response);
         return databaseService.createOrUpdateDatabase(databaseReq, user);
     }
 
     @GetMapping("/{id}")
-    public DatabaseResp getDatabase(
-            @PathVariable("id") Long id, HttpServletRequest request, HttpServletResponse response) {
+    public DatabaseResp getDatabase(@PathVariable("id") Long id, HttpServletRequest request,
+            HttpServletResponse response) {
         User user = UserHolder.findUser(request, response);
         return databaseService.getDatabase(id, user);
     }
 
     @GetMapping("/getDatabaseList")
-    public List<DatabaseResp> getDatabaseList(
-            HttpServletRequest request, HttpServletResponse response) {
+    public List<DatabaseResp> getDatabaseList(HttpServletRequest request,
+            HttpServletResponse response) {
         User user = UserHolder.findUser(request, response);
         return databaseService.getDatabaseList(user);
     }
@@ -74,10 +71,8 @@ public class DatabaseController {
     }
 
     @PostMapping("/executeSql")
-    public SemanticQueryResp executeSql(
-            @RequestBody SqlExecuteReq sqlExecuteReq,
-            HttpServletRequest request,
-            HttpServletResponse response) {
+    public SemanticQueryResp executeSql(@RequestBody SqlExecuteReq sqlExecuteReq,
+            HttpServletRequest request, HttpServletResponse response) {
         User user = UserHolder.findUser(request, response);
         return databaseService.executeSql(sqlExecuteReq, sqlExecuteReq.getId(), user);
     }
@@ -88,31 +83,28 @@ public class DatabaseController {
     }
 
     @RequestMapping("/getTables")
-    public List<String> getTables(
-            @RequestParam("databaseId") Long databaseId, @RequestParam("db") String db)
-            throws SQLException {
+    public List<String> getTables(@RequestParam("databaseId") Long databaseId,
+            @RequestParam("db") String db) throws SQLException {
         return databaseService.getTables(databaseId, db);
     }
 
     @RequestMapping("/getColumnsByName")
-    public List<DBColumn> getColumnsByName(
-            @RequestParam("databaseId") Long databaseId,
-            @RequestParam("db") String db,
-            @RequestParam("table") String table)
+    public List<DBColumn> getColumnsByName(@RequestParam("databaseId") Long databaseId,
+            @RequestParam("db") String db, @RequestParam("table") String table)
             throws SQLException {
         return databaseService.getColumns(databaseId, db, table);
     }
 
-    @RequestMapping("/getColumnsBySql")
-    public List<DBColumn> getColumnsBySql(
-            @RequestParam("databaseId") Long databaseId, @RequestParam("sql") String sql)
+    @PostMapping("/listColumnsBySql")
+    public List<DBColumn> listColumnsBySql(@RequestBody ModelBuildReq modelBuildReq)
             throws SQLException {
-        return databaseService.getColumns(databaseId, sql);
+        return databaseService.getColumns(modelBuildReq.getDatabaseId(), modelBuildReq.getSql());
     }
 
     @GetMapping("/getDatabaseParameters")
-    public Map<String, List<DatabaseParameter>> getDatabaseParameters(
-            HttpServletRequest request, HttpServletResponse response) {
-        return databaseService.getDatabaseParameters();
+    public Map<String, List<DatabaseParameter>> getDatabaseParameters(HttpServletRequest request,
+            HttpServletResponse response) {
+        User user = UserHolder.findUser(request, response);
+        return databaseService.getDatabaseParameters(user);
     }
 }

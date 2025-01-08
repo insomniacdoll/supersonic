@@ -5,6 +5,7 @@ import com.tencent.supersonic.headless.api.pojo.request.DictValueReq;
 import com.tencent.supersonic.headless.api.pojo.response.DictValueResp;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 
@@ -26,6 +27,7 @@ import java.util.stream.Stream;
 @Slf4j
 @Component
 public class FileHandlerImpl implements FileHandler {
+
     public static final String FILE_SPILT = File.separator;
 
     private final LocalFileConfig localFileConfig;
@@ -77,16 +79,53 @@ public class FileHandlerImpl implements FileHandler {
 
     @Override
     public PageInfo<DictValueResp> queryDictValue(String fileName, DictValueReq dictValueReq) {
+        if (StringUtils.isEmpty(dictValueReq.getKeyValue())) {
+            return getDictValueRespPagWithoutKey(fileName, dictValueReq);
+        }
+        return getDictValueRespPagWithKey(fileName, dictValueReq);
+    }
+
+    private PageInfo<DictValueResp> getDictValueRespPagWithKey(String fileName,
+            DictValueReq dictValueReq) {
+        PageInfo<DictValueResp> dictValueRespPageInfo = new PageInfo<>();
+        dictValueRespPageInfo.setPageSize(dictValueReq.getPageSize());
+        dictValueRespPageInfo.setPageNum(dictValueReq.getCurrent());
+        String filePath = localFileConfig.getDictDirectoryLatest() + FILE_SPILT + fileName;
+        Long fileLineNum = getFileLineNum(filePath);
+        Integer startLine = 1;
+        List<DictValueResp> dictValueRespList =
+                getFileData(filePath, startLine, fileLineNum.intValue()).stream().filter(
+                        dictValue -> dictValue.getValue().contains(dictValueReq.getKeyValue()))
+                        .collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(dictValueRespList)) {
+            dictValueRespPageInfo.setList(new ArrayList<>());
+            return dictValueRespPageInfo;
+        }
+
+        Integer startIndex =
+                Math.max((dictValueReq.getCurrent() - 1) * dictValueReq.getPageSize(), 0);
+        Integer endIndex =
+                Integer.valueOf(Math.min(dictValueReq.getCurrent() * dictValueReq.getPageSize(),
+                        dictValueRespList.size()) + "");
+        List<DictValueResp> list = dictValueRespList.subList(startIndex, endIndex);
+        dictValueRespPageInfo.setPageSize(dictValueReq.getPageSize());
+        dictValueRespPageInfo.setPageNum(dictValueReq.getCurrent());
+        dictValueRespPageInfo.setTotal(dictValueRespList.size());
+        dictValueRespPageInfo.setList(list);
+        dictValueRespPageInfo.setHasNextPage(endIndex >= dictValueRespList.size() ? false : true);
+        dictValueRespPageInfo.setHasPreviousPage(startLine <= 0 ? false : true);
+        return dictValueRespPageInfo;
+    }
+
+    private PageInfo<DictValueResp> getDictValueRespPagWithoutKey(String fileName,
+            DictValueReq dictValueReq) {
         PageInfo<DictValueResp> dictValueRespPageInfo = new PageInfo<>();
         String filePath = localFileConfig.getDictDirectoryLatest() + FILE_SPILT + fileName;
         Long fileLineNum = getFileLineNum(filePath);
-        Integer startLine = (dictValueReq.getCurrent() - 1) * dictValueReq.getPageSize() + 1;
-        Integer endLine =
-                Integer.valueOf(
-                        Math.min(
-                                        dictValueReq.getCurrent() * dictValueReq.getPageSize(),
-                                        fileLineNum)
-                                + "");
+        Integer startLine =
+                Math.max(1, (dictValueReq.getCurrent() - 1) * dictValueReq.getPageSize() + 1);
+        Integer endLine = Integer.valueOf(
+                Math.min(dictValueReq.getCurrent() * dictValueReq.getPageSize(), fileLineNum) + "");
         List<DictValueResp> dictValueRespList = getFileData(filePath, startLine, endLine);
 
         dictValueRespPageInfo.setPageSize(dictValueReq.getPageSize());
@@ -94,7 +133,7 @@ public class FileHandlerImpl implements FileHandler {
         dictValueRespPageInfo.setTotal(fileLineNum);
         dictValueRespPageInfo.setList(dictValueRespList);
         dictValueRespPageInfo.setHasNextPage(endLine >= fileLineNum ? false : true);
-        dictValueRespPageInfo.setHasPreviousPage(startLine <= 0 ? false : true);
+        dictValueRespPageInfo.setHasPreviousPage(startLine <= 1 ? false : true);
         return dictValueRespPageInfo;
     }
 
@@ -108,16 +147,25 @@ public class FileHandlerImpl implements FileHandler {
         return null;
     }
 
+    /**
+     *
+     * @param filePath
+     * @param startLine 1开始
+     * @param endLine
+     * @return
+     */
     private List<DictValueResp> getFileData(String filePath, Integer startLine, Integer endLine) {
         List<DictValueResp> fileData = new ArrayList<>();
+        Path path = Paths.get(filePath);
+        if (!Files.exists(path)) {
+            log.warn("[getFileData] File does not exist: {}", getAbsolutePath(filePath));
+            return fileData;
+        }
 
-        try (Stream<String> lines = Files.lines(Paths.get(filePath))) {
-            fileData =
-                    lines.skip(startLine - 1)
-                            .limit(endLine - startLine + 1)
-                            .map(lineStr -> convert2Resp(lineStr))
-                            .filter(line -> Objects.nonNull(line))
-                            .collect(Collectors.toList());
+        try (Stream<String> lines = Files.lines(path)) {
+            fileData = lines.skip(startLine - 1).limit(endLine - startLine + 1)
+                    .map(lineStr -> convert2Resp(lineStr)).filter(line -> Objects.nonNull(line))
+                    .collect(Collectors.toList());
         } catch (IOException e) {
             log.warn("[getFileData] e:{}", e);
         }
@@ -138,7 +186,13 @@ public class FileHandlerImpl implements FileHandler {
     }
 
     private Long getFileLineNum(String filePath) {
-        try (Stream<String> lines = Files.lines(Paths.get(filePath))) {
+        Path path = Paths.get(filePath);
+        if (!Files.exists(path)) {
+            log.warn("[getFileData] File does not exist: {}", getAbsolutePath(filePath));
+            return 0L;
+        }
+
+        try (Stream<String> lines = Files.lines(path)) {
             Long lineCount = lines.count();
             return lineCount;
         } catch (IOException e) {
@@ -204,8 +258,8 @@ public class FileHandlerImpl implements FileHandler {
 
     private BufferedWriter getWriter(String filePath, Boolean append) throws IOException {
         if (append) {
-            return Files.newBufferedWriter(
-                    Paths.get(filePath), StandardCharsets.UTF_8, StandardOpenOption.APPEND);
+            return Files.newBufferedWriter(Paths.get(filePath), StandardCharsets.UTF_8,
+                    StandardOpenOption.APPEND);
         }
         return Files.newBufferedWriter(Paths.get(filePath), StandardCharsets.UTF_8);
     }

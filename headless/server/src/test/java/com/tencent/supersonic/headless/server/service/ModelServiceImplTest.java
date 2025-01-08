@@ -1,10 +1,11 @@
 package com.tencent.supersonic.headless.server.service;
 
 import com.google.common.collect.Lists;
-import com.tencent.supersonic.auth.api.authentication.pojo.User;
 import com.tencent.supersonic.auth.api.authentication.service.UserService;
+import com.tencent.supersonic.common.pojo.User;
 import com.tencent.supersonic.common.pojo.enums.AggOperatorEnum;
 import com.tencent.supersonic.common.pojo.enums.StatusEnum;
+import com.tencent.supersonic.common.service.ChatModelService;
 import com.tencent.supersonic.headless.api.pojo.Dim;
 import com.tencent.supersonic.headless.api.pojo.DimensionTimeTypeParams;
 import com.tencent.supersonic.headless.api.pojo.Identify;
@@ -14,6 +15,7 @@ import com.tencent.supersonic.headless.api.pojo.enums.DimensionType;
 import com.tencent.supersonic.headless.api.pojo.enums.IdentifyType;
 import com.tencent.supersonic.headless.api.pojo.request.ModelReq;
 import com.tencent.supersonic.headless.api.pojo.response.ModelResp;
+import com.tencent.supersonic.headless.server.builder.ModelIntelligentBuilder;
 import com.tencent.supersonic.headless.server.persistence.dataobject.ModelDO;
 import com.tencent.supersonic.headless.server.persistence.repository.DateInfoRepository;
 import com.tencent.supersonic.headless.server.persistence.repository.ModelRepository;
@@ -34,7 +36,7 @@ class ModelServiceImplTest {
     void createModel() throws Exception {
         ModelRepository modelRepository = Mockito.mock(ModelRepository.class);
         ModelService modelService = mockModelService(modelRepository);
-        ModelResp actualModelResp = modelService.createModel(mockModelReq(), User.getFakeUser());
+        ModelResp actualModelResp = modelService.createModel(mockModelReq(), User.getDefaultUser());
         ModelResp expectedModelResp = buildExpectedModelResp();
         Assertions.assertEquals(expectedModelResp, actualModelResp);
     }
@@ -44,9 +46,9 @@ class ModelServiceImplTest {
         ModelRepository modelRepository = Mockito.mock(ModelRepository.class);
         ModelService modelService = mockModelService(modelRepository);
         ModelReq modelReq = mockModelReq_update();
-        ModelDO modelDO = ModelConverter.convert(mockModelReq(), User.getFakeUser());
+        ModelDO modelDO = ModelConverter.convert(mockModelReq(), User.getDefaultUser());
         when(modelRepository.getModelById(modelReq.getId())).thenReturn(modelDO);
-        User user = User.getFakeUser();
+        User user = User.getDefaultUser();
         user.setName("alice");
         ModelResp actualModelResp = modelService.updateModel(modelReq, user);
         ModelResp expectedModelResp = buildExpectedModelResp_update();
@@ -60,9 +62,9 @@ class ModelServiceImplTest {
         ModelRepository modelRepository = Mockito.mock(ModelRepository.class);
         ModelService modelService = mockModelService(modelRepository);
         ModelReq modelReq = mockModelReq_updateAdmin();
-        ModelDO modelDO = ModelConverter.convert(mockModelReq(), User.getFakeUser());
+        ModelDO modelDO = ModelConverter.convert(mockModelReq(), User.getDefaultUser());
         when(modelRepository.getModelById(modelReq.getId())).thenReturn(modelDO);
-        ModelResp actualModelResp = modelService.updateModel(modelReq, User.getFakeUser());
+        ModelResp actualModelResp = modelService.updateModel(modelReq, User.getDefaultUser());
         ModelResp expectedModelResp = buildExpectedModelResp();
         Assertions.assertEquals(expectedModelResp, actualModelResp);
     }
@@ -75,15 +77,13 @@ class ModelServiceImplTest {
         UserService userService = Mockito.mock(UserService.class);
         DateInfoRepository dateInfoRepository = Mockito.mock(DateInfoRepository.class);
         DataSetService viewService = Mockito.mock(DataSetService.class);
-        return new ModelServiceImpl(
-                modelRepository,
-                databaseService,
-                dimensionService,
-                metricService,
-                domainService,
-                userService,
-                viewService,
-                dateInfoRepository);
+        ModelIntelligentBuilder modelIntelligentBuilder =
+                Mockito.mock(ModelIntelligentBuilder.class);
+        ChatModelService chatModelService = Mockito.mock(ChatModelService.class);
+        ModelRelaService modelRelaService = Mockito.mock(ModelRelaService.class);
+        return new ModelServiceImpl(modelRepository, databaseService, dimensionService,
+                metricService, domainService, userService, viewService, dateInfoRepository,
+                modelIntelligentBuilder, chatModelService, modelRelaService);
     }
 
     private ModelReq mockModelReq() {
@@ -156,9 +156,8 @@ class ModelServiceImplTest {
         measures.add(measure2);
 
         modelDetail.setMeasures(measures);
-        modelDetail.setSqlQuery(
-                "SELECT imp_date_a, user_name_a, page_a, 1 as pv_a,"
-                        + " user_name as uv_a FROM s2_pv_uv_statis");
+        modelDetail.setSqlQuery("SELECT imp_date_a, user_name_a, page_a, 1 as pv_a,"
+                + " user_name as uv_a FROM s2_pv_uv_statis");
         modelDetail.setQueryType("sql_query");
         modelReq.setDomainId(1L);
         modelReq.setFilterSql("where user_name = 'tom'");
@@ -189,9 +188,8 @@ class ModelServiceImplTest {
         Measure measure2 = new Measure("访问人数", "uv", AggOperatorEnum.COUNT_DISTINCT.name(), 1);
         measures.add(measure2);
         modelDetail.setMeasures(measures);
-        modelDetail.setSqlQuery(
-                "SELECT imp_date, user_name, page, 1 as pv, "
-                        + "user_name as uv FROM s2_pv_uv_statis");
+        modelDetail.setSqlQuery("SELECT imp_date, user_name, page, 1 as pv, "
+                + "user_name as uv FROM s2_pv_uv_statis");
         modelDetail.setQueryType("sql_query");
         modelReq.setModelDetail(modelDetail);
         return modelReq;
@@ -274,19 +272,14 @@ class ModelServiceImplTest {
         measure1.setExpr("pv_a");
         measures.add(measure1);
 
-        Measure measure2 =
-                new Measure(
-                        "访问人数_a",
-                        "s2_pv_uv_statis_a_uv_a",
-                        AggOperatorEnum.COUNT_DISTINCT.name(),
-                        1);
+        Measure measure2 = new Measure("访问人数_a", "s2_pv_uv_statis_a_uv_a",
+                AggOperatorEnum.COUNT_DISTINCT.name(), 1);
         measure2.setExpr("uv_a");
         measures.add(measure2);
 
         modelDetail.setMeasures(measures);
-        modelDetail.setSqlQuery(
-                "SELECT imp_date_a, user_name_a, page_a, 1 as pv_a, "
-                        + "user_name as uv_a FROM s2_pv_uv_statis");
+        modelDetail.setSqlQuery("SELECT imp_date_a, user_name_a, page_a, 1 as pv_a, "
+                + "user_name as uv_a FROM s2_pv_uv_statis");
         modelDetail.setQueryType("sql_query");
         modelResp.setModelDetail(modelDetail);
         modelResp.setId(1L);

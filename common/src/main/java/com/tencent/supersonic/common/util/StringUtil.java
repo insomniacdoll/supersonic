@@ -28,7 +28,7 @@ public class StringUtil {
      * @param v1
      * @param v2
      * @return value 0 if v1 equal to v2; less than 0 if v1 is less than v2; greater than 0 if v1 is
-     *     greater than v2
+     *         greater than v2
      */
     public static int compareVersion(String v1, String v2) {
         String[] v1s = v1.split("\\.");
@@ -46,6 +46,26 @@ public class StringUtil {
     }
 
     public static String replaceBackticks(String sql) {
+        if (StringUtils.isBlank(sql)) {
+            return sql;
+        }
         return sql.replaceAll("`", "");
+    }
+
+    public static String append(String old, String add) {
+        return append(old, add, "\n");
+    }
+
+    public static String append(String old, String add, String split) {
+        if (StringUtils.isNotBlank(old)) {
+            if (StringUtils.isNotBlank(add)) {
+                return String.format("%s%s%s", old, split, add);
+            }
+            return old;
+        }
+        if (StringUtils.isNotBlank(add)) {
+            return add;
+        }
+        return null;
     }
 }

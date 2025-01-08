@@ -1,15 +1,9 @@
 package com.tencent.supersonic.util;
 
-import com.alibaba.fastjson.JSONObject;
-import com.google.common.collect.Lists;
-import com.tencent.supersonic.auth.api.authentication.pojo.User;
 import com.tencent.supersonic.chat.api.pojo.request.ChatParseReq;
-import com.tencent.supersonic.chat.server.agent.Agent;
-import com.tencent.supersonic.chat.server.agent.AgentConfig;
-import com.tencent.supersonic.chat.server.agent.AgentToolType;
-import com.tencent.supersonic.chat.server.agent.PluginTool;
-import com.tencent.supersonic.chat.server.agent.RuleParserTool;
 import com.tencent.supersonic.common.pojo.DateConf;
+import com.tencent.supersonic.common.pojo.User;
+import com.tencent.supersonic.common.pojo.enums.DatePeriodEnum;
 import com.tencent.supersonic.common.pojo.enums.FilterOperatorEnum;
 import com.tencent.supersonic.headless.api.pojo.SchemaElement;
 import com.tencent.supersonic.headless.api.pojo.request.QueryFilter;
@@ -25,7 +19,7 @@ public class DataUtils {
     public static final Integer tagAgentId = 2;
     public static final Integer ONE_TURNS_CHAT_ID = 10;
     public static final Integer MULTI_TURNS_CHAT_ID = 11;
-    private static final User user_test = User.getFakeUser();
+    private static final User user_test = User.getDefaultUser();
 
     public static User getUser() {
         return user_test;
@@ -43,33 +37,21 @@ public class DataUtils {
         return User.get(3L, "tom");
     }
 
-    public static ChatParseReq getChatParseReq(Integer id, String query) {
+    public static ChatParseReq getChatParseReq(Integer id, String query, boolean enableLLM) {
         ChatParseReq chatParseReq = new ChatParseReq();
         chatParseReq.setQueryText(query);
         chatParseReq.setChatId(id);
         chatParseReq.setUser(user_test);
+        chatParseReq.setDisableLLM(!enableLLM);
         return chatParseReq;
-    }
-
-    public static ChatParseReq getChatParseReqWithAgent(Integer id, String query, Integer agentId) {
-        ChatParseReq queryReq = new ChatParseReq();
-        queryReq.setQueryText(query);
-        queryReq.setChatId(id);
-        queryReq.setUser(user_test);
-        queryReq.setAgentId(agentId);
-        return queryReq;
     }
 
     public static SchemaElement getSchemaElement(String name) {
         return SchemaElement.builder().name(name).build();
     }
 
-    public static QueryFilter getFilter(
-            String bizName,
-            FilterOperatorEnum filterOperatorEnum,
-            Object value,
-            String name,
-            Long elementId) {
+    public static QueryFilter getFilter(String bizName, FilterOperatorEnum filterOperatorEnum,
+            Object value, String name, Long elementId) {
         QueryFilter filter = new QueryFilter();
         filter.setBizName(bizName);
         filter.setOperator(filterOperatorEnum);
@@ -79,22 +61,19 @@ public class DataUtils {
         return filter;
     }
 
-    public static DateConf getDateConf(Integer unit, DateConf.DateMode dateMode, String period) {
+    public static DateConf getDateConf(Integer unit, DateConf.DateMode dateMode,
+            DatePeriodEnum period) {
         DateConf dateInfo = new DateConf();
         dateInfo.setUnit(unit);
         dateInfo.setDateMode(dateMode);
         dateInfo.setPeriod(period);
-        dateInfo.setStartDate(now().plusDays(-unit).toString());
-        dateInfo.setEndDate(now().plusDays(-1).toString());
+        dateInfo.setStartDate(now().minusDays(unit).toString());
+        dateInfo.setEndDate(now().toString());
         return dateInfo;
     }
 
-    public static DateConf getDateConf(
-            DateConf.DateMode dateMode,
-            Integer unit,
-            String period,
-            String startDate,
-            String endDate) {
+    public static DateConf getDateConf(DateConf.DateMode dateMode, Integer unit,
+            DatePeriodEnum period, String startDate, String endDate) {
         DateConf dateInfo = new DateConf();
         dateInfo.setUnit(unit);
         dateInfo.setDateMode(dateMode);
@@ -102,69 +81,6 @@ public class DataUtils {
         dateInfo.setStartDate(startDate);
         dateInfo.setEndDate(endDate);
         return dateInfo;
-    }
-
-    public static DateConf getDateConf(
-            DateConf.DateMode dateMode, String startDate, String endDate) {
-        DateConf dateInfo = new DateConf();
-        dateInfo.setDateMode(dateMode);
-        dateInfo.setStartDate(startDate);
-        dateInfo.setEndDate(endDate);
-        return dateInfo;
-    }
-
-    public static DateConf getDateConf(
-            DateConf.DateMode dateMode, String startDate, String endDate, int unit) {
-        DateConf dateInfo = new DateConf();
-        dateInfo.setDateMode(dateMode);
-        dateInfo.setStartDate(startDate);
-        dateInfo.setEndDate(endDate);
-        dateInfo.setUnit(unit);
-        return dateInfo;
-    }
-
-    public static Agent getMetricAgent() {
-        Agent agent = new Agent();
-        agent.setId(1);
-        agent.setName("查信息");
-        agent.setDescription("查信息");
-        AgentConfig agentConfig = new AgentConfig();
-        agentConfig.getTools().add(getRuleQueryTool());
-        agent.setAgentConfig(JSONObject.toJSONString(agentConfig));
-        return agent;
-    }
-
-    public static Agent getTagAgent() {
-        Agent agent = new Agent();
-        agent.setId(2);
-        agent.setName("标签圈选");
-        agent.setDescription("标签圈选");
-        AgentConfig agentConfig = new AgentConfig();
-        agentConfig.getTools().add(getRuleQueryTool());
-        agent.setAgentConfig(JSONObject.toJSONString(agentConfig));
-        return agent;
-    }
-
-    private static RuleParserTool getRuleQueryTool() {
-        RuleParserTool ruleQueryTool = new RuleParserTool();
-        ruleQueryTool.setType(AgentToolType.NL2SQL_RULE);
-        ruleQueryTool.setDataSetIds(Lists.newArrayList(-1L));
-        ruleQueryTool.setQueryModes(
-                Lists.newArrayList(
-                        "METRIC_ID",
-                        "METRIC_FILTER",
-                        "METRIC_MODEL",
-                        "TAG_DETAIL",
-                        "TAG_LIST_FILTER",
-                        "TAG_ID"));
-        return ruleQueryTool;
-    }
-
-    private static PluginTool getPluginTool() {
-        PluginTool pluginTool = new PluginTool();
-        pluginTool.setType(AgentToolType.PLUGIN);
-        pluginTool.setPlugins(Lists.newArrayList(1L));
-        return pluginTool;
     }
 
     public static Set<Long> getMetricAgentIModelIds() {

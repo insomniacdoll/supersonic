@@ -102,6 +102,12 @@ export function mockDimensionValuesAlias(data: any): Promise<any> {
   });
 }
 
+export function getDictData(data: any): Promise<any> {
+  return request.post(`${process.env.API_BASE_URL}knowledge/dict/data`, {
+    data,
+  });
+}
+
 export function queryMetric(data: any): Promise<any> {
   const { domainId, modelId } = data;
   const queryParams = {
@@ -364,9 +370,9 @@ export async function executeSql(params: ExcuteSqlParams) {
   return request.post(`${process.env.API_BASE_URL}database/executeSql`, { data });
 }
 
-export async function getColumnsBySql(params: { databaseId: number; sql: string }) {
-  return request.get(`${process.env.API_BASE_URL}database/getColumnsBySql`, {
-    params,
+export async function listColumnsBySql(data: { databaseId: number; sql: string }) {
+  return request.post(`${process.env.API_BASE_URL}database/listColumnsBySql`, {
+    data,
   });
 }
 
@@ -606,7 +612,7 @@ export function getDatabaseDetail(id: number): Promise<any> {
   return request.get(`${process.env.API_BASE_URL}database/${id}`);
 }
 
-export function getViewList(domainId: number): Promise<any> {
+export function getDataSetList(domainId: number): Promise<any> {
   return request(`${process.env.API_BASE_URL}dataSet/getDataSetList`, {
     method: 'GET',
     params: { domainId },
@@ -760,12 +766,10 @@ export function batchUpdateMetricSensitiveLevel(data: any): Promise<any> {
   });
 }
 
-export function getTermList(domainId: number): Promise<any> {
+export function getTermList(data: any): Promise<any> {
   return request(`${process.env.API_BASE_URL}term`, {
     method: 'GET',
-    params: {
-      domainId,
-    },
+    params: data,
   });
 }
 
@@ -776,8 +780,35 @@ export function saveOrUpdate(data: any): Promise<any> {
   });
 }
 
-export function deleteTerm(id: number): Promise<any> {
-  return request(`${process.env.API_BASE_URL}term/${id}`, {
+export function deleteTerm(data: any): Promise<any> {
+  return request(`${process.env.API_BASE_URL}term/deleteBatch`, {
+    method: 'POST',
+    data: { ...data },
+  });
+}
+
+export function createLlmConfig(data: any): Promise<any> {
+  return request(`${process.env.CHAT_API_BASE_URL}chat/model`, {
+    method: 'POST',
+    data: { ...data },
+  });
+}
+
+export function saveLlmConfig(data: any): Promise<any> {
+  if (data.id) {
+    return request(`${process.env.CHAT_API_BASE_URL}model`, {
+      method: 'PUT',
+      data,
+    });
+  }
+  return request(`${process.env.CHAT_API_BASE_URL}model`, {
+    method: 'POST',
+    data,
+  });
+}
+
+export function deleteLlmConfig(id: number): Promise<any> {
+  return request(`${process.env.CHAT_API_BASE_URL}model/${id}`, {
     method: 'DELETE',
   });
 }

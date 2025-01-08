@@ -19,10 +19,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
@@ -31,20 +30,20 @@ import java.util.stream.Collectors;
 @Slf4j
 public class ChatWorkflowEngine {
 
-    private static final Logger keyPipelineLog = LoggerFactory.getLogger("keyPipeline");
     private final List<SchemaMapper> schemaMappers = ComponentFactory.getSchemaMappers();
     private final List<SemanticParser> semanticParsers = ComponentFactory.getSemanticParsers();
     private final List<SemanticCorrector> semanticCorrectors =
             ComponentFactory.getSemanticCorrectors();
     private final List<ResultProcessor> resultProcessors = ComponentFactory.getResultProcessors();
 
-    public void execute(ChatQueryContext queryCtx, ParseResp parseResult) {
-        queryCtx.setChatWorkflowState(ChatWorkflowState.MAPPING);
+    public void start(ChatWorkflowState initialState, ChatQueryContext queryCtx,
+            ParseResp parseResult) {
+        queryCtx.setChatWorkflowState(initialState);
         while (queryCtx.getChatWorkflowState() != ChatWorkflowState.FINISHED) {
             switch (queryCtx.getChatWorkflowState()) {
                 case MAPPING:
                     performMapping(queryCtx);
-                    if (queryCtx.getMapInfo().getMatchedDataSetInfos().isEmpty()) {
+                    if (queryCtx.getMapInfo().isEmpty()) {
                         parseResult.setState(ParseResp.ParseState.FAILED);
                         parseResult.setErrorMsg(
                                 "No semantic entities can be mapped against user question.");
@@ -62,10 +61,8 @@ public class ChatWorkflowEngine {
                         parseResult.setErrorMsg("No semantic queries can be parsed out.");
                         queryCtx.setChatWorkflowState(ChatWorkflowState.FINISHED);
                     } else {
-                        List<SemanticParseInfo> parseInfos =
-                                queryCtx.getCandidateQueries().stream()
-                                        .map(SemanticQuery::getParseInfo)
-                                        .collect(Collectors.toList());
+                        List<SemanticParseInfo> parseInfos = queryCtx.getCandidateQueries().stream()
+                                .map(SemanticQuery::getParseInfo).collect(Collectors.toList());
                         parseResult.setSelectedParses(parseInfos);
                         queryCtx.setChatWorkflowState(ChatWorkflowState.CORRECTING);
                     }
@@ -76,7 +73,7 @@ public class ChatWorkflowEngine {
                     break;
                 case TRANSLATING:
                     long start = System.currentTimeMillis();
-                    performTranslating(queryCtx);
+                    performTranslating(queryCtx, parseResult);
                     parseResult.getParseTimeCost().setSqlTime(System.currentTimeMillis() - start);
                     queryCtx.setChatWorkflowState(ChatWorkflowState.PROCESSING);
                     break;
@@ -101,14 +98,11 @@ public class ChatWorkflowEngine {
     }
 
     private void performParsing(ChatQueryContext queryCtx) {
-        semanticParsers.forEach(
-                parser -> {
-                    parser.parse(queryCtx);
-                    log.debug(
-                            "{} result:{}",
-                            parser.getClass().getSimpleName(),
-                            JsonUtil.toString(queryCtx));
-                });
+        semanticParsers.forEach(parser -> {
+            parser.parse(queryCtx);
+            log.debug("{} result:{}", parser.getClass().getSimpleName(),
+                    JsonUtil.toString(queryCtx));
+        });
     }
 
     private void performCorrecting(ChatQueryContext queryCtx) {
@@ -126,45 +120,46 @@ public class ChatWorkflowEngine {
     }
 
     private void performProcessing(ChatQueryContext queryCtx, ParseResp parseResult) {
-        resultProcessors.forEach(
-                processor -> {
-                    processor.process(parseResult, queryCtx);
-                });
+        resultProcessors.forEach(processor -> processor.process(parseResult, queryCtx));
     }
 
-    private void performTranslating(ChatQueryContext chatQueryContext) {
-        List<SemanticParseInfo> semanticParseInfos =
-                chatQueryContext.getCandidateQueries().stream()
-                        .map(SemanticQuery::getParseInfo)
-                        .collect(Collectors.toList());
-
-        semanticParseInfos.forEach(
-                parseInfo -> {
-                    try {
-                        SemanticQuery semanticQuery =
-                                QueryManager.createQuery(parseInfo.getQueryMode());
-                        if (Objects.isNull(semanticQuery)) {
-                            return;
-                        }
-                        semanticQuery.setParseInfo(parseInfo);
-                        SemanticQueryReq semanticQueryReq = semanticQuery.buildSemanticQueryReq();
-                        SemanticLayerService queryService =
-                                ContextUtils.getBean(SemanticLayerService.class);
-                        SemanticTranslateResp explain =
-                                queryService.translate(
-                                        semanticQueryReq, chatQueryContext.getUser());
-                        parseInfo.getSqlInfo().setQuerySQL(explain.getQuerySQL());
-
-                        keyPipelineLog.info(
-                                "SqlInfoProcessor results:\n"
-                                        + "Parsed S2SQL: {}\nCorrected S2SQL: {}\nQuery SQL: {}",
-                                StringUtils.normalizeSpace(parseInfo.getSqlInfo().getParsedS2SQL()),
-                                StringUtils.normalizeSpace(
-                                        parseInfo.getSqlInfo().getCorrectedS2SQL()),
-                                StringUtils.normalizeSpace(parseInfo.getSqlInfo().getQuerySQL()));
-                    } catch (Exception e) {
-                        log.warn("get sql info failed:{}", parseInfo, e);
-                    }
-                });
+    private void performTranslating(ChatQueryContext queryCtx, ParseResp parseResult) {
+        List<SemanticParseInfo> semanticParseInfos = queryCtx.getCandidateQueries().stream()
+                .map(SemanticQuery::getParseInfo).collect(Collectors.toList());
+        List<String> errorMsg = new ArrayList<>();
+        if (StringUtils.isNotBlank(parseResult.getErrorMsg())) {
+            errorMsg.add(parseResult.getErrorMsg());
+        }
+        semanticParseInfos.forEach(parseInfo -> {
+            try {
+                SemanticQuery semanticQuery = QueryManager.createQuery(parseInfo.getQueryMode());
+                if (Objects.isNull(semanticQuery)) {
+                    return;
+                }
+                semanticQuery.setParseInfo(parseInfo);
+                SemanticQueryReq semanticQueryReq = semanticQuery.buildSemanticQueryReq();
+                SemanticLayerService queryService =
+                        ContextUtils.getBean(SemanticLayerService.class);
+                SemanticTranslateResp explain =
+                        queryService.translate(semanticQueryReq, queryCtx.getRequest().getUser());
+                parseInfo.getSqlInfo().setQuerySQL(explain.getQuerySQL());
+                if (StringUtils.isNotBlank(explain.getErrMsg())) {
+                    errorMsg.add(explain.getErrMsg());
+                }
+                log.info(
+                        "SqlInfoProcessor results:\n"
+                                + "Parsed S2SQL: {}\nCorrected S2SQL: {}\nQuery SQL: {}",
+                        StringUtils.normalizeSpace(parseInfo.getSqlInfo().getParsedS2SQL()),
+                        StringUtils.normalizeSpace(parseInfo.getSqlInfo().getCorrectedS2SQL()),
+                        StringUtils.normalizeSpace(parseInfo.getSqlInfo().getQuerySQL()));
+            } catch (Exception e) {
+                log.warn("get sql info failed:{}", parseInfo, e);
+                errorMsg.add(String.format("S2SQL:%s %s", parseInfo.getSqlInfo().getParsedS2SQL(),
+                        e.getMessage()));
+            }
+        });
+        if (!errorMsg.isEmpty()) {
+            parseResult.setErrorMsg(String.join("\n", errorMsg));
+        }
     }
 }

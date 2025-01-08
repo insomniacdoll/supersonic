@@ -10,7 +10,9 @@ public enum AggOperatorEnum {
     SUM("SUM"),
 
     COUNT("COUNT"),
+
     COUNT_DISTINCT("COUNT_DISTINCT"),
+
     DISTINCT("DISTINCT"),
 
     TOPN("TOPN"),
@@ -18,6 +20,7 @@ public enum AggOperatorEnum {
     PERCENTILE("PERCENTILE"),
 
     RATIO_ROLL("RATIO_ROLL"),
+
     RATIO_OVER("RATIO_OVER"),
 
     UNKNOWN("UNKNOWN");

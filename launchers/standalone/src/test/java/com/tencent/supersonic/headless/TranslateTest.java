@@ -1,6 +1,6 @@
 package com.tencent.supersonic.headless;
 
-import com.tencent.supersonic.auth.api.authentication.pojo.User;
+import com.tencent.supersonic.common.pojo.User;
 import com.tencent.supersonic.headless.api.pojo.request.QueryStructReq;
 import com.tencent.supersonic.headless.api.pojo.response.SemanticTranslateResp;
 import com.tencent.supersonic.headless.chat.utils.QueryReqBuilder;
@@ -17,10 +17,9 @@ public class TranslateTest extends BaseTest {
     @Test
     public void testSqlExplain() throws Exception {
         String sql = "SELECT 部门, SUM(访问次数) AS 访问次数 FROM 超音数PVUV统计  GROUP BY 部门 ";
-        SemanticTranslateResp explain =
-                semanticLayerService.translate(
-                        QueryReqBuilder.buildS2SQLReq(sql, DataUtils.getMetricAgentView()),
-                        User.getFakeUser());
+        SemanticTranslateResp explain = semanticLayerService.translate(
+                QueryReqBuilder.buildS2SQLReq(sql, DataUtils.getMetricAgentView()),
+                User.getDefaultUser());
         assertNotNull(explain);
         assertNotNull(explain.getQuerySQL());
         assertTrue(explain.getQuerySQL().contains("department"));
@@ -31,7 +30,7 @@ public class TranslateTest extends BaseTest {
     public void testStructExplain() throws Exception {
         QueryStructReq queryStructReq = buildQueryStructReq(Arrays.asList("department"));
         SemanticTranslateResp explain =
-                semanticLayerService.translate(queryStructReq, User.getFakeUser());
+                semanticLayerService.translate(queryStructReq, User.getDefaultUser());
         assertNotNull(explain);
         assertNotNull(explain.getQuerySQL());
         assertTrue(explain.getQuerySQL().contains("department"));

@@ -3,12 +3,12 @@ package com.tencent.supersonic.auth.authorization.rest;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import com.tencent.supersonic.auth.api.authentication.pojo.User;
 import com.tencent.supersonic.auth.api.authentication.utils.UserHolder;
 import com.tencent.supersonic.auth.api.authorization.pojo.AuthGroup;
 import com.tencent.supersonic.auth.api.authorization.request.QueryAuthResReq;
 import com.tencent.supersonic.auth.api.authorization.response.AuthorizedResourceResp;
 import com.tencent.supersonic.auth.api.authorization.service.AuthService;
+import com.tencent.supersonic.common.pojo.User;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -31,8 +31,7 @@ public class AuthController {
     }
 
     @GetMapping("/queryGroup")
-    public List<AuthGroup> queryAuthGroup(
-            @RequestParam("modelId") String modelId,
+    public List<AuthGroup> queryAuthGroup(@RequestParam("modelId") String modelId,
             @RequestParam(value = "groupId", required = false) Integer groupId) {
         return authService.queryAuthGroups(modelId, groupId);
     }
@@ -69,10 +68,8 @@ public class AuthController {
      * @return
      */
     @PostMapping("/queryAuthorizedRes")
-    public AuthorizedResourceResp queryAuthorizedResources(
-            @RequestBody QueryAuthResReq req,
-            HttpServletRequest request,
-            HttpServletResponse response) {
+    public AuthorizedResourceResp queryAuthorizedResources(@RequestBody QueryAuthResReq req,
+            HttpServletRequest request, HttpServletResponse response) {
         User user = UserHolder.findUser(request, response);
         return authService.queryAuthorizedResources(req, user);
     }

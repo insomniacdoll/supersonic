@@ -1,7 +1,7 @@
 package com.tencent.supersonic.headless.chat.parser.rule;
 
-import com.tencent.supersonic.common.pojo.Constants;
 import com.tencent.supersonic.common.pojo.DateConf;
+import com.tencent.supersonic.common.pojo.enums.DatePeriodEnum;
 import com.tencent.supersonic.headless.api.pojo.SemanticParseInfo;
 import com.tencent.supersonic.headless.chat.ChatQueryContext;
 import com.tencent.supersonic.headless.chat.parser.SemanticParser;
@@ -30,16 +30,15 @@ import java.util.regex.Pattern;
 @Slf4j
 public class TimeRangeParser implements SemanticParser {
 
-    private static final Pattern RECENT_PATTERN_CN =
-            Pattern.compile(
-                    ".*(?<periodStr>(近|过去)((?<enNum>\\d+)|(?<zhNum>[一二三四五六七八九十百千万亿]+))个?(?<zhPeriod>[天周月年])).*");
+    private static final Pattern RECENT_PATTERN_CN = Pattern.compile(
+            ".*(?<periodStr>(近|过去)((?<enNum>\\d+)|(?<zhNum>[一二三四五六七八九十百千万亿]+))个?(?<zhPeriod>[天周月年])).*");
     private static final Pattern DATE_PATTERN_NUMBER = Pattern.compile("(\\d{8})");
     private static final DateFormat DATE_FORMAT_NUMBER = new SimpleDateFormat("yyyyMMdd");
     private static final DateFormat DATE_FORMAT = new SimpleDateFormat("yyyy-MM-dd");
 
     @Override
     public void parse(ChatQueryContext queryContext) {
-        String queryText = queryContext.getQueryText();
+        String queryText = queryContext.getRequest().getQueryText();
         DateConf dateConf = parseRecent(queryText);
         if (dateConf == null) {
             dateConf = parseDateNumber(queryText);
@@ -63,15 +62,15 @@ public class TimeRangeParser implements SemanticParser {
                 parseInfo.setScore(parseInfo.getScore() + dateConf.getDetectWord().length());
             }
         } else {
-            SemanticParseInfo contextParseInfo = queryContext.getContextParseInfo();
+            SemanticParseInfo contextParseInfo = queryContext.getRequest().getContextParseInfo();
             if (QueryManager.containsRuleQuery(contextParseInfo.getQueryMode())) {
                 RuleSemanticQuery semanticQuery =
                         QueryManager.createRuleQuery(contextParseInfo.getQueryMode());
                 if (queryContext.containsPartitionDimensions(contextParseInfo.getDataSetId())) {
                     contextParseInfo.setDateInfo(dateConf);
                 }
-                contextParseInfo.setScore(
-                        contextParseInfo.getScore() + dateConf.getDetectWord().length());
+                contextParseInfo
+                        .setScore(contextParseInfo.getScore() + dateConf.getDetectWord().length());
                 semanticQuery.setParseInfo(contextParseInfo);
                 queryContext.getCandidateQueries().add(semanticQuery);
             }
@@ -132,11 +131,11 @@ public class TimeRangeParser implements SemanticParser {
         String detectWord = matcher.group("periodStr");
 
         DateConf info = new DateConf();
-        info.setPeriod(getPeriodConstant(zhPeriod));
-        info.setDateMode(DateConf.DateMode.RECENT);
+        info.setPeriod(DatePeriodEnum.fromChName(zhPeriod));
+        info.setDateMode(DateConf.DateMode.BETWEEN);
         info.setDetectWord(detectWord);
         info.setStartDate(LocalDate.now().minusDays(days).toString());
-        info.setEndDate(LocalDate.now().minusDays(1).toString());
+        info.setEndDate(LocalDate.now().toString());
         info.setUnit(num);
 
         return info;
@@ -163,19 +162,6 @@ public class TimeRangeParser implements SemanticParser {
                 return 365;
             default:
                 return 1;
-        }
-    }
-
-    private String getPeriodConstant(String zhPeriod) {
-        switch (zhPeriod) {
-            case "周":
-                return Constants.WEEK;
-            case "月":
-                return Constants.MONTH;
-            case "年":
-                return Constants.YEAR;
-            default:
-                return Constants.DAY;
         }
     }
 

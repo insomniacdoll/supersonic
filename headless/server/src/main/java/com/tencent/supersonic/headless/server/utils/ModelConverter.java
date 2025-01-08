@@ -2,8 +2,8 @@ package com.tencent.supersonic.headless.server.utils;
 
 import com.alibaba.fastjson.JSONObject;
 import com.google.common.collect.Lists;
-import com.tencent.supersonic.auth.api.authentication.pojo.User;
 import com.tencent.supersonic.common.pojo.DimensionConstants;
+import com.tencent.supersonic.common.pojo.User;
 import com.tencent.supersonic.common.pojo.enums.StatusEnum;
 import com.tencent.supersonic.common.util.BeanMapper;
 import com.tencent.supersonic.common.util.JsonUtil;
@@ -55,22 +55,14 @@ public class ModelConverter {
     public static ModelResp convert(ModelDO modelDO) {
         ModelResp modelResp = new ModelResp();
         BeanUtils.copyProperties(modelDO, modelResp);
-        modelResp.setAdmins(
-                StringUtils.isBlank(modelDO.getAdmin())
-                        ? Lists.newArrayList()
-                        : Arrays.asList(modelDO.getAdmin().split(",")));
-        modelResp.setAdminOrgs(
-                StringUtils.isBlank(modelDO.getAdminOrg())
-                        ? Lists.newArrayList()
-                        : Arrays.asList(modelDO.getAdminOrg().split(",")));
-        modelResp.setViewers(
-                StringUtils.isBlank(modelDO.getViewer())
-                        ? Lists.newArrayList()
-                        : Arrays.asList(modelDO.getViewer().split(",")));
-        modelResp.setViewOrgs(
-                StringUtils.isBlank(modelDO.getViewOrg())
-                        ? Lists.newArrayList()
-                        : Arrays.asList(modelDO.getViewOrg().split(",")));
+        modelResp.setAdmins(StringUtils.isBlank(modelDO.getAdmin()) ? Lists.newArrayList()
+                : Arrays.asList(modelDO.getAdmin().split(",")));
+        modelResp.setAdminOrgs(StringUtils.isBlank(modelDO.getAdminOrg()) ? Lists.newArrayList()
+                : Arrays.asList(modelDO.getAdminOrg().split(",")));
+        modelResp.setViewers(StringUtils.isBlank(modelDO.getViewer()) ? Lists.newArrayList()
+                : Arrays.asList(modelDO.getViewer().split(",")));
+        modelResp.setViewOrgs(StringUtils.isBlank(modelDO.getViewOrg()) ? Lists.newArrayList()
+                : Arrays.asList(modelDO.getViewOrg().split(",")));
         modelResp.setDrillDownDimensions(
                 JsonUtil.toList(modelDO.getDrillDownDimensions(), DrillDownDimension.class));
         modelResp.setModelDetail(JsonUtil.toObject(modelDO.getModelDetail(), ModelDetail.class));
@@ -129,9 +121,10 @@ public class ModelConverter {
         dimensionReq.setModelId(modelDO.getId());
         dimensionReq.setExpr(dim.getBizName());
         dimensionReq.setType(dim.getType());
-        dimensionReq.setDescription(
-                Objects.isNull(dim.getDescription()) ? "" : dim.getDescription());
+        dimensionReq
+                .setDescription(Objects.isNull(dim.getDescription()) ? "" : dim.getDescription());
         dimensionReq.setIsTag(dim.getIsTag());
+        dimensionReq.setTypeParams(dim.getTypeParams());
         return dimensionReq;
     }
 
@@ -188,8 +181,7 @@ public class ModelConverter {
         if (CollectionUtils.isEmpty(modelDetail.getDimensions())) {
             return Lists.newArrayList();
         }
-        return modelDetail.getDimensions().stream()
-                .filter(ModelConverter::isCreateDimension)
+        return modelDetail.getDimensions().stream().filter(ModelConverter::isCreateDimension)
                 .collect(Collectors.toList());
     }
 
@@ -197,8 +189,7 @@ public class ModelConverter {
         if (CollectionUtils.isEmpty(modelDetail.getIdentifiers())) {
             return Lists.newArrayList();
         }
-        return modelDetail.getIdentifiers().stream()
-                .filter(ModelConverter::isCreateDimension)
+        return modelDetail.getIdentifiers().stream().filter(ModelConverter::isCreateDimension)
                 .collect(Collectors.toList());
     }
 
@@ -206,8 +197,7 @@ public class ModelConverter {
         if (CollectionUtils.isEmpty(modelDetail.getMeasures())) {
             return Lists.newArrayList();
         }
-        return modelDetail.getMeasures().stream()
-                .filter(ModelConverter::isCreateMetric)
+        return modelDetail.getMeasures().stream().filter(ModelConverter::isCreateMetric)
                 .collect(Collectors.toList());
     }
 
@@ -217,20 +207,15 @@ public class ModelConverter {
                 JSONObject.parseObject(modelDO.getModelDetail(), ModelDetail.class);
         List<Dim> dims = getDimToCreateDimension(modelDetail);
         if (!CollectionUtils.isEmpty(dims)) {
-            dimensionReqs =
-                    dims.stream()
-                            .filter(dim -> StringUtils.isNotBlank(dim.getName()))
-                            .map(dim -> convert(dim, modelDO))
-                            .collect(Collectors.toList());
+            dimensionReqs = dims.stream().filter(dim -> StringUtils.isNotBlank(dim.getName()))
+                    .map(dim -> convert(dim, modelDO)).collect(Collectors.toList());
         }
         List<Identify> identifies = getIdentityToCreateDimension(modelDetail);
         if (CollectionUtils.isEmpty(identifies)) {
             return dimensionReqs;
         }
-        dimensionReqs.addAll(
-                identifies.stream()
-                        .map(identify -> convert(identify, modelDO))
-                        .collect(Collectors.toList()));
+        dimensionReqs.addAll(identifies.stream().map(identify -> convert(identify, modelDO))
+                .collect(Collectors.toList()));
         return dimensionReqs;
     }
 
@@ -241,8 +226,7 @@ public class ModelConverter {
         if (CollectionUtils.isEmpty(measures)) {
             return Lists.newArrayList();
         }
-        return measures.stream()
-                .map(measure -> convert(measure, modelDO))
+        return measures.stream().map(measure -> convert(measure, modelDO))
                 .collect(Collectors.toList());
     }
 
@@ -274,6 +258,7 @@ public class ModelConverter {
                 continue;
             }
             // Compatible with front-end tmp
+
             String oriFieldName =
                     measure.getBizName().replaceFirst(modelReq.getBizName() + "_", "");
             measure.setExpr(oriFieldName);

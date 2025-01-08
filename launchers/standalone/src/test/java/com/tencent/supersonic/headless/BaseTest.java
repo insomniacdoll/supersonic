@@ -1,11 +1,11 @@
 package com.tencent.supersonic.headless;
 
 import com.tencent.supersonic.BaseApplication;
-import com.tencent.supersonic.auth.api.authentication.pojo.User;
 import com.tencent.supersonic.common.pojo.Aggregator;
 import com.tencent.supersonic.common.pojo.DateConf;
 import com.tencent.supersonic.common.pojo.DateConf.DateMode;
 import com.tencent.supersonic.common.pojo.Order;
+import com.tencent.supersonic.common.pojo.User;
 import com.tencent.supersonic.common.pojo.enums.AggOperatorEnum;
 import com.tencent.supersonic.common.pojo.enums.QueryType;
 import com.tencent.supersonic.headless.api.pojo.request.QuerySqlReq;
@@ -27,12 +27,14 @@ import static java.time.LocalDate.now;
 
 public class BaseTest extends BaseApplication {
 
-    @Autowired protected SemanticLayerService semanticLayerService;
+    @Autowired
+    protected SemanticLayerService semanticLayerService;
 
-    @Autowired private DomainRepository domainRepository;
+    @Autowired
+    private DomainRepository domainRepository;
 
     protected SemanticQueryResp queryBySql(String sql) throws Exception {
-        return queryBySql(sql, User.getFakeUser());
+        return queryBySql(sql, User.getDefaultUser());
     }
 
     protected SemanticQueryResp queryBySql(String sql, User user) throws Exception {
@@ -47,7 +49,7 @@ public class BaseTest extends BaseApplication {
     }
 
     protected QueryStructReq buildQueryStructReq(List<String> groups) {
-        return buildQueryStructReq(groups, QueryType.METRIC);
+        return buildQueryStructReq(groups, QueryType.AGGREGATE);
     }
 
     protected QueryStructReq buildQueryStructReq(List<String> groups, QueryType queryType) {
@@ -84,7 +86,7 @@ public class BaseTest extends BaseApplication {
         for (Long modelId : DataUtils.getMetricAgentIModelIds()) {
             queryStructReq.addModelId(modelId);
         }
-        queryStructReq.setQueryType(QueryType.METRIC);
+        queryStructReq.setQueryType(QueryType.AGGREGATE);
         queryStructReq.setAggregators(Arrays.asList(aggregator));
 
         if (CollectionUtils.isNotEmpty(groups)) {

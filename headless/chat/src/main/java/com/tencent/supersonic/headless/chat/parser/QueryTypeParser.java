@@ -1,7 +1,8 @@
 package com.tencent.supersonic.headless.chat.parser;
 
-import com.tencent.supersonic.auth.api.authentication.pojo.User;
+import com.tencent.supersonic.common.jsqlparser.SqlSelectFunctionHelper;
 import com.tencent.supersonic.common.jsqlparser.SqlSelectHelper;
+import com.tencent.supersonic.common.pojo.User;
 import com.tencent.supersonic.common.pojo.enums.QueryType;
 import com.tencent.supersonic.common.pojo.enums.TimeDimensionEnum;
 import com.tencent.supersonic.headless.api.pojo.DataSetSchema;
@@ -30,7 +31,7 @@ public class QueryTypeParser implements SemanticParser {
     public void parse(ChatQueryContext chatQueryContext) {
 
         List<SemanticQuery> candidateQueries = chatQueryContext.getCandidateQueries();
-        User user = chatQueryContext.getUser();
+        User user = chatQueryContext.getRequest().getUser();
 
         for (SemanticQuery semanticQuery : candidateQueries) {
             // 1.init S2SQL
@@ -58,10 +59,8 @@ public class QueryTypeParser implements SemanticParser {
             List<String> whereFields = SqlSelectHelper.getWhereFields(sqlInfo.getParsedS2SQL());
             List<String> whereFilterByTimeFields = filterByTimeFields(whereFields);
             if (CollectionUtils.isNotEmpty(whereFilterByTimeFields)) {
-                Set<String> ids =
-                        semanticSchema.getEntities(dataSetId).stream()
-                                .map(SchemaElement::getName)
-                                .collect(Collectors.toSet());
+                Set<String> ids = semanticSchema.getEntities(dataSetId).stream()
+                        .map(SchemaElement::getName).collect(Collectors.toSet());
                 if (CollectionUtils.isNotEmpty(ids)
                         && ids.stream().anyMatch(whereFilterByTimeFields::contains)) {
                     return QueryType.ID;
@@ -70,23 +69,21 @@ public class QueryTypeParser implements SemanticParser {
         }
 
         // 2. metric queryType
-        if (selectContainsMetric(sqlInfo, dataSetId, semanticSchema)) {
-            return QueryType.METRIC;
+        if (selectContainsMetric(sqlInfo, dataSetId, semanticSchema)
+                || SqlSelectFunctionHelper.hasAggregateFunction(sqlInfo.getParsedS2SQL())) {
+            return QueryType.AGGREGATE;
         }
 
         return QueryType.DETAIL;
     }
 
     private static List<String> filterByTimeFields(List<String> whereFields) {
-        List<String> selectAndWhereFilterByTimeFields =
-                whereFields.stream()
-                        .filter(field -> !TimeDimensionEnum.containsTimeDimension(field))
-                        .collect(Collectors.toList());
-        return selectAndWhereFilterByTimeFields;
+        return whereFields.stream().filter(field -> !TimeDimensionEnum.containsTimeDimension(field))
+                .collect(Collectors.toList());
     }
 
-    private static boolean selectContainsMetric(
-            SqlInfo sqlInfo, Long dataSetId, SemanticSchema semanticSchema) {
+    private static boolean selectContainsMetric(SqlInfo sqlInfo, Long dataSetId,
+            SemanticSchema semanticSchema) {
         List<String> selectFields = SqlSelectHelper.getSelectFields(sqlInfo.getParsedS2SQL());
         List<SchemaElement> metrics = semanticSchema.getMetrics(dataSetId);
         if (CollectionUtils.isNotEmpty(metrics)) {

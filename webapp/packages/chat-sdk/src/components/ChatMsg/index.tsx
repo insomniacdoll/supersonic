@@ -15,6 +15,7 @@ import { isMobile } from '../../utils/utils';
 
 type Props = {
   queryId?: number;
+  question: string;
   data: MsgDataType;
   chartIndex: number;
   triggerResize?: boolean;
@@ -25,6 +26,7 @@ type Props = {
 
 const ChatMsg: React.FC<Props> = ({
   queryId,
+  question,
   data,
   chartIndex,
   triggerResize,
@@ -84,16 +86,8 @@ const ChatMsg: React.FC<Props> = ({
     }
     const isDslMetricCard =
       queryMode === 'LLM_S2SQL' && singleData && metricFields.length === 1 && columns.length === 1;
-
     const isMetricCard = (queryMode.includes('METRIC') || isDslMetricCard) && singleData;
-
-    const isText =
-      queryMode === 'PLAIN_TEXT' ||
-      (columns.length === 1 &&
-        columns[0].showType === 'CATEGORY' &&
-        ((!queryMode.includes('METRIC') && !queryMode.includes('ENTITY')) ||
-          queryMode === 'METRIC_INTERPRET') &&
-        singleData);
+    const isText = !queryColumns?.length;
 
     if (isText) {
       return MsgContentTypeEnum.TEXT;
@@ -109,6 +103,7 @@ const ChatMsg: React.FC<Props> = ({
       (categoryField.length > 1 ||
         queryMode === 'TAG_DETAIL' ||
         queryMode === 'ENTITY_DIMENSION' ||
+        dataSource?.length === 1 ||
         (categoryField.length === 1 && metricFields.length === 0));
 
     if (isTable) {
@@ -117,6 +112,8 @@ const ChatMsg: React.FC<Props> = ({
     const isMetricTrend =
       dateField &&
       metricFields.length > 0 &&
+      categoryField.length <= 1 &&
+      !(metricFields.length > 1 && categoryField.length > 0) &&
       !dataSource.every(item => item[dateField.nameEn] === dataSource[0][dateField.nameEn]);
 
     if (isMetricTrend) {
@@ -176,6 +173,7 @@ const ChatMsg: React.FC<Props> = ({
         return (
           <MetricCard
             data={{ ...data, queryColumns: columns, queryResults: dataSource }}
+            question={question}
             loading={loading}
           />
         );
@@ -194,6 +192,7 @@ const ChatMsg: React.FC<Props> = ({
               queryColumns: columns,
               queryResults: dataSource,
             }}
+            question={question}
             loading={loading}
             chartIndex={chartIndex}
             triggerResize={triggerResize}
@@ -207,6 +206,7 @@ const ChatMsg: React.FC<Props> = ({
         return (
           <Bar
             data={{ ...data, queryColumns: columns, queryResults: dataSource }}
+            question={question}
             triggerResize={triggerResize}
             loading={loading}
             metricField={metricFields[0]}
@@ -342,7 +342,7 @@ const ChatMsg: React.FC<Props> = ({
   return (
     <div className={chartMsgClass} style={style}>
       {dataSource?.length === 0 ? (
-        <div>暂无数据，如有疑问请联系管理员</div>
+        <div>暂无数据</div>
       ) : (
         <div>
           {getMsgContent()}

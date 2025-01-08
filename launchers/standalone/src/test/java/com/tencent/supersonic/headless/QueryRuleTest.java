@@ -1,6 +1,6 @@
 package com.tencent.supersonic.headless;
 
-import com.tencent.supersonic.auth.api.authentication.pojo.User;
+import com.tencent.supersonic.common.pojo.User;
 import com.tencent.supersonic.headless.api.pojo.ActionInfo;
 import com.tencent.supersonic.headless.api.pojo.RuleInfo;
 import com.tencent.supersonic.headless.api.pojo.enums.QueryRuleType;
@@ -19,9 +19,10 @@ import java.util.List;
 
 public class QueryRuleTest extends BaseTest {
 
-    @Autowired private QueryRuleService queryRuleService;
+    @Autowired
+    private QueryRuleService queryRuleService;
 
-    private User user = User.getFakeUser();
+    private User user = User.getDefaultUser();
 
     public QueryRuleReq addSystemRule() {
         QueryRuleReq queryRuleReq = new QueryRuleReq();

@@ -5,15 +5,17 @@ import javax.servlet.http.HttpServletResponse;
 import javax.validation.Valid;
 
 import com.github.pagehelper.PageInfo;
-import com.tencent.supersonic.auth.api.authentication.pojo.User;
 import com.tencent.supersonic.auth.api.authentication.utils.UserHolder;
+import com.tencent.supersonic.common.pojo.User;
+import com.tencent.supersonic.common.service.EmbeddingService;
+import com.tencent.supersonic.common.service.ExemplarService;
 import com.tencent.supersonic.headless.api.pojo.request.DictItemFilter;
 import com.tencent.supersonic.headless.api.pojo.request.DictItemReq;
 import com.tencent.supersonic.headless.api.pojo.request.DictSingleTaskReq;
 import com.tencent.supersonic.headless.api.pojo.request.DictValueReq;
 import com.tencent.supersonic.headless.api.pojo.response.DictItemResp;
 import com.tencent.supersonic.headless.api.pojo.response.DictTaskResp;
-import com.tencent.supersonic.headless.api.pojo.response.DictValueResp;
+import com.tencent.supersonic.headless.api.pojo.response.DictValueDimResp;
 import com.tencent.supersonic.headless.server.service.DictConfService;
 import com.tencent.supersonic.headless.server.service.DictTaskService;
 import com.tencent.supersonic.headless.server.task.DictionaryReloadTask;
@@ -32,13 +34,23 @@ import java.util.List;
 @RequestMapping("/api/semantic/knowledge")
 public class KnowledgeController {
 
-    @Autowired private DictTaskService taskService;
+    @Autowired
+    private DictTaskService taskService;
 
-    @Autowired private DictConfService confService;
+    @Autowired
+    private DictConfService confService;
 
-    @Autowired private MetaEmbeddingTask embeddingTask;
+    @Autowired
+    private MetaEmbeddingTask metaEmbeddingTask;
 
-    @Autowired private DictionaryReloadTask dictionaryReloadTask;
+    @Autowired
+    private DictionaryReloadTask dictionaryReloadTask;
+
+    @Autowired
+    private ExemplarService exemplarService;
+
+    @Autowired
+    private EmbeddingService embeddingService;
 
     /**
      * addDictConf-新增item的字典配置 Add configuration information for dictionary entries
@@ -46,10 +58,8 @@ public class KnowledgeController {
      * @param dictItemReq
      */
     @PostMapping("/conf")
-    public DictItemResp addDictConf(
-            @RequestBody @Valid DictItemReq dictItemReq,
-            HttpServletRequest request,
-            HttpServletResponse response) {
+    public DictItemResp addDictConf(@RequestBody @Valid DictItemReq dictItemReq,
+            HttpServletRequest request, HttpServletResponse response) {
         User user = UserHolder.findUser(request, response);
         return confService.addDictConf(dictItemReq, user);
     }
@@ -60,10 +70,8 @@ public class KnowledgeController {
      * @param dictItemReq
      */
     @PutMapping("/conf")
-    public DictItemResp editDictConf(
-            @RequestBody @Valid DictItemReq dictItemReq,
-            HttpServletRequest request,
-            HttpServletResponse response) {
+    public DictItemResp editDictConf(@RequestBody @Valid DictItemReq dictItemReq,
+            HttpServletRequest request, HttpServletResponse response) {
         User user = UserHolder.findUser(request, response);
         return confService.editDictConf(dictItemReq, user);
     }
@@ -74,10 +82,8 @@ public class KnowledgeController {
      * @param filter
      */
     @PostMapping("/conf/query")
-    public List<DictItemResp> queryDictConf(
-            @RequestBody @Valid DictItemFilter filter,
-            HttpServletRequest request,
-            HttpServletResponse response) {
+    public List<DictItemResp> queryDictConf(@RequestBody @Valid DictItemFilter filter,
+            HttpServletRequest request, HttpServletResponse response) {
         User user = UserHolder.findUser(request, response);
         return confService.queryDictConf(filter, user);
     }
@@ -88,9 +94,7 @@ public class KnowledgeController {
      * @param taskReq
      */
     @PostMapping("/task")
-    public Long addDictTask(
-            @RequestBody DictSingleTaskReq taskReq,
-            HttpServletRequest request,
+    public Long addDictTask(@RequestBody DictSingleTaskReq taskReq, HttpServletRequest request,
             HttpServletResponse response) {
         User user = UserHolder.findUser(request, response);
         return taskService.addDictTask(taskReq, user);
@@ -102,17 +106,17 @@ public class KnowledgeController {
      * @param taskReq
      */
     @PutMapping("/task/delete")
-    public Long deleteDictTask(
-            @RequestBody DictSingleTaskReq taskReq,
-            HttpServletRequest request,
+    public Long deleteDictTask(@RequestBody DictSingleTaskReq taskReq, HttpServletRequest request,
             HttpServletResponse response) {
         User user = UserHolder.findUser(request, response);
         return taskService.deleteDictTask(taskReq, user);
     }
 
-    /** dailyDictTask-手动离线更新所有字典 */
+    /**
+     * dailyDictTask-手动离线更新所有字典
+     */
     @PutMapping("/task/all")
-    public Boolean dailyDictTask(HttpServletRequest request, HttpServletResponse response) {
+    public Boolean dailyDictTask() {
         return taskService.dailyDictTask();
     }
 
@@ -122,23 +126,28 @@ public class KnowledgeController {
      * @param taskReq
      */
     @PostMapping("/task/search")
-    public DictTaskResp queryLatestDictTask(
-            @RequestBody DictSingleTaskReq taskReq,
-            HttpServletRequest request,
-            HttpServletResponse response) {
+    public DictTaskResp queryLatestDictTask(@RequestBody DictSingleTaskReq taskReq,
+            HttpServletRequest request, HttpServletResponse response) {
         User user = UserHolder.findUser(request, response);
         return taskService.queryLatestDictTask(taskReq, user);
     }
 
-    @GetMapping("/meta/embedding/reload")
-    public Object reloadMetaEmbedding() {
-        embeddingTask.reloadMetaEmbedding();
+    @GetMapping("/embedding/reload")
+    public Object reloadEmbedding() {
+        metaEmbeddingTask.reloadMetaEmbedding();
+        exemplarService.loadSysExemplars();
         return true;
+    }
+
+    @GetMapping("/embedding/reset")
+    public Object resetEmbedding() {
+        embeddingService.removeAll();
+        return reloadEmbedding();
     }
 
     @GetMapping("/embedding/persistFile")
     public Object executePersistFileTask() {
-        embeddingTask.executePersistFileTask();
+        metaEmbeddingTask.executePersistFileTask();
         return true;
     }
 
@@ -148,10 +157,8 @@ public class KnowledgeController {
      * @param dictValueReq
      */
     @PostMapping("/dict/data")
-    public PageInfo<DictValueResp> queryDictValue(
-            @RequestBody @Valid DictValueReq dictValueReq,
-            HttpServletRequest request,
-            HttpServletResponse response) {
+    public PageInfo<DictValueDimResp> queryDictValue(@RequestBody @Valid DictValueReq dictValueReq,
+            HttpServletRequest request, HttpServletResponse response) {
         User user = UserHolder.findUser(request, response);
         return taskService.queryDictValue(dictValueReq, user);
     }
@@ -162,19 +169,14 @@ public class KnowledgeController {
      * @param dictValueReq
      */
     @PostMapping("/dict/file")
-    public String queryDictFilePath(
-            @RequestBody @Valid DictValueReq dictValueReq,
-            HttpServletRequest request,
-            HttpServletResponse response) {
+    public String queryDictFilePath(@RequestBody @Valid DictValueReq dictValueReq,
+            HttpServletRequest request, HttpServletResponse response) {
         User user = UserHolder.findUser(request, response);
         return taskService.queryDictFilePath(dictValueReq, user);
     }
 
     @PostMapping("/dict/reload")
-    public boolean reloadKnowledge(
-            @RequestBody @Valid DictValueReq dictValueReq,
-            HttpServletRequest request,
-            HttpServletResponse response) {
+    public boolean reloadKnowledge() {
         dictionaryReloadTask.reloadKnowledge();
         return true;
     }

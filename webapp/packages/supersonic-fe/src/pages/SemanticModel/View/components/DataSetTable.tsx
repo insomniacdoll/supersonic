@@ -4,7 +4,7 @@ import { message, Button, Space, Popconfirm } from 'antd';
 import React, { useRef, useState, useEffect } from 'react';
 import { StatusEnum } from '../../enum';
 import { useModel } from '@umijs/max';
-import { deleteView, updateView, getViewList, getAllModelByDomainId } from '../../service';
+import { deleteView, updateView, getDataSetList, getAllModelByDomainId } from '../../service';
 import ViewCreateFormModal from './ViewCreateFormModal';
 import moment from 'moment';
 import styles from '../../components/style.less';
@@ -13,45 +13,50 @@ import { ColumnsConfig } from '../../components/TableColumnRender';
 import ViewSearchFormModal from './ViewSearchFormModal';
 
 type Props = {
+  dataSetList: ISemantic.IDatasetItem[];
   disabledEdit?: boolean;
-  modelList: ISemantic.IModelItem[];
 };
 
-const DataSetTable: React.FC<Props> = ({ disabledEdit = false }) => {
+const DataSetTable: React.FC<Props> = ({ dataSetList, disabledEdit = false }) => {
   const domainModel = useModel('SemanticModel.domainData');
   const { selectDomainId } = domainModel;
 
-  const [viewItem, setViewItem] = useState<ISemantic.IViewItem>();
+  const [viewItem, setViewItem] = useState<ISemantic.IDatasetItem>();
   const [saveLoading, setSaveLoading] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(false);
   const [createDataSourceModalOpen, setCreateDataSourceModalOpen] = useState(false);
   const [searchModalOpen, setSearchModalOpen] = useState(false);
   const [modelList, setModelList] = useState<ISemantic.IModelItem[]>([]);
   const actionRef = useRef<ActionType>();
+  const [editFormStep, setEditFormStep] = useState<number>(0);
 
-  const updateViewStatus = async (modelData: ISemantic.IViewItem) => {
+  const updateViewStatus = async (modelData: ISemantic.IDatasetItem) => {
     setSaveLoading(true);
     const { code, msg } = await updateView({
       ...modelData,
     });
     setSaveLoading(false);
     if (code === 200) {
-      queryViewList();
+      queryDataSetList();
     } else {
       message.error(msg);
     }
   };
 
-  const [viewList, setViewList] = useState([]);
+  const [viewList, setViewList] = useState<ISemantic.IDatasetItem[]>(dataSetList);
 
   useEffect(() => {
-    queryViewList();
+    setViewList(dataSetList);
+  }, [dataSetList]);
+
+  useEffect(() => {
+    // queryDataSetList();
     queryDomainAllModel();
   }, [selectDomainId]);
 
-  const queryViewList = async () => {
+  const queryDataSetList = async () => {
     setLoading(true);
-    const { code, data, msg } = await getViewList(selectDomainId);
+    const { code, data, msg } = await getDataSetList(selectDomainId);
     setLoading(false);
     if (code === 200) {
       setViewList(data);
@@ -82,6 +87,19 @@ const DataSetTable: React.FC<Props> = ({ disabledEdit = false }) => {
       dataIndex: 'name',
       title: '数据集名称',
       search: false,
+      render: (name, record) => {
+        return (
+          <a
+            onClick={() => {
+              setEditFormStep(1);
+              setViewItem(record);
+              setCreateDataSourceModalOpen(true);
+            }}
+          >
+            {name}
+          </a>
+        );
+      },
     },
     {
       dataIndex: 'bizName',
@@ -126,6 +144,7 @@ const DataSetTable: React.FC<Props> = ({ disabledEdit = false }) => {
             <a
               key="metricEditBtn"
               onClick={() => {
+                setEditFormStep(0);
                 setViewItem(record);
                 setCreateDataSourceModalOpen(true);
               }}
@@ -175,7 +194,7 @@ const DataSetTable: React.FC<Props> = ({ disabledEdit = false }) => {
               onConfirm={async () => {
                 const { code, msg } = await deleteView(record.id);
                 if (code === 200) {
-                  queryViewList();
+                  queryDataSetList();
                 } else {
                   message.error(msg);
                 }
@@ -223,11 +242,12 @@ const DataSetTable: React.FC<Props> = ({ disabledEdit = false }) => {
       />
       {createDataSourceModalOpen && (
         <ViewCreateFormModal
+          step={editFormStep}
           domainId={selectDomainId}
           viewItem={viewItem}
           modelList={modelList}
           onSubmit={() => {
-            queryViewList();
+            queryDataSetList();
             setCreateDataSourceModalOpen(false);
           }}
           onCancel={() => {
@@ -241,7 +261,7 @@ const DataSetTable: React.FC<Props> = ({ disabledEdit = false }) => {
           domainId={selectDomainId}
           viewItem={viewItem}
           onSubmit={() => {
-            queryViewList();
+            queryDataSetList();
             setSearchModalOpen(false);
           }}
           onCancel={() => {

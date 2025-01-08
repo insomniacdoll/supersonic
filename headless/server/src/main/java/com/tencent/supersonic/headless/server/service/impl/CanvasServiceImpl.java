@@ -3,7 +3,7 @@ package com.tencent.supersonic.headless.server.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.google.common.collect.Lists;
-import com.tencent.supersonic.auth.api.authentication.pojo.User;
+import com.tencent.supersonic.common.pojo.User;
 import com.tencent.supersonic.common.pojo.enums.AuthType;
 import com.tencent.supersonic.headless.api.pojo.MetaFilter;
 import com.tencent.supersonic.headless.api.pojo.request.CanvasReq;
@@ -27,11 +27,14 @@ import java.util.List;
 public class CanvasServiceImpl extends ServiceImpl<CanvasDOMapper, CanvasDO>
         implements CanvasService {
 
-    @Autowired private ModelService modelService;
+    @Autowired
+    private ModelService modelService;
 
-    @Autowired private DimensionService dimensionService;
+    @Autowired
+    private DimensionService dimensionService;
 
-    @Autowired private MetricService metricService;
+    @Autowired
+    private MetricService metricService;
 
     @Override
     public List<CanvasDO> getCanvasList(Long domainId) {

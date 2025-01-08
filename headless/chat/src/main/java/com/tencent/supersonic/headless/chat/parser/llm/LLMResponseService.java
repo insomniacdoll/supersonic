@@ -23,35 +23,33 @@ import java.util.Objects;
 @Service
 public class LLMResponseService {
 
-    public SemanticParseInfo addParseInfo(
-            ChatQueryContext queryCtx, ParseResult parseResult, String s2SQL, Double weight) {
+    public void addParseInfo(ChatQueryContext queryCtx, ParseResult parseResult, String s2SQL,
+            Double weight) {
         if (Objects.isNull(weight)) {
             weight = 0D;
         }
         LLMSemanticQuery semanticQuery = QueryManager.createLLMQuery(LLMSqlQuery.QUERY_MODE);
         SemanticParseInfo parseInfo = semanticQuery.getParseInfo();
         parseInfo.setDataSet(queryCtx.getSemanticSchema().getDataSet(parseResult.getDataSetId()));
-        parseInfo
-                .getElementMatches()
+        parseInfo.setQueryConfig(
+                queryCtx.getSemanticSchema().getQueryConfig(parseResult.getDataSetId()));
+        parseInfo.getElementMatches()
                 .addAll(queryCtx.getMapInfo().getMatchedElements(parseInfo.getDataSetId()));
 
         Map<String, Object> properties = new HashMap<>();
         properties.put(Constants.CONTEXT, parseResult);
         properties.put("type", "internal");
         Text2SQLExemplar exemplar =
-                Text2SQLExemplar.builder()
-                        .question(queryCtx.getQueryText())
+                Text2SQLExemplar.builder().question(queryCtx.getRequest().getQueryText())
                         .sideInfo(parseResult.getLlmResp().getSideInfo())
                         .dbSchema(parseResult.getLlmResp().getSchema())
-                        .sql(parseResult.getLlmResp().getSqlOutput())
-                        .build();
+                        .sql(parseResult.getLlmResp().getSqlOutput()).build();
         properties.put(Text2SQLExemplar.PROPERTY_KEY, exemplar);
         parseInfo.setProperties(properties);
-        parseInfo.setScore(queryCtx.getQueryText().length() * (1 + weight));
+        parseInfo.setScore(queryCtx.getRequest().getQueryText().length() * (1 + weight));
         parseInfo.setQueryMode(semanticQuery.getQueryMode());
         parseInfo.getSqlInfo().setParsedS2SQL(s2SQL);
         queryCtx.getCandidateQueries().add(semanticQuery);
-        return parseInfo;
     }
 
     public Map<String, LLMSqlResp> getDeduplicationSqlResp(int currentRetry, LLMResp llmResp) {

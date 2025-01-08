@@ -1,23 +1,26 @@
 package com.tencent.supersonic.headless.server.utils;
 
+import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
 import com.tencent.supersonic.common.jsqlparser.FieldExpression;
 import com.tencent.supersonic.common.jsqlparser.SqlSelectHelper;
 import com.tencent.supersonic.common.pojo.Aggregator;
 import com.tencent.supersonic.common.pojo.DateConf;
 import com.tencent.supersonic.common.pojo.DateConf.DateMode;
 import com.tencent.supersonic.common.pojo.ItemDateResp;
+import com.tencent.supersonic.common.pojo.enums.DatePeriodEnum;
 import com.tencent.supersonic.common.pojo.enums.TypeEnums;
 import com.tencent.supersonic.common.util.DateModeUtils;
 import com.tencent.supersonic.common.util.SqlFilterUtils;
+import com.tencent.supersonic.headless.api.pojo.Identify;
 import com.tencent.supersonic.headless.api.pojo.ItemDateFilter;
 import com.tencent.supersonic.headless.api.pojo.MetaFilter;
 import com.tencent.supersonic.headless.api.pojo.SchemaItem;
 import com.tencent.supersonic.headless.api.pojo.request.QuerySqlReq;
 import com.tencent.supersonic.headless.api.pojo.request.QueryStructReq;
-import com.tencent.supersonic.headless.api.pojo.response.DimSchemaResp;
 import com.tencent.supersonic.headless.api.pojo.response.DimensionResp;
 import com.tencent.supersonic.headless.api.pojo.response.MetricResp;
-import com.tencent.supersonic.headless.api.pojo.response.MetricSchemaResp;
+import com.tencent.supersonic.headless.api.pojo.response.ModelResp;
 import com.tencent.supersonic.headless.api.pojo.response.SemanticSchemaResp;
 import com.tencent.supersonic.headless.server.service.SchemaService;
 import lombok.extern.slf4j.Slf4j;
@@ -40,32 +43,20 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-import static com.tencent.supersonic.common.pojo.Constants.DAY;
 import static com.tencent.supersonic.common.pojo.Constants.DAY_FORMAT;
-import static com.tencent.supersonic.common.pojo.Constants.MONTH;
-import static com.tencent.supersonic.common.pojo.Constants.WEEK;
 
 @Slf4j
 @Component
 public class QueryStructUtils {
 
-    public static Set<String> internalTimeCols =
+    public static Set<String> internalCols =
             new HashSet<>(Arrays.asList("dayno", "sys_imp_date", "sys_imp_week", "sys_imp_month"));
-    public static Set<String> internalCols;
-
-    static {
-        internalCols = new HashSet<>(Arrays.asList("plat_sys_var"));
-        internalCols.addAll(internalTimeCols);
-    }
 
     private final DateModeUtils dateModeUtils;
     private final SqlFilterUtils sqlFilterUtils;
     private final SchemaService schemaService;
-    private String variablePrefix = "'${";
 
-    public QueryStructUtils(
-            DateModeUtils dateModeUtils,
-            SqlFilterUtils sqlFilterUtils,
+    public QueryStructUtils(DateModeUtils dateModeUtils, SqlFilterUtils sqlFilterUtils,
             SchemaService schemaService) {
 
         this.dateModeUtils = dateModeUtils;
@@ -130,42 +121,101 @@ public class QueryStructUtils {
         return new HashSet<>(SqlSelectHelper.getAllSelectFields(querySqlReq.getSql()));
     }
 
-    public Set<String> getBizNameFromSql(
-            QuerySqlReq querySqlReq, SemanticSchemaResp semanticSchemaResp) {
+    public Set<Long> getModelIdsFromStruct(QueryStructReq queryStructReq,
+            SemanticSchemaResp semanticSchemaResp) {
+        Set<Long> modelIds = Sets.newHashSet();
+        Set<String> bizNameFromStruct = getBizNameFromStruct(queryStructReq);
+        modelIds.addAll(semanticSchemaResp.getMetrics().stream()
+                .filter(metric -> bizNameFromStruct.contains(metric.getBizName()))
+                .map(MetricResp::getModelId).collect(Collectors.toSet()));
+        modelIds.addAll(semanticSchemaResp.getDimensions().stream()
+                .filter(dimension -> bizNameFromStruct.contains(dimension.getBizName()))
+                .map(DimensionResp::getModelId).collect(Collectors.toList()));
+        return modelIds;
+    }
+
+    private List<MetricResp> getMetricsFromSql(QuerySqlReq querySqlReq,
+            SemanticSchemaResp semanticSchemaResp) {
         Set<String> resNameSet = getResName(querySqlReq);
-        Set<String> resNameEnSet = new HashSet<>();
         if (semanticSchemaResp != null) {
-            List<MetricSchemaResp> metrics = semanticSchemaResp.getMetrics();
-            List<DimSchemaResp> dimensions = semanticSchemaResp.getDimensions();
-            metrics.stream()
-                    .forEach(
-                            o -> {
-                                if (resNameSet.contains(o.getName())
-                                        || resNameSet.contains(o.getBizName())) {
-                                    resNameEnSet.add(o.getBizName());
-                                }
-                            });
-            dimensions.stream()
-                    .forEach(
-                            o -> {
-                                if (resNameSet.contains(o.getName())
-                                        || resNameSet.contains(o.getBizName())) {
-                                    resNameEnSet.add(o.getBizName());
-                                }
-                            });
+            return semanticSchemaResp.getMetrics().stream().filter(
+                    m -> resNameSet.contains(m.getName()) || resNameSet.contains(m.getBizName()))
+                    .collect(Collectors.toList());
         }
-        return resNameEnSet.stream()
-                .filter(res -> !internalCols.contains(res))
-                .collect(Collectors.toSet());
+        return Lists.newArrayList();
+    }
+
+    private Set<Long> getModelIdsByIdentifiesFromSql(QuerySqlReq querySqlReq,
+            SemanticSchemaResp semanticSchemaResp) {
+        Set<String> resNameSet = getResName(querySqlReq);
+        Set<Long> modelIds = new HashSet<>();
+
+        if (semanticSchemaResp == null) {
+            return modelIds;
+        }
+        if (CollectionUtils.isEmpty(semanticSchemaResp.getModelResps())) {
+            return modelIds;
+        }
+        for (ModelResp modelResp : semanticSchemaResp.getModelResps()) {
+            if (modelHasMatchingIdentifier(modelResp, resNameSet)) {
+                modelIds.add(modelResp.getId());
+            }
+        }
+        return modelIds;
+    }
+
+    private boolean modelHasMatchingIdentifier(ModelResp modelResp, Set<String> resNameSet) {
+        if (modelResp.getModelDetail() == null) {
+            return false;
+        }
+        List<Identify> identifiers = modelResp.getModelDetail().getIdentifiers();
+        if (CollectionUtils.isEmpty(identifiers)) {
+            return false;
+        }
+        return identifiers.stream().anyMatch(identifier -> resNameSet.contains(identifier.getName())
+                || resNameSet.contains(identifier.getBizName()));
+    }
+
+    private List<DimensionResp> getDimensionsFromSql(QuerySqlReq querySqlReq,
+            SemanticSchemaResp semanticSchemaResp) {
+        Set<String> resNameSet = getResName(querySqlReq);
+        if (semanticSchemaResp != null) {
+            return semanticSchemaResp.getDimensions().stream().filter(
+                    m -> resNameSet.contains(m.getName()) || resNameSet.contains(m.getBizName()))
+                    .collect(Collectors.toList());
+        }
+        return Lists.newArrayList();
+    }
+
+    public Set<Long> getModelIdFromSql(QuerySqlReq querySqlReq,
+            SemanticSchemaResp semanticSchemaResp) {
+        Set<Long> modelIds = Sets.newHashSet();
+        List<DimensionResp> dimensions = getDimensionsFromSql(querySqlReq, semanticSchemaResp);
+        List<MetricResp> metrics = getMetricsFromSql(querySqlReq, semanticSchemaResp);
+        modelIds.addAll(
+                dimensions.stream().map(DimensionResp::getModelId).collect(Collectors.toList()));
+        modelIds.addAll(metrics.stream().map(MetricResp::getModelId).collect(Collectors.toList()));
+        modelIds.addAll(getModelIdsByIdentifiesFromSql(querySqlReq, semanticSchemaResp));
+        return modelIds;
+    }
+
+    public Set<String> getBizNameFromSql(QuerySqlReq querySqlReq,
+            SemanticSchemaResp semanticSchemaResp) {
+        Set<String> bizNames = Sets.newHashSet();
+        List<DimensionResp> dimensions = getDimensionsFromSql(querySqlReq, semanticSchemaResp);
+        List<MetricResp> metrics = getMetricsFromSql(querySqlReq, semanticSchemaResp);
+        bizNames.addAll(
+                dimensions.stream().map(DimensionResp::getBizName).collect(Collectors.toList()));
+        bizNames.addAll(metrics.stream().map(MetricResp::getBizName).collect(Collectors.toList()));
+        return bizNames;
     }
 
     public ItemDateResp getItemDateResp(QueryStructReq queryStructCmd) {
         List<Long> dimensionIds = getDimensionIds(queryStructCmd);
         List<Long> metricIds = getMetricIds(queryStructCmd);
-        ItemDateResp dateDate =
-                schemaService.getItemDate(
-                        new ItemDateFilter(dimensionIds, TypeEnums.DIMENSION.name()),
-                        new ItemDateFilter(metricIds, TypeEnums.METRIC.name()));
+        ItemDateResp dateDate = schemaService.getItemDate(
+                new ItemDateFilter(dimensionIds, TypeEnums.DIMENSION.name()),
+                new ItemDateFilter(metricIds, TypeEnums.METRIC.name()));
         return dateDate;
     }
 
@@ -183,17 +233,14 @@ public class QueryStructUtils {
             case BETWEEN:
                 return Triple.of(dateInfo, dateConf.getStartDate(), dateConf.getEndDate());
             case LIST:
-                return Triple.of(
-                        dateInfo,
-                        Collections.min(dateConf.getDateList()),
+                return Triple.of(dateInfo, Collections.min(dateConf.getDateList()),
                         Collections.max(dateConf.getDateList()));
             case RECENT:
                 ItemDateResp dateDate = getItemDateResp(queryStructCmd);
                 LocalDate dateMax = LocalDate.now().minusDays(1);
                 LocalDate dateMin = dateMax.minusDays(dateConf.getUnit() - 1);
                 if (Objects.isNull(dateDate)) {
-                    return Triple.of(
-                            dateInfo,
+                    return Triple.of(dateInfo,
                             dateMin.format(DateTimeFormatter.ofPattern(DAY_FORMAT)),
                             dateMax.format(DateTimeFormatter.ofPattern(DAY_FORMAT)));
                 }
@@ -211,11 +258,8 @@ public class QueryStructUtils {
                                 dateModeUtils.recentMonth(dateDate, dateConf);
                         Optional<String> minBegins =
                                 rets.stream().map(i -> i.left).sorted().findFirst();
-                        Optional<String> maxBegins =
-                                rets.stream()
-                                        .map(i -> i.right)
-                                        .sorted(Comparator.reverseOrder())
-                                        .findFirst();
+                        Optional<String> maxBegins = rets.stream().map(i -> i.right)
+                                .sorted(Comparator.reverseOrder()).findFirst();
                         if (minBegins.isPresent() && maxBegins.isPresent()) {
                             return Triple.of(dateInfo, minBegins.get(), maxBegins.get());
                         }
@@ -236,7 +280,7 @@ public class QueryStructUtils {
             Set<String> dateList = new HashSet<>();
             String startDate = "";
             String endDate = "";
-            String period = "";
+            DatePeriodEnum period = null;
             for (FieldExpression f : fieldExpressions) {
                 if (Objects.isNull(f.getFieldName())
                         || !internalCols.contains(f.getFieldName().toLowerCase())) {
@@ -247,7 +291,7 @@ public class QueryStructUtils {
                     continue;
                 }
                 period = dateModeUtils.getPeriodByCol(f.getFieldName().toLowerCase());
-                if ("".equals(period)) {
+                if (period == null) {
                     continue;
                 }
                 if ("=".equals(f.getOperator())) {
@@ -263,7 +307,7 @@ public class QueryStructUtils {
                     }
                 }
             }
-            if (!"".equals(period)) {
+            if (period != null) {
                 DateConf dateConf = new DateConf();
                 dateConf.setPeriod(period);
                 if (!CollectionUtils.isEmpty(dateList)) {

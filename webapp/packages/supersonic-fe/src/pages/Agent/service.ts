@@ -35,26 +35,43 @@ export function getMetricList(modelId: number) {
   });
 }
 
-export function testLLMConn(data: any) {
-  return request<Result<{ list: MetricType[] }>>('/api/chat/agent/testLLMConn', {
-    method: 'POST',
-    data,
-  });
-}
-
-export function getMemeoryList(agentId: number, chatMemoryFilter: any, current: number) {
+export function getMemeoryList(data: { agentId: number; chatMemoryFilter: any; current: number }) {
+  const { agentId, chatMemoryFilter, current } = data;
   return request<Result<{ list: MetricType[] }>>('/api/chat/memory/pageMemories', {
     method: 'POST',
     data: {
+      ...data,
       chatMemoryFilter: { agentId, ...chatMemoryFilter },
       current,
       pageSize: 10,
+      sort: 'desc',
+      // orderCondition: 'updatedAt',
     },
   });
 }
 
 export function saveMemory(data: MemoryType) {
   return request<Result<string>>('/api/chat/memory/updateMemory', {
+    method: 'POST',
+    data,
+  });
+}
+
+export function batchDeleteMemory(ids: number[]) {
+  return request<Result<string>>('/api/chat/memory/batchDelete', {
+    method: 'POST',
+    data: { ids },
+  });
+}
+
+export function getToolTypes(): Promise<any> {
+  return request(`${process.env.CHAT_API_BASE_URL}agent/getToolTypes`, {
+    method: 'GET',
+  });
+}
+
+export function createMemory(data: any) {
+  return request<Result<string>>('/api/chat/memory/createMemory', {
     method: 'POST',
     data,
   });

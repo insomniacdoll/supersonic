@@ -31,35 +31,26 @@ public class SqlExecutor implements ChatQueryExecutor {
         QueryResult queryResult = doExecute(executeContext);
 
         if (queryResult != null) {
-            String textResult =
-                    ResultFormatter.transform2TextNew(
-                            queryResult.getQueryColumns(), queryResult.getQueryResults());
+            String textResult = ResultFormatter.transform2TextNew(queryResult.getQueryColumns(),
+                    queryResult.getQueryResults());
             queryResult.setTextResult(textResult);
 
             if (queryResult.getQueryState().equals(QueryState.SUCCESS)
                     && queryResult.getQueryMode().equals(LLMSqlQuery.QUERY_MODE)) {
                 Text2SQLExemplar exemplar =
                         JsonUtil.toObject(
-                                JsonUtil.toString(
-                                        executeContext
-                                                .getParseInfo()
-                                                .getProperties()
-                                                .get(Text2SQLExemplar.PROPERTY_KEY)),
+                                JsonUtil.toString(executeContext.getParseInfo().getProperties()
+                                        .get(Text2SQLExemplar.PROPERTY_KEY)),
                                 Text2SQLExemplar.class);
 
                 MemoryService memoryService = ContextUtils.getBean(MemoryService.class);
-                memoryService.createMemory(
-                        ChatMemoryDO.builder()
-                                .agentId(executeContext.getAgent().getId())
-                                .status(MemoryStatus.PENDING)
-                                .question(exemplar.getQuestion())
-                                .sideInfo(exemplar.getSideInfo())
-                                .dbSchema(exemplar.getDbSchema())
-                                .s2sql(exemplar.getSql())
-                                .createdBy(executeContext.getUser().getName())
-                                .updatedBy(executeContext.getUser().getName())
-                                .createdAt(new Date())
-                                .build());
+                memoryService.createMemory(ChatMemoryDO.builder()
+                        .agentId(executeContext.getAgent().getId()).status(MemoryStatus.PENDING)
+                        .question(exemplar.getQuestion()).sideInfo(exemplar.getSideInfo())
+                        .dbSchema(exemplar.getDbSchema()).s2sql(exemplar.getSql())
+                        .createdBy(executeContext.getRequest().getUser().getName())
+                        .updatedBy(executeContext.getRequest().getUser().getName())
+                        .createdAt(new Date()).build());
             }
         }
 
@@ -71,7 +62,8 @@ public class SqlExecutor implements ChatQueryExecutor {
         SemanticLayerService semanticLayer = ContextUtils.getBean(SemanticLayerService.class);
         ChatContextService chatContextService = ContextUtils.getBean(ChatContextService.class);
 
-        ChatContext chatCtx = chatContextService.getOrCreateContext(executeContext.getChatId());
+        ChatContext chatCtx =
+                chatContextService.getOrCreateContext(executeContext.getRequest().getChatId());
         SemanticParseInfo parseInfo = executeContext.getParseInfo();
         if (Objects.isNull(parseInfo.getSqlInfo())
                 || StringUtils.isBlank(parseInfo.getSqlInfo().getCorrectedS2SQL())) {
@@ -84,23 +76,25 @@ public class SqlExecutor implements ChatQueryExecutor {
         sqlReq.setDataSetId(parseInfo.getDataSetId());
 
         long startTime = System.currentTimeMillis();
-        SemanticQueryResp queryResp = semanticLayer.queryByReq(sqlReq, executeContext.getUser());
         QueryResult queryResult = new QueryResult();
         queryResult.setChatContext(parseInfo);
         queryResult.setQueryMode(parseInfo.getQueryMode());
         queryResult.setQueryTimeCost(System.currentTimeMillis() - startTime);
+        SemanticQueryResp queryResp =
+                semanticLayer.queryByReq(sqlReq, executeContext.getRequest().getUser());
         if (queryResp != null) {
             queryResult.setQueryAuthorization(queryResp.getQueryAuthorization());
             queryResult.setQuerySql(queryResp.getSql());
             queryResult.setQueryResults(queryResp.getResultList());
             queryResult.setQueryColumns(queryResp.getColumns());
             queryResult.setQueryState(QueryState.SUCCESS);
-
+            queryResult.setErrorMsg(queryResp.getErrorMsg());
             chatCtx.setParseInfo(parseInfo);
             chatContextService.updateContext(chatCtx);
         } else {
             queryResult.setQueryState(QueryState.INVALID);
         }
+
         return queryResult;
     }
 }

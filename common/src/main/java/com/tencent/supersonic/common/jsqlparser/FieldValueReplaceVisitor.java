@@ -1,5 +1,6 @@
 package com.tencent.supersonic.common.jsqlparser;
 
+import com.tencent.supersonic.common.util.ContextUtils;
 import lombok.extern.slf4j.Slf4j;
 import net.sf.jsqlparser.expression.DoubleValue;
 import net.sf.jsqlparser.expression.Expression;
@@ -27,12 +28,11 @@ import java.util.Objects;
 @Slf4j
 public class FieldValueReplaceVisitor extends ExpressionVisitorAdapter {
 
-    ParseVisitorHelper parseVisitorHelper = new ParseVisitorHelper();
     private boolean exactReplace;
     private Map<String, Map<String, String>> filedNameToValueMap;
 
-    public FieldValueReplaceVisitor(
-            boolean exactReplace, Map<String, Map<String, String>> filedNameToValueMap) {
+    public FieldValueReplaceVisitor(boolean exactReplace,
+            Map<String, Map<String, String>> filedNameToValueMap) {
         this.exactReplace = exactReplace;
         this.filedNameToValueMap = filedNameToValueMap;
     }
@@ -64,27 +64,26 @@ public class FieldValueReplaceVisitor extends ExpressionVisitorAdapter {
         }
         Column column = (Column) inExpression.getLeftExpression();
         Map<String, String> valueMap = filedNameToValueMap.get(column.getColumnName());
+        if (!(inExpression.getRightExpression() instanceof ExpressionList)) {
+            return;
+        }
         ExpressionList rightItemsList = (ExpressionList) inExpression.getRightExpression();
         List<Expression> expressions = rightItemsList.getExpressions();
         List<String> values = new ArrayList<>();
-        expressions.stream()
-                .forEach(
-                        o -> {
-                            if (o instanceof StringValue) {
-                                values.add(((StringValue) o).getValue());
-                            }
-                        });
+        expressions.stream().forEach(o -> {
+            if (o instanceof StringValue) {
+                values.add(((StringValue) o).getValue());
+            }
+        });
         if (valueMap == null || CollectionUtils.isEmpty(values)) {
             return;
         }
         List<Expression> newExpressions = new ArrayList<>();
-        values.stream()
-                .forEach(
-                        o -> {
-                            String replaceValue = valueMap.getOrDefault(o, o);
-                            StringValue stringValue = new StringValue(replaceValue);
-                            newExpressions.add(stringValue);
-                        });
+        values.stream().forEach(o -> {
+            String replaceValue = valueMap.getOrDefault(o, o);
+            StringValue stringValue = new StringValue(replaceValue);
+            newExpressions.add(stringValue);
+        });
         rightItemsList.setExpressions(newExpressions);
         inExpression.setRightExpression(rightItemsList);
     }
@@ -139,7 +138,8 @@ public class FieldValueReplaceVisitor extends ExpressionVisitorAdapter {
     private String getReplaceValue(Map<String, String> valueMap, String beforeValue) {
         String afterValue = valueMap.get(String.valueOf(beforeValue));
         if (StringUtils.isEmpty(afterValue) && !exactReplace) {
-            return parseVisitorHelper.getReplaceValue(beforeValue, valueMap, false);
+            ReplaceService replaceService = ContextUtils.getBean(ReplaceService.class);
+            return replaceService.getReplaceValue(beforeValue, valueMap, false);
         }
         return afterValue;
     }

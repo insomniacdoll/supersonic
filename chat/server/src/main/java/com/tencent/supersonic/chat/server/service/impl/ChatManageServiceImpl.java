@@ -2,10 +2,10 @@ package com.tencent.supersonic.chat.server.service.impl;
 
 import com.alibaba.fastjson.JSONObject;
 import com.github.pagehelper.PageInfo;
-import com.tencent.supersonic.auth.api.authentication.pojo.User;
 import com.tencent.supersonic.chat.api.pojo.request.ChatExecuteReq;
 import com.tencent.supersonic.chat.api.pojo.request.ChatParseReq;
 import com.tencent.supersonic.chat.api.pojo.request.PageQueryInfoReq;
+import com.tencent.supersonic.chat.api.pojo.response.ChatParseResp;
 import com.tencent.supersonic.chat.api.pojo.response.QueryResp;
 import com.tencent.supersonic.chat.api.pojo.response.QueryResult;
 import com.tencent.supersonic.chat.api.pojo.response.ShowCaseResp;
@@ -16,6 +16,7 @@ import com.tencent.supersonic.chat.server.persistence.dataobject.QueryDO;
 import com.tencent.supersonic.chat.server.persistence.repository.ChatQueryRepository;
 import com.tencent.supersonic.chat.server.persistence.repository.ChatRepository;
 import com.tencent.supersonic.chat.server.service.ChatManageService;
+import com.tencent.supersonic.common.pojo.User;
 import com.tencent.supersonic.common.util.JsonUtil;
 import com.tencent.supersonic.headless.api.pojo.SemanticParseInfo;
 import com.tencent.supersonic.headless.api.pojo.response.ParseResp;
@@ -25,11 +26,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
 
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -37,8 +34,10 @@ import java.util.stream.Collectors;
 @Service
 public class ChatManageServiceImpl implements ChatManageService {
 
-    @Autowired private ChatRepository chatRepository;
-    @Autowired private ChatQueryRepository chatQueryRepository;
+    @Autowired
+    private ChatRepository chatRepository;
+    @Autowired
+    private ChatQueryRepository chatQueryRepository;
 
     @Override
     public Long addChat(User user, String chatName, Integer agentId) {
@@ -95,9 +94,8 @@ public class ChatManageServiceImpl implements ChatManageService {
     }
 
     @Override
-    public void createChatQuery(ChatParseReq chatParseReq, ParseResp parseResp) {
-        Long queryId = chatQueryRepository.createChatQuery(chatParseReq);
-        parseResp.setQueryId(queryId);
+    public Long createChatQuery(ChatParseReq chatParseReq) {
+        return chatQueryRepository.createChatQuery(chatParseReq);
     }
 
     @Override
@@ -121,30 +119,23 @@ public class ChatManageServiceImpl implements ChatManageService {
         if (CollectionUtils.isEmpty(queryResps)) {
             return showCaseResp;
         }
-        queryResps.removeIf(
-                queryResp -> {
-                    if (queryResp.getQueryResult() == null) {
-                        return true;
-                    }
-                    if (queryResp.getQueryResult().getResponse() != null) {
-                        return false;
-                    }
-                    if (CollectionUtils.isEmpty(queryResp.getQueryResult().getQueryResults())) {
-                        return true;
-                    }
-                    Map<String, Object> data = queryResp.getQueryResult().getQueryResults().get(0);
-                    return CollectionUtils.isEmpty(data);
-                });
-        queryResps =
-                new ArrayList<>(
-                        queryResps.stream()
-                                .collect(
-                                        Collectors.toMap(
-                                                QueryResp::getQueryText,
-                                                Function.identity(),
-                                                (existing, replacement) -> existing,
-                                                LinkedHashMap::new))
-                                .values());
+        queryResps.removeIf(queryResp -> {
+            if (queryResp.getQueryResult() == null) {
+                return true;
+            }
+            if (queryResp.getQueryResult().getResponse() != null) {
+                return false;
+            }
+            if (CollectionUtils.isEmpty(queryResp.getQueryResult().getQueryResults())) {
+                return true;
+            }
+            Map<String, Object> data = queryResp.getQueryResult().getQueryResults().get(0);
+            return CollectionUtils.isEmpty(data);
+        });
+        queryResps = new ArrayList<>(queryResps.stream()
+                .collect(Collectors.toMap(QueryResp::getQueryText, Function.identity(),
+                        (existing, replacement) -> existing, LinkedHashMap::new))
+                .values());
         fillParseInfo(queryResps);
         Map<Long, List<QueryResp>> showCaseMap =
                 queryResps.stream().collect(Collectors.groupingBy(QueryResp::getChatId));
@@ -166,17 +157,11 @@ public class ChatManageServiceImpl implements ChatManageService {
             if (CollectionUtils.isEmpty(chatParseDOList)) {
                 continue;
             }
-            List<SemanticParseInfo> parseInfos =
-                    chatParseDOList.stream()
-                            .map(
-                                    chatParseDO ->
-                                            JsonUtil.toObject(
-                                                    chatParseDO.getParseInfo(),
-                                                    SemanticParseInfo.class))
-                            .sorted(
-                                    Comparator.comparingDouble(SemanticParseInfo::getScore)
-                                            .reversed())
-                            .collect(Collectors.toList());
+            List<SemanticParseInfo> parseInfos = chatParseDOList.stream()
+                    .map(chatParseDO -> JsonUtil.toObject(chatParseDO.getParseInfo(),
+                            SemanticParseInfo.class))
+                    .sorted(Comparator.comparingDouble(SemanticParseInfo::getScore).reversed())
+                    .collect(Collectors.toList());
             queryResp.setParseInfos(parseInfos);
         }
     }
@@ -188,10 +173,8 @@ public class ChatManageServiceImpl implements ChatManageService {
         chatQueryDO.setQueryResult(JsonUtil.toString(queryResult));
         chatQueryDO.setQueryState(1);
         updateQuery(chatQueryDO);
-        chatRepository.updateLastQuestion(
-                chatExecuteReq.getChatId().longValue(),
-                chatExecuteReq.getQueryText(),
-                getCurrentTime());
+        chatRepository.updateLastQuestion(chatExecuteReq.getChatId().longValue(),
+                chatExecuteReq.getQueryText(), getCurrentTime());
         return chatQueryDO;
     }
 
@@ -201,16 +184,25 @@ public class ChatManageServiceImpl implements ChatManageService {
     }
 
     @Override
-    public void updateParseCostTime(ParseResp parseResp) {
-        ChatQueryDO chatQueryDO = chatQueryRepository.getChatQueryDO(parseResp.getQueryId());
-        chatQueryDO.setParseTimeCost(JsonUtil.toString(parseResp.getParseTimeCost()));
+    public void deleteQuery(Long queryId) {
+        ChatQueryDO chatQuery = chatQueryRepository.getChatQueryDO(queryId);
+        if (Objects.nonNull(chatQuery)) {
+            chatQuery.setQueryState(0);
+            chatQueryRepository.updateChatQuery(chatQuery);
+        }
+    }
+
+    @Override
+    public void updateParseCostTime(ChatParseResp chatParseResp) {
+        ChatQueryDO chatQueryDO = chatQueryRepository.getChatQueryDO(chatParseResp.getQueryId());
+        chatQueryDO.setParseTimeCost(JsonUtil.toString(chatParseResp.getParseTimeCost()));
         updateQuery(chatQueryDO);
     }
 
     @Override
-    public List<ChatParseDO> batchAddParse(ChatParseReq chatParseReq, ParseResp parseResult) {
-        List<SemanticParseInfo> candidateParses = parseResult.getSelectedParses();
-        return chatQueryRepository.batchSaveParseInfo(chatParseReq, parseResult, candidateParses);
+    public List<ChatParseDO> batchAddParse(ChatParseReq chatParseReq, ChatParseResp chatParseResp) {
+        List<SemanticParseInfo> candidateParses = chatParseResp.getSelectedParses();
+        return chatQueryRepository.batchSaveParseInfo(chatParseReq, chatParseResp, candidateParses);
     }
 
     private String getCurrentTime() {

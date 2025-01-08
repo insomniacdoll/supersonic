@@ -21,24 +21,22 @@ public class MapFilter {
     public static void filter(ChatQueryContext chatQueryContext) {
         filterByDataSetId(chatQueryContext);
         filterByDetectWordLenLessThanOne(chatQueryContext);
-        switch (chatQueryContext.getQueryDataType()) {
+        twoCharactersMustEqual(chatQueryContext);
+        switch (chatQueryContext.getRequest().getQueryDataType()) {
             case TAG:
                 filterByQueryDataType(chatQueryContext, element -> !(element.getIsTag() > 0));
                 break;
             case METRIC:
-                filterByQueryDataType(
-                        chatQueryContext,
+                filterByQueryDataType(chatQueryContext,
                         element -> !SchemaElementType.METRIC.equals(element.getType()));
                 break;
             case DIMENSION:
-                filterByQueryDataType(
-                        chatQueryContext,
-                        element -> {
-                            boolean isDimensionOrValue =
-                                    SchemaElementType.DIMENSION.equals(element.getType())
-                                            || SchemaElementType.VALUE.equals(element.getType());
-                            return !isDimensionOrValue;
-                        });
+                filterByQueryDataType(chatQueryContext, element -> {
+                    boolean isDimensionOrValue =
+                            SchemaElementType.DIMENSION.equals(element.getType())
+                                    || SchemaElementType.VALUE.equals(element.getType());
+                    return !isDimensionOrValue;
+                });
                 break;
             case ALL:
             default:
@@ -48,7 +46,7 @@ public class MapFilter {
     }
 
     public static void filterByDataSetId(ChatQueryContext chatQueryContext) {
-        Set<Long> dataSetIds = chatQueryContext.getDataSetIds();
+        Set<Long> dataSetIds = chatQueryContext.getRequest().getDataSetIds();
         if (CollectionUtils.isEmpty(dataSetIds)) {
             return;
         }
@@ -67,31 +65,41 @@ public class MapFilter {
         for (Map.Entry<Long, List<SchemaElementMatch>> entry : dataSetElementMatches.entrySet()) {
             List<SchemaElementMatch> value = entry.getValue();
             if (!CollectionUtils.isEmpty(value)) {
-                value.removeIf(
-                        schemaElementMatch ->
-                                StringUtils.length(schemaElementMatch.getDetectWord()) <= 1);
+                value.removeIf(schemaElementMatch -> StringUtils
+                        .length(schemaElementMatch.getDetectWord()) <= 1);
             }
         }
     }
 
-    public static void filterByQueryDataType(
-            ChatQueryContext chatQueryContext, Predicate<SchemaElement> needRemovePredicate) {
+    private static void twoCharactersMustEqual(ChatQueryContext chatQueryContext) {
+        Map<Long, List<SchemaElementMatch>> dataSetElementMatches =
+                chatQueryContext.getMapInfo().getDataSetElementMatches();
+        for (Map.Entry<Long, List<SchemaElementMatch>> entry : dataSetElementMatches.entrySet()) {
+            List<SchemaElementMatch> value = entry.getValue();
+            if (!CollectionUtils.isEmpty(value)) {
+                value.removeIf(
+                        schemaElementMatch -> StringUtils.length(schemaElementMatch.getWord()) <= 2
+                                && schemaElementMatch.getSimilarity() < 1);
+            }
+        }
+    }
+
+    public static void filterByQueryDataType(ChatQueryContext chatQueryContext,
+            Predicate<SchemaElement> needRemovePredicate) {
         Map<Long, List<SchemaElementMatch>> dataSetElementMatches =
                 chatQueryContext.getMapInfo().getDataSetElementMatches();
         for (Map.Entry<Long, List<SchemaElementMatch>> entry : dataSetElementMatches.entrySet()) {
             List<SchemaElementMatch> schemaElementMatches = entry.getValue();
-            schemaElementMatches.removeIf(
-                    schemaElementMatch -> {
-                        SchemaElement element = schemaElementMatch.getElement();
-                        SchemaElementType type = element.getType();
+            schemaElementMatches.removeIf(schemaElementMatch -> {
+                SchemaElement element = schemaElementMatch.getElement();
+                SchemaElementType type = element.getType();
 
-                        boolean isEntityOrDatasetOrId =
-                                SchemaElementType.ENTITY.equals(type)
-                                        || SchemaElementType.DATASET.equals(type)
-                                        || SchemaElementType.ID.equals(type);
+                boolean isEntityOrDatasetOrId = SchemaElementType.ENTITY.equals(type)
+                        || SchemaElementType.DATASET.equals(type)
+                        || SchemaElementType.ID.equals(type);
 
-                        return !isEntityOrDatasetOrId && needRemovePredicate.test(element);
-                    });
+                return !isEntityOrDatasetOrId && needRemovePredicate.test(element);
+            });
         }
     }
 
@@ -116,21 +124,16 @@ public class MapFilter {
             List<SchemaElementMatch> group = entry.getValue();
 
             // Filter out objects with similarity=1.0
-            List<SchemaElementMatch> fullMatches =
-                    group.stream()
-                            .filter(SchemaElementMatch::isFullMatched)
-                            .collect(Collectors.toList());
+            List<SchemaElementMatch> fullMatches = group.stream()
+                    .filter(SchemaElementMatch::isFullMatched).collect(Collectors.toList());
 
             if (!fullMatches.isEmpty()) {
                 // If there are objects with similarity=1.0, choose the one with the longest
                 // detectWord and smallest offset
-                SchemaElementMatch bestMatch =
-                        fullMatches.stream()
-                                .max(
-                                        Comparator.comparing(
-                                                (SchemaElementMatch match) ->
-                                                        match.getDetectWord().length()))
-                                .orElse(null);
+                SchemaElementMatch bestMatch = fullMatches.stream()
+                        .max(Comparator.comparing(
+                                (SchemaElementMatch match) -> match.getDetectWord().length()))
+                        .orElse(null);
                 if (bestMatch != null) {
                     result.add(bestMatch);
                 }
@@ -145,8 +148,7 @@ public class MapFilter {
 
     public static void filterInExactMatch(List<SchemaElementMatch> matches) {
         Map<String, List<SchemaElementMatch>> fullMatches =
-                matches.stream()
-                        .filter(schemaElementMatch -> schemaElementMatch.isFullMatched())
+                matches.stream().filter(schemaElementMatch -> schemaElementMatch.isFullMatched())
                         .collect(Collectors.groupingBy(SchemaElementMatch::getWord));
         Set<String> keys = new HashSet<>(fullMatches.keySet());
         for (String key1 : keys) {
@@ -157,8 +159,7 @@ public class MapFilter {
             }
         }
         List<SchemaElementMatch> notFullMatches =
-                matches.stream()
-                        .filter(schemaElementMatch -> !schemaElementMatch.isFullMatched())
+                matches.stream().filter(schemaElementMatch -> !schemaElementMatch.isFullMatched())
                         .collect(Collectors.toList());
 
         List<SchemaElementMatch> mergedMatches = new ArrayList<>();

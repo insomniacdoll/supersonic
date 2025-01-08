@@ -3,8 +3,8 @@ package com.tencent.supersonic.headless.server.rest;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import com.tencent.supersonic.auth.api.authentication.pojo.User;
 import com.tencent.supersonic.auth.api.authentication.utils.UserHolder;
+import com.tencent.supersonic.common.pojo.User;
 import com.tencent.supersonic.headless.api.pojo.MetaFilter;
 import com.tencent.supersonic.headless.api.pojo.request.DataSetReq;
 import com.tencent.supersonic.headless.api.pojo.response.DataSetResp;
@@ -26,21 +26,18 @@ import java.util.List;
 @RequestMapping("/api/semantic/dataSet")
 public class DataSetController {
 
-    @Autowired private DataSetService dataSetService;
+    @Autowired
+    private DataSetService dataSetService;
 
     @PostMapping
-    public DataSetResp save(
-            @RequestBody DataSetReq dataSetReq,
-            HttpServletRequest request,
+    public DataSetResp save(@RequestBody DataSetReq dataSetReq, HttpServletRequest request,
             HttpServletResponse response) {
         User user = UserHolder.findUser(request, response);
         return dataSetService.save(dataSetReq, user);
     }
 
     @PutMapping
-    public DataSetResp update(
-            @RequestBody DataSetReq dataSetReq,
-            HttpServletRequest request,
+    public DataSetResp update(@RequestBody DataSetReq dataSetReq, HttpServletRequest request,
             HttpServletResponse response) {
         User user = UserHolder.findUser(request, response);
         return dataSetService.update(dataSetReq, user);
@@ -59,8 +56,8 @@ public class DataSetController {
     }
 
     @DeleteMapping("/{id}")
-    public Boolean delete(
-            @PathVariable("id") Long id, HttpServletRequest request, HttpServletResponse response) {
+    public Boolean delete(@PathVariable("id") Long id, HttpServletRequest request,
+            HttpServletResponse response) {
         User user = UserHolder.findUser(request, response);
         dataSetService.delete(id, user);
         return true;

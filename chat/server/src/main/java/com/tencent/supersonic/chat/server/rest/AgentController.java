@@ -3,13 +3,11 @@ package com.tencent.supersonic.chat.server.rest;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import com.tencent.supersonic.auth.api.authentication.pojo.User;
 import com.tencent.supersonic.auth.api.authentication.utils.UserHolder;
 import com.tencent.supersonic.chat.server.agent.Agent;
 import com.tencent.supersonic.chat.server.agent.AgentToolType;
 import com.tencent.supersonic.chat.server.service.AgentService;
-import com.tencent.supersonic.chat.server.util.LLMConnHelper;
-import com.tencent.supersonic.common.pojo.ChatModelConfig;
+import com.tencent.supersonic.common.pojo.User;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -26,21 +24,18 @@ import java.util.Map;
 @RequestMapping({"/api/chat/agent", "/openapi/chat/agent"})
 public class AgentController {
 
-    @Autowired private AgentService agentService;
+    @Autowired
+    private AgentService agentService;
 
     @PostMapping
-    public Agent createAgent(
-            @RequestBody Agent agent,
-            HttpServletRequest httpServletRequest,
+    public Agent createAgent(@RequestBody Agent agent, HttpServletRequest httpServletRequest,
             HttpServletResponse httpServletResponse) {
         User user = UserHolder.findUser(httpServletRequest, httpServletResponse);
         return agentService.createAgent(agent, user);
     }
 
     @PutMapping
-    public Agent updateAgent(
-            @RequestBody Agent agent,
-            HttpServletRequest httpServletRequest,
+    public Agent updateAgent(@RequestBody Agent agent, HttpServletRequest httpServletRequest,
             HttpServletResponse httpServletResponse) {
         User user = UserHolder.findUser(httpServletRequest, httpServletResponse);
         return agentService.updateAgent(agent, user);
@@ -52,11 +47,6 @@ public class AgentController {
         return true;
     }
 
-    @PostMapping("/testLLMConn")
-    public boolean testLLMConn(@RequestBody ChatModelConfig modelConfig) {
-        return LLMConnHelper.testConnection(modelConfig);
-    }
-
     @RequestMapping("/getAgentList")
     public List<Agent> getAgentList() {
         return agentService.getAgents();
@@ -66,4 +56,5 @@ public class AgentController {
     public Map<AgentToolType, String> getToolTypes() {
         return AgentToolType.getToolTypes();
     }
+
 }

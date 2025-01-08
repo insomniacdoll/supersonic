@@ -5,7 +5,7 @@ import { getSystemConfig, saveSystemConfig } from '@/services/user';
 import { ProCard } from '@ant-design/pro-components';
 import SelectTMEPerson from '@/components/SelectTMEPerson';
 import { ConfigParametersItem, SystemConfig, dependenciesItem } from './types';
-
+// import { testLLMConn } from '../../services/system';
 import { groupBy } from 'lodash';
 import { genneratorFormItemList } from '../SemanticModel/utils';
 
@@ -23,7 +23,7 @@ const System: React.FC = () => {
   const configMap = useRef<Record<string, ConfigParametersItem>>();
 
   const configIocDepMap = useRef<Record<string, any>>();
-  // const [configIocDepMap, setConfigIocDepMap] = useState<any>({});
+  // const [llmTestLoading, setLlmTestLoading] = useState<boolean>(false);
 
   useEffect(() => {
     querySystemConfig();
@@ -48,7 +48,6 @@ const System: React.FC = () => {
       configMap.current = parametersMap;
 
       groupConfigAndSet(parameters);
-
       initDepConfig(parameters, admins);
 
       setConfigSource(data);
@@ -197,6 +196,17 @@ const System: React.FC = () => {
     groupConfigAndSet(Object.values(tempConfigMap));
   };
 
+  // const testLLMConnect = async (params: any) => {
+  //   setLlmTestLoading(true);
+  //   const { code, data } = await testLLMConn(params);
+  //   setLlmTestLoading(false);
+  //   if (code === 200 && data) {
+  //     message.success('连接成功');
+  //   } else {
+  //     message.error('模型连接失败');
+  //   }
+  // };
+
   return (
     <>
       <div style={{ margin: '40px auto', width: 1200 }}>
@@ -242,7 +252,7 @@ const System: React.FC = () => {
                         bordered
                         id={key}
                       >
-                        {genneratorFormItemList(itemList, form)}
+                        {genneratorFormItemList(itemList)}
                       </ProCard>
                     );
                   })}

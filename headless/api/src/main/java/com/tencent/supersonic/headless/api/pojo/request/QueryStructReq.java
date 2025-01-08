@@ -48,16 +48,14 @@ public class QueryStructReq extends SemanticQueryReq {
     private List<Filter> dimensionFilters = new ArrayList<>();
     private List<Filter> metricFilters = new ArrayList<>();
     private DateConf dateInfo;
-    private Long limit = 2000L;
+    private long limit = Constants.DEFAULT_DETAIL_LIMIT;
     private QueryType queryType = QueryType.ID;
     private boolean convertToSql = true;
 
     public List<String> getGroups() {
         if (!CollectionUtils.isEmpty(this.groups)) {
-            this.groups =
-                    groups.stream()
-                            .filter(group -> !StringUtils.isEmpty(group))
-                            .collect(Collectors.toList());
+            this.groups = groups.stream().filter(group -> !StringUtils.isEmpty(group))
+                    .collect(Collectors.toList());
         }
 
         if (CollectionUtils.isEmpty(this.groups)) {
@@ -195,8 +193,8 @@ public class QueryStructReq extends SemanticQueryReq {
         return selectItems;
     }
 
-    private SelectItem buildAggregatorSelectItem(
-            Aggregator aggregator, QueryStructReq queryStructReq) {
+    private SelectItem buildAggregatorSelectItem(Aggregator aggregator,
+            QueryStructReq queryStructReq) {
         String columnName = aggregator.getColumn();
         if (queryStructReq.getQueryType().isNativeAggQuery()) {
             return new SelectItem(new Column(columnName));
@@ -213,10 +211,8 @@ public class QueryStructReq extends SemanticQueryReq {
             }
             function.setParameters(new ExpressionList(new Column(columnName)));
             SelectItem selectExpressionItem = new SelectItem(function);
-            String alias =
-                    StringUtils.isNotBlank(aggregator.getAlias())
-                            ? aggregator.getAlias()
-                            : columnName;
+            String alias = StringUtils.isNotBlank(aggregator.getAlias()) ? aggregator.getAlias()
+                    : columnName;
             selectExpressionItem.setAlias(new Alias(alias));
             return selectExpressionItem;
         }

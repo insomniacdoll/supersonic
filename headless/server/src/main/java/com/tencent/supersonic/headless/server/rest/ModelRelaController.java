@@ -1,7 +1,7 @@
 package com.tencent.supersonic.headless.server.rest;
 
-import com.tencent.supersonic.auth.api.authentication.pojo.User;
 import com.tencent.supersonic.common.pojo.ModelRela;
+import com.tencent.supersonic.common.pojo.User;
 import com.tencent.supersonic.headless.server.service.ModelRelaService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -19,7 +19,8 @@ import java.util.List;
 @RequestMapping("/api/semantic/modelRela")
 public class ModelRelaController {
 
-    @Autowired private ModelRelaService modelRelaService;
+    @Autowired
+    private ModelRelaService modelRelaService;
 
     @PostMapping
     public boolean save(@RequestBody ModelRela modelRela, User user) {

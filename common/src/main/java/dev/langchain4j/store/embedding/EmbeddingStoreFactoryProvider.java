@@ -6,6 +6,7 @@ import com.tencent.supersonic.common.util.ContextUtils;
 import dev.langchain4j.chroma.spring.ChromaEmbeddingStoreFactory;
 import dev.langchain4j.inmemory.spring.InMemoryEmbeddingStoreFactory;
 import dev.langchain4j.milvus.spring.MilvusEmbeddingStoreFactory;
+import dev.langchain4j.pgvector.spring.PgvectorEmbeddingStoreFactory;
 import org.apache.commons.lang3.StringUtils;
 
 import java.util.Map;
@@ -27,24 +28,24 @@ public class EmbeddingStoreFactoryProvider {
             return ContextUtils.getBean(EmbeddingStoreFactory.class);
         }
         if (EmbeddingStoreType.CHROMA.name().equalsIgnoreCase(embeddingStoreConfig.getProvider())) {
-            return factoryMap.computeIfAbsent(
-                    embeddingStoreConfig,
+            return factoryMap.computeIfAbsent(embeddingStoreConfig,
                     storeConfig -> new ChromaEmbeddingStoreFactory(storeConfig));
         }
         if (EmbeddingStoreType.MILVUS.name().equalsIgnoreCase(embeddingStoreConfig.getProvider())) {
-            return factoryMap.computeIfAbsent(
-                    embeddingStoreConfig,
+            return factoryMap.computeIfAbsent(embeddingStoreConfig,
                     storeConfig -> new MilvusEmbeddingStoreFactory(storeConfig));
         }
-        if (EmbeddingStoreType.IN_MEMORY
-                .name()
+        if (EmbeddingStoreType.PGVECTOR.name()
                 .equalsIgnoreCase(embeddingStoreConfig.getProvider())) {
-            return factoryMap.computeIfAbsent(
-                    embeddingStoreConfig,
+            return factoryMap.computeIfAbsent(embeddingStoreConfig,
+                    storeConfig -> new PgvectorEmbeddingStoreFactory(storeConfig));
+        }
+        if (EmbeddingStoreType.IN_MEMORY.name()
+                .equalsIgnoreCase(embeddingStoreConfig.getProvider())) {
+            return factoryMap.computeIfAbsent(embeddingStoreConfig,
                     storeConfig -> new InMemoryEmbeddingStoreFactory(storeConfig));
         }
-        throw new RuntimeException(
-                "Unsupported EmbeddingStoreFactory provider: "
-                        + embeddingStoreConfig.getProvider());
+        throw new RuntimeException("Unsupported EmbeddingStoreFactory provider: "
+                + embeddingStoreConfig.getProvider());
     }
 }

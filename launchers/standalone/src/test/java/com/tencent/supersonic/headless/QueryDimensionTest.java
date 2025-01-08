@@ -1,6 +1,6 @@
 package com.tencent.supersonic.headless;
 
-import com.tencent.supersonic.auth.api.authentication.pojo.User;
+import com.tencent.supersonic.common.pojo.User;
 import com.tencent.supersonic.headless.api.pojo.request.DimensionValueReq;
 import com.tencent.supersonic.headless.api.pojo.response.SemanticQueryResp;
 import org.junit.Assert;
@@ -15,7 +15,7 @@ public class QueryDimensionTest extends BaseTest {
         queryDimValueReq.setBizName("department");
 
         SemanticQueryResp queryResp =
-                semanticLayerService.queryDimensionValue(queryDimValueReq, User.getFakeUser());
+                semanticLayerService.queryDimensionValue(queryDimValueReq, User.getDefaultUser());
         Assert.assertNotNull(queryResp.getResultList());
         Assert.assertEquals(4, queryResp.getResultList().size());
     }

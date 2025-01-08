@@ -42,12 +42,12 @@ const ROUTES = [
     component: './Agent',
     envEnableList: [ENV_KEY.CHAT],
   },
-  {
-    path: '/plugin',
-    name: 'plugin',
-    component: './ChatPlugin',
-    envEnableList: [ENV_KEY.CHAT],
-  },
+  // {
+  //   path: '/plugin',
+  //   name: 'plugin',
+  //   component: './ChatPlugin',
+  //   envEnableList: [ENV_KEY.CHAT],
+  // },
   {
     path: '/model/metric/edit/:metricId',
     name: 'metricEdit',
@@ -152,8 +152,13 @@ const ROUTES = [
   {
     path: '/database',
     name: 'database',
-    // hideInMenu: true,
     component: './SemanticModel/components/Database/DatabaseTable',
+    envEnableList: [ENV_KEY.SEMANTIC],
+  },
+  {
+    path: '/llm',
+    name: 'llm',
+    component: './SemanticModel/components/LLM/LlmTable',
     envEnableList: [ENV_KEY.SEMANTIC],
   },
   {

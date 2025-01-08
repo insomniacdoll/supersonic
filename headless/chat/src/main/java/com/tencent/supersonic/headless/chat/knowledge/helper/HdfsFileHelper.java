@@ -59,11 +59,12 @@ public class HdfsFileHelper {
         String[] path = Config.CustomDictionaryPath;
         FileSystem fs = FileSystem.get(URI.create(path[0]), new Configuration());
         String cacheFilePath = path[0] + Predefine.BIN_EXT;
-        int customBase = cacheFilePath.lastIndexOf(FileHelper.FILE_SPILT);
-        String customPath =
-                cacheFilePath.substring(0, customBase) + FileHelper.FILE_SPILT + "*.txt";
+
+        Path hdfsPath = new Path(cacheFilePath);
+        String parentPath = hdfsPath.getParent().toString();
+        Path customPath = new Path(parentPath, "*.txt");
         log.info("customPath:{}", customPath);
-        List<String> fileList = getFileList(fs, new Path(customPath));
+        List<String> fileList = getFileList(fs, customPath);
         log.info("CustomDictionaryPath:{}", fileList);
         Config.CustomDictionaryPath = fileList.toArray(new String[0]);
         customDictionary.path =

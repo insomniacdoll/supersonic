@@ -1,7 +1,6 @@
 package com.tencent.supersonic.auth.authorization.service;
 
 import com.google.gson.Gson;
-import com.tencent.supersonic.auth.api.authentication.pojo.User;
 import com.tencent.supersonic.auth.api.authentication.service.UserService;
 import com.tencent.supersonic.auth.api.authorization.pojo.AuthGroup;
 import com.tencent.supersonic.auth.api.authorization.pojo.AuthRes;
@@ -10,6 +9,7 @@ import com.tencent.supersonic.auth.api.authorization.pojo.DimensionFilter;
 import com.tencent.supersonic.auth.api.authorization.request.QueryAuthResReq;
 import com.tencent.supersonic.auth.api.authorization.response.AuthorizedResourceResp;
 import com.tencent.supersonic.auth.api.authorization.service.AuthService;
+import com.tencent.supersonic.common.pojo.User;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -39,18 +39,15 @@ public class AuthServiceImpl implements AuthService {
         List<String> rows =
                 jdbcTemplate.queryForList("select config from s2_auth_groups", String.class);
         Gson g = new Gson();
-        return rows.stream()
-                .map(row -> g.fromJson(row, AuthGroup.class))
+        return rows.stream().map(row -> g.fromJson(row, AuthGroup.class))
                 .collect(Collectors.toList());
     }
 
     @Override
     public List<AuthGroup> queryAuthGroups(String modelId, Integer groupId) {
         return load().stream()
-                .filter(
-                        group ->
-                                (Objects.isNull(groupId) || groupId.equals(group.getGroupId()))
-                                        && modelId.equals(group.getModelId().toString()))
+                .filter(group -> (Objects.isNull(groupId) || groupId.equals(group.getGroupId()))
+                        && modelId.equals(group.getModelId().toString()))
                 .collect(Collectors.toList());
     }
 
@@ -65,15 +62,11 @@ public class AuthServiceImpl implements AuthService {
                 nextGroupId = obj + 1;
             }
             group.setGroupId(nextGroupId);
-            jdbcTemplate.update(
-                    "insert into s2_auth_groups (group_id, config) values (?, ?);",
-                    nextGroupId,
-                    g.toJson(group));
+            jdbcTemplate.update("insert into s2_auth_groups (group_id, config) values (?, ?);",
+                    nextGroupId, g.toJson(group));
         } else {
-            jdbcTemplate.update(
-                    "update s2_auth_groups set config = ? where group_id = ?;",
-                    g.toJson(group),
-                    group.getGroupId());
+            jdbcTemplate.update("update s2_auth_groups set config = ? where group_id = ?;",
+                    g.toJson(group), group.getGroupId());
         }
     }
 
@@ -119,30 +112,24 @@ public class AuthServiceImpl implements AuthService {
         return resource;
     }
 
-    private List<AuthGroup> getAuthGroups(
-            List<Long> modelIds, String userName, List<String> departmentIds) {
-        List<AuthGroup> groups =
-                load().stream()
-                        .filter(
-                                group -> {
-                                    if (!modelIds.contains(group.getModelId())) {
-                                        return false;
-                                    }
-                                    if (!CollectionUtils.isEmpty(group.getAuthorizedUsers())
-                                            && group.getAuthorizedUsers().contains(userName)) {
-                                        return true;
-                                    }
-                                    for (String departmentId : departmentIds) {
-                                        if (!CollectionUtils.isEmpty(
-                                                        group.getAuthorizedDepartmentIds())
-                                                && group.getAuthorizedDepartmentIds()
-                                                        .contains(departmentId)) {
-                                            return true;
-                                        }
-                                    }
-                                    return false;
-                                })
-                        .collect(Collectors.toList());
+    private List<AuthGroup> getAuthGroups(List<Long> modelIds, String userName,
+            List<String> departmentIds) {
+        List<AuthGroup> groups = load().stream().filter(group -> {
+            if (!modelIds.contains(group.getModelId())) {
+                return false;
+            }
+            if (!CollectionUtils.isEmpty(group.getAuthorizedUsers())
+                    && group.getAuthorizedUsers().contains(userName)) {
+                return true;
+            }
+            for (String departmentId : departmentIds) {
+                if (!CollectionUtils.isEmpty(group.getAuthorizedDepartmentIds())
+                        && group.getAuthorizedDepartmentIds().contains(departmentId)) {
+                    return true;
+                }
+            }
+            return false;
+        }).collect(Collectors.toList());
         log.info("user:{} department:{} authGroups:{}", userName, departmentIds, groups);
         return groups;
     }

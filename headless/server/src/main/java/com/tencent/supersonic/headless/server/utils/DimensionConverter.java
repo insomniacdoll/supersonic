@@ -7,6 +7,7 @@ import com.tencent.supersonic.common.pojo.enums.TypeEnums;
 import com.tencent.supersonic.common.util.BeanMapper;
 import com.tencent.supersonic.common.util.JsonUtil;
 import com.tencent.supersonic.headless.api.pojo.DimValueMap;
+import com.tencent.supersonic.headless.api.pojo.DimensionTimeTypeParams;
 import com.tencent.supersonic.headless.api.pojo.enums.DimensionType;
 import com.tencent.supersonic.headless.api.pojo.enums.IdentifyType;
 import com.tencent.supersonic.headless.api.pojo.request.DimensionReq;
@@ -33,6 +34,11 @@ public class DimensionConverter {
             dimensionDO.setDefaultValues(JSONObject.toJSONString(dimensionReq.getDefaultValues()));
         }
         if (!CollectionUtils.isEmpty(dimensionReq.getDimValueMaps())) {
+            List<DimValueMap> dimValueMaps = dimensionReq.getDimValueMaps();
+            dimValueMaps.stream().forEach(dimValueMap -> {
+                dimValueMap.setTechName(dimValueMap.getValue());
+            });
+
             dimensionDO.setDimValueMaps(JSONObject.toJSONString(dimensionReq.getDimValueMaps()));
         } else {
             dimensionDO.setDimValueMaps(JSONObject.toJSONString(new ArrayList<>()));
@@ -42,6 +48,9 @@ public class DimensionConverter {
         }
         if (dimensionReq.getExt() != null) {
             dimensionDO.setExt(JSONObject.toJSONString(dimensionReq.getExt()));
+        }
+        if (Objects.nonNull(dimensionReq.getTypeParams())) {
+            dimensionDO.setTypeParams(JSONObject.toJSONString(dimensionReq.getTypeParams()));
         }
         return dimensionDO;
     }
@@ -65,24 +74,20 @@ public class DimensionConverter {
         return dimensionDO;
     }
 
-    public static DimensionResp convert2DimensionResp(
-            DimensionDO dimensionDO, Map<Long, ModelResp> modelRespMap) {
+    public static DimensionResp convert2DimensionResp(DimensionDO dimensionDO,
+            Map<Long, ModelResp> modelRespMap) {
         DimensionResp dimensionResp = new DimensionResp();
         BeanUtils.copyProperties(dimensionDO, dimensionResp);
         dimensionResp.setModelName(
                 modelRespMap.getOrDefault(dimensionResp.getModelId(), new ModelResp()).getName());
-        dimensionResp.setModelBizName(
-                modelRespMap
-                        .getOrDefault(dimensionResp.getModelId(), new ModelResp())
-                        .getBizName());
+        dimensionResp.setModelBizName(modelRespMap
+                .getOrDefault(dimensionResp.getModelId(), new ModelResp()).getBizName());
         if (dimensionDO.getDefaultValues() != null) {
             dimensionResp.setDefaultValues(
                     JSONObject.parseObject(dimensionDO.getDefaultValues(), List.class));
         }
-        dimensionResp.setModelFilterSql(
-                modelRespMap
-                        .getOrDefault(dimensionResp.getModelId(), new ModelResp())
-                        .getFilterSql());
+        dimensionResp.setModelFilterSql(modelRespMap
+                .getOrDefault(dimensionResp.getModelId(), new ModelResp()).getFilterSql());
         if (StringUtils.isNotEmpty(dimensionDO.getDimValueMaps())) {
             dimensionResp.setDimValueMaps(
                     JsonUtil.toList(dimensionDO.getDimValueMaps(), DimValueMap.class));
@@ -92,6 +97,10 @@ public class DimensionConverter {
         }
         if (dimensionDO.getExt() != null) {
             dimensionResp.setExt(JSONObject.parseObject(dimensionDO.getExt(), Map.class));
+        }
+        if (StringUtils.isNoneBlank(dimensionDO.getTypeParams())) {
+            dimensionResp.setTypeParams(JSONObject.parseObject(dimensionDO.getTypeParams(),
+                    DimensionTimeTypeParams.class));
         }
         dimensionResp.setType(getType(dimensionDO.getType()));
         dimensionResp.setTypeEnum(TypeEnums.DIMENSION);
@@ -113,15 +122,12 @@ public class DimensionConverter {
         }
     }
 
-    public static List<DimensionResp> filterByDataSet(
-            List<DimensionResp> dimensionResps, DataSetResp dataSetResp) {
+    public static List<DimensionResp> filterByDataSet(List<DimensionResp> dimensionResps,
+            DataSetResp dataSetResp) {
         return dimensionResps.stream()
-                .filter(
-                        dimensionResp ->
-                                dataSetResp.dimensionIds().contains(dimensionResp.getId())
-                                        || dataSetResp
-                                                .getAllIncludeAllModels()
-                                                .contains(dimensionResp.getModelId()))
+                .filter(dimensionResp -> dataSetResp.dimensionIds().contains(dimensionResp.getId())
+                        || dataSetResp.getAllIncludeAllModels()
+                                .contains(dimensionResp.getModelId()))
                 .collect(Collectors.toList());
     }
 }

@@ -19,6 +19,7 @@ type Props = {
   queryMode?: string;
   sqlInfo: SqlInfoType;
   sqlTimeCost?: number;
+  executeErrorMsg: string;
 };
 
 const SqlItem: React.FC<Props> = ({
@@ -31,6 +32,7 @@ const SqlItem: React.FC<Props> = ({
   queryMode,
   sqlInfo,
   sqlTimeCost,
+  executeErrorMsg,
 }) => {
   const [sqlType, setSqlType] = useState('');
 
@@ -49,7 +51,7 @@ const SqlItem: React.FC<Props> = ({
     return null;
   }
 
-  const { schema, linking, priorExts } = llmReq || {};
+  const { schema, terms, priorExts } = llmReq || {};
 
   const fewShots = (Object.values(llmResp?.sqlRespMap || {})[0] as any)?.fewShots || [];
 
@@ -57,9 +59,9 @@ const SqlItem: React.FC<Props> = ({
     return `
 Schema映射
 ${schema?.fieldNameList?.length > 0 ? `名称：${schema.fieldNameList.join('、')}` : ''}${
-      linking?.length > 0
+      schema?.values?.length > 0
         ? `
-取值：${linking
+取值：${schema.values
             .map((item: any) => {
               return `${item.fieldName}: ${item.fieldValue}`;
             })
@@ -71,9 +73,9 @@ ${schema?.fieldNameList?.length > 0 ? `名称：${schema.fieldNameList.join('、
 附加：${priorExts}`
         : ''
     }${
-      schema?.terms?.length > 0
+      terms?.length > 0
         ? `
-术语：${schema.terms
+术语：${terms
             .map((item: any) => {
               return `${item.name}${item.alias?.length > 0 ? `(${item.alias.join(',')})` : ''}: ${
                 item.description
@@ -126,6 +128,14 @@ ${format(sqlInfo.querySQL)}
 `;
   };
 
+  const getErrorMsgText = () => {
+    return `
+异常日志
+
+${executeErrorMsg}
+`;
+  };
+
   const onExportLog = () => {
     let text = '';
     if (question) {
@@ -148,6 +158,9 @@ ${format(sqlInfo.querySQL)}
     if (sqlInfo.querySQL) {
       text += getQuerySQLText();
     }
+    if (!!executeErrorMsg) {
+      text += getErrorMsgText();
+    }
     exportTextFile(text, `supersonic-debug-${agentId}-${queryId}.log`);
   };
 
@@ -157,7 +170,7 @@ ${format(sqlInfo.querySQL)}
         <CheckCircleFilled className={`${tipPrefixCls}-step-icon`} />
         <div className={`${tipPrefixCls}-step-title`}>
           SQL生成
-          {sqlTimeCost && (
+          {!!sqlTimeCost && (
             <span className={`${tipPrefixCls}-title-tip`}>(耗时: {sqlTimeCost}ms)</span>
           )}
           ：
@@ -253,11 +266,11 @@ ${format(sqlInfo.querySQL)}
                 </div>
               </div>
             )}
-            {linking?.length > 0 && (
+            {schema?.values?.length > 0 && (
               <div className={`${prefixCls}-schema-row`}>
                 <div className={`${prefixCls}-schema-title`}>取值：</div>
                 <div className={`${prefixCls}-schema-content`}>
-                  {linking
+                  {schema.values
                     .map((item: any) => {
                       return `${item.fieldName}: ${item.fieldValue}`;
                     })
@@ -271,11 +284,11 @@ ${format(sqlInfo.querySQL)}
                 <div className={`${prefixCls}-schema-content`}>{priorExts}</div>
               </div>
             )}
-            {schema?.terms?.length > 0 && (
+            {terms?.length > 0 && (
               <div className={`${prefixCls}-schema-row`}>
                 <div className={`${prefixCls}-schema-title`}>术语：</div>
                 <div className={`${prefixCls}-schema-content`}>
-                  {schema.terms
+                  {terms
                     .map((item: any) => {
                       return `${item.name}${
                         item.alias?.length > 0 ? `(${item.alias.join(',')})` : ''

@@ -367,3 +367,30 @@ alter table s2_chat_parse modify column `chat_id` int(11);
 --20240806
 UPDATE `s2_dimension` SET `type` = 'identify' WHERE `type` in ('primary','foreign');
 alter table singer drop column imp_date;
+
+--20240913
+ALTER TABLE s2_model MODIFY COLUMN drill_down_dimensions TEXT DEFAULT NULL;
+
+--20241009
+CREATE TABLE IF NOT EXISTS `s2_chat_model` (
+   `id` bigint(20) NOT NULL AUTO_INCREMENT,
+   `name` varchar(255) NOT NULL COMMENT '名称',
+   `description` varchar(500) DEFAULT NULL COMMENT '描述',
+   `config` text NOT NULL COMMENT '配置信息',
+   `created_at` datetime NOT NULL COMMENT '创建时间',
+   `created_by` varchar(100) NOT NULL COMMENT '创建人',
+   `updated_at` datetime NOT NULL COMMENT '更新时间',
+   `updated_by` varchar(100) NOT NULL COMMENT '更新人',
+   `admin` varchar(500) DEFAULT NULL,
+   `viewer` varchar(500) DEFAULT NULL,
+   PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COMMENT='对话大模型实例表';
+ALTER TABLE s2_agent CHANGE COLUMN config tool_config text;
+ALTER TABLE s2_agent CHANGE COLUMN model_config chat_model_config text;
+--20241011
+ALTER TABLE s2_agent DROP COLUMN  `prompt_config`;
+ALTER TABLE s2_agent DROP COLUMN  `multi_turn_config`;
+ALTER TABLE s2_agent DROP COLUMN  `enable_memory_review`;
+
+--20241012
+alter table s2_agent add column `enable_feedback` tinyint DEFAULT 1;

@@ -16,6 +16,7 @@ import static com.tencent.supersonic.headless.chat.parser.ParserConfig.PARSER_TE
  * by current candidate queries. If so, current parser could be skipped.
  */
 @Slf4j
+@Deprecated
 public class SatisfactionChecker {
 
     // check all the parse info in candidate
@@ -24,7 +25,8 @@ public class SatisfactionChecker {
             if (query.getQueryMode().equals(LLMSqlQuery.QUERY_MODE)) {
                 continue;
             }
-            if (checkThreshold(chatQueryContext.getQueryText(), query.getParseInfo())) {
+            if (checkThreshold(chatQueryContext.getRequest().getQueryText(),
+                    query.getParseInfo())) {
                 return true;
             }
         }
@@ -49,10 +51,7 @@ public class SatisfactionChecker {
         } else if (degree < shortTextLengthThreshold) {
             return false;
         }
-        log.info(
-                "queryMode:{}, degree:{}, parse info:{}",
-                semanticParseInfo.getQueryMode(),
-                degree,
+        log.info("queryMode:{}, degree:{}, parse info:{}", semanticParseInfo.getQueryMode(), degree,
                 semanticParseInfo);
         return true;
     }

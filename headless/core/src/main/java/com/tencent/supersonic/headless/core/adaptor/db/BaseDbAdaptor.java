@@ -45,8 +45,8 @@ public abstract class BaseDbAdaptor implements DbAdaptor {
         List<String> tablesAndViews = new ArrayList<>();
         DatabaseMetaData metaData = getDatabaseMetaData(connectionInfo);
 
-        try (ResultSet resultSet =
-                metaData.getTables(schemaName, schemaName, null, new String[] {"TABLE", "VIEW"})) {
+        try {
+            ResultSet resultSet = getResultSet(schemaName, metaData);
             while (resultSet.next()) {
                 String name = resultSet.getString("TABLE_NAME");
                 tablesAndViews.add(name);
@@ -55,6 +55,11 @@ public abstract class BaseDbAdaptor implements DbAdaptor {
             log.error("Failed to get tables and views", e);
         }
         return tablesAndViews;
+    }
+
+    protected ResultSet getResultSet(String schemaName, DatabaseMetaData metaData)
+            throws SQLException {
+        return metaData.getTables(schemaName, schemaName, null, new String[] {"TABLE", "VIEW"});
     }
 
     public List<DBColumn> getColumns(ConnectInfo connectInfo, String schemaName, String tableName)
@@ -72,11 +77,9 @@ public abstract class BaseDbAdaptor implements DbAdaptor {
     }
 
     protected DatabaseMetaData getDatabaseMetaData(ConnectInfo connectionInfo) throws SQLException {
-        Connection connection =
-                DriverManager.getConnection(
-                        connectionInfo.getUrl(),
-                        connectionInfo.getUserName(),
-                        connectionInfo.getPassword());
+        Connection connection = DriverManager.getConnection(connectionInfo.getUrl(),
+                connectionInfo.getUserName(), connectionInfo.getPassword());
         return connection.getMetaData();
     }
+
 }

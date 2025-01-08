@@ -1,7 +1,7 @@
 package com.tencent.supersonic.headless.server.service;
 
-import com.tencent.supersonic.auth.api.authentication.pojo.User;
 import com.tencent.supersonic.common.pojo.ItemDateResp;
+import com.tencent.supersonic.common.pojo.User;
 import com.tencent.supersonic.common.pojo.enums.AuthType;
 import com.tencent.supersonic.headless.api.pojo.DataSetSchema;
 import com.tencent.supersonic.headless.api.pojo.ItemDateFilter;
@@ -57,11 +57,9 @@ public interface SchemaService {
 
     List<ItemResp> getDomainDataSetTree();
 
-    void getSchemaYamlTpl(
-            SemanticSchemaResp semanticSchemaResp,
+    void getSchemaYamlTpl(SemanticSchemaResp semanticSchemaResp,
             Map<String, List<DimensionYamlTpl>> dimensionYamlMap,
-            List<DataModelYamlTpl> dataModelYamlTplList,
-            List<MetricYamlTpl> metricYamlTplList,
+            List<DataModelYamlTpl> dataModelYamlTplList, List<MetricYamlTpl> metricYamlTplList,
             Map<Long, String> modelIdName);
 
     ItemDateResp getItemDate(ItemDateFilter dimension, ItemDateFilter metric);

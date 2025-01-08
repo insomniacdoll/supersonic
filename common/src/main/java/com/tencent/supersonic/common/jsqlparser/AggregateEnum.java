@@ -12,6 +12,7 @@ public enum AggregateEnum {
     SMALLEST("最小", "min"),
     LOWEST("最低", "min"),
     AVERAGE("平均", "avg");
+
     private String aggregateCh;
     private String aggregateEN;
 
@@ -29,9 +30,7 @@ public enum AggregateEnum {
     }
 
     public static Map<String, String> getAggregateEnum() {
-        return Arrays.stream(AggregateEnum.values())
-                .collect(
-                        Collectors.toMap(
-                                AggregateEnum::getAggregateCh, AggregateEnum::getAggregateEN));
+        return Arrays.stream(AggregateEnum.values()).collect(
+                Collectors.toMap(AggregateEnum::getAggregateCh, AggregateEnum::getAggregateEN));
     }
 }

@@ -16,6 +16,7 @@ import java.util.stream.Collectors;
 @Data
 public class DataSetSchema {
 
+    private String databaseType;
     private SchemaElement dataSet;
     private Set<SchemaElement> metrics = new HashSet<>();
     private Set<SchemaElement> dimensions = new HashSet<>();
@@ -64,83 +65,85 @@ public class DataSetSchema {
         List<SchemaElement> allElements = new ArrayList<>();
         allElements.addAll(getDimensions());
         allElements.addAll(getMetrics());
-        return allElements.stream()
-                .collect(
-                        Collectors.toMap(
-                                SchemaElement::getBizName, SchemaElement::getName, (k1, k2) -> k1));
+        return allElements.stream().collect(Collectors.toMap(SchemaElement::getBizName,
+                SchemaElement::getName, (k1, k2) -> k1));
     }
 
     public TimeDefaultConfig getTagTypeTimeDefaultConfig() {
         if (queryConfig == null) {
             return null;
         }
-        if (queryConfig.getTagTypeDefaultConfig() == null) {
+        if (queryConfig.getDetailTypeDefaultConfig() == null) {
             return null;
         }
-        return queryConfig.getTagTypeDefaultConfig().getTimeDefaultConfig();
+        return queryConfig.getDetailTypeDefaultConfig().getTimeDefaultConfig();
     }
 
     public TimeDefaultConfig getMetricTypeTimeDefaultConfig() {
         if (queryConfig == null) {
             return null;
         }
-        if (queryConfig.getMetricTypeDefaultConfig() == null) {
+        if (queryConfig.getAggregateTypeDefaultConfig() == null) {
             return null;
         }
-        return queryConfig.getMetricTypeDefaultConfig().getTimeDefaultConfig();
+        return queryConfig.getAggregateTypeDefaultConfig().getTimeDefaultConfig();
     }
 
-    public TagTypeDefaultConfig getTagTypeDefaultConfig() {
+    public DetailTypeDefaultConfig getTagTypeDefaultConfig() {
         if (queryConfig == null) {
             return null;
         }
-        return queryConfig.getTagTypeDefaultConfig();
+        return queryConfig.getDetailTypeDefaultConfig();
     }
 
     public List<SchemaElement> getTagDefaultDimensions() {
-        TagTypeDefaultConfig tagTypeDefaultConfig = getTagTypeDefaultConfig();
-        if (Objects.isNull(tagTypeDefaultConfig)
-                || Objects.isNull(tagTypeDefaultConfig.getDefaultDisplayInfo())) {
+        DetailTypeDefaultConfig detailTypeDefaultConfig = getTagTypeDefaultConfig();
+        if (Objects.isNull(detailTypeDefaultConfig)
+                || Objects.isNull(detailTypeDefaultConfig.getDefaultDisplayInfo())) {
             return new ArrayList<>();
         }
-        if (CollectionUtils.isNotEmpty(
-                tagTypeDefaultConfig.getDefaultDisplayInfo().getMetricIds())) {
-            return tagTypeDefaultConfig.getDefaultDisplayInfo().getMetricIds().stream()
-                    .map(
-                            id -> {
-                                SchemaElement metric = getElement(SchemaElementType.METRIC, id);
-                                return metric;
-                            })
-                    .filter(Objects::nonNull)
-                    .collect(Collectors.toList());
+        if (CollectionUtils
+                .isNotEmpty(detailTypeDefaultConfig.getDefaultDisplayInfo().getMetricIds())) {
+            return detailTypeDefaultConfig.getDefaultDisplayInfo().getMetricIds().stream()
+                    .map(id -> {
+                        SchemaElement metric = getElement(SchemaElementType.METRIC, id);
+                        return metric;
+                    }).filter(Objects::nonNull).collect(Collectors.toList());
         }
         return new ArrayList<>();
     }
 
     public List<SchemaElement> getTagDefaultMetrics() {
-        TagTypeDefaultConfig tagTypeDefaultConfig = getTagTypeDefaultConfig();
-        if (Objects.isNull(tagTypeDefaultConfig)
-                || Objects.isNull(tagTypeDefaultConfig.getDefaultDisplayInfo())) {
+        DetailTypeDefaultConfig detailTypeDefaultConfig = getTagTypeDefaultConfig();
+        if (Objects.isNull(detailTypeDefaultConfig)
+                || Objects.isNull(detailTypeDefaultConfig.getDefaultDisplayInfo())) {
             return new ArrayList<>();
         }
-        if (CollectionUtils.isNotEmpty(
-                tagTypeDefaultConfig.getDefaultDisplayInfo().getDimensionIds())) {
-            return tagTypeDefaultConfig.getDefaultDisplayInfo().getDimensionIds().stream()
-                    .map(id -> getElement(SchemaElementType.DIMENSION, id))
-                    .filter(Objects::nonNull)
+        if (CollectionUtils
+                .isNotEmpty(detailTypeDefaultConfig.getDefaultDisplayInfo().getDimensionIds())) {
+            return detailTypeDefaultConfig.getDefaultDisplayInfo().getDimensionIds().stream()
+                    .map(id -> getElement(SchemaElementType.DIMENSION, id)).filter(Objects::nonNull)
                     .collect(Collectors.toList());
         }
         return new ArrayList<>();
     }
 
     public boolean containsPartitionDimensions() {
-        return dimensions.stream().anyMatch(SchemaElement::containsPartitionTime);
+        return dimensions.stream().anyMatch(SchemaElement::isPartitionTime);
     }
 
     public SchemaElement getPartitionDimension() {
         for (SchemaElement dimension : dimensions) {
-            String partitionTimeFormat = dimension.getPartitionTimeFormat();
-            if (StringUtils.isNotBlank(partitionTimeFormat)) {
+            if (dimension.isPartitionTime()) {
+                return dimension;
+            }
+        }
+        return null;
+    }
+
+    public SchemaElement getPrimaryKey() {
+        for (SchemaElement dimension : dimensions) {
+            if (dimension.isPrimaryKey()) {
                 return dimension;
             }
         }

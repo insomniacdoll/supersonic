@@ -1,6 +1,6 @@
 package com.tencent.supersonic.headless.server.service.impl;
 
-import com.tencent.supersonic.auth.api.authentication.pojo.User;
+import com.tencent.supersonic.common.pojo.User;
 import com.tencent.supersonic.common.pojo.enums.StatusEnum;
 import com.tencent.supersonic.common.util.BeanMapper;
 import com.tencent.supersonic.headless.api.pojo.request.QueryRuleFilter;
@@ -26,8 +26,8 @@ public class QueryRuleServiceImpl implements QueryRuleService {
     private final QueryRuleRepository queryRuleRepository;
     private final DataSetService dataSetService;
 
-    public QueryRuleServiceImpl(
-            QueryRuleRepository queryRuleRepository, DataSetService dataSetService) {
+    public QueryRuleServiceImpl(QueryRuleRepository queryRuleRepository,
+            DataSetService dataSetService) {
         this.queryRuleRepository = queryRuleRepository;
         this.dataSetService = dataSetService;
     }

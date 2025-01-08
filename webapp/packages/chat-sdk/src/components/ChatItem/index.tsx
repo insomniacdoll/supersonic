@@ -21,6 +21,7 @@ import Tools from '../Tools';
 import SqlItem from './SqlItem';
 import SimilarQuestionItem from './SimilarQuestionItem';
 import dayjs, { Dayjs } from 'dayjs';
+
 type Props = {
   msg: string;
   conversationId?: number;
@@ -72,6 +73,7 @@ const ChatItem: React.FC<Props> = ({
   const [executeMode, setExecuteMode] = useState(false);
   const [executeLoading, setExecuteLoading] = useState(false);
   const [executeTip, setExecuteTip] = useState('');
+  const [executeErrorMsg, setExecuteErrorMsg] = useState('');
   const [data, setData] = useState<MsgDataType>();
   const [entitySwitchLoading, setEntitySwitchLoading] = useState(false);
   const [dimensionFilters, setDimensionFilters] = useState<FilterItemType[]>([]);
@@ -86,8 +88,9 @@ const ChatItem: React.FC<Props> = ({
   const updateData = (res: Result<MsgDataType>) => {
     let tip: string = '';
     let data: MsgDataType | undefined = undefined;
-    const { queryColumns, queryResults, queryState, queryMode, response, chatContext } =
+    const { queryColumns, queryResults, queryState, queryMode, response, chatContext, errorMsg } =
       res.data || {};
+    setExecuteErrorMsg(errorMsg);
     if (res.code === 400 || res.code === 401 || res.code === 412) {
       tip = res.msg;
     } else if (res.code !== 200) {
@@ -326,6 +329,11 @@ const ChatItem: React.FC<Props> = ({
     <div className={prefixCls}>
       {!isMobile && <IconFont type="icon-zhinengsuanfa" className={`${prefixCls}-avatar`} />}
       <div className={isMobile ? `${prefixCls}-mobile-msg-card` : ''}>
+        <div className={`${prefixCls}-time`}>
+          {parseTimeCost?.parseStartTime
+            ? dayjs(parseTimeCost.parseStartTime).format('M月D日 HH:mm')
+            : ''}
+        </div>
         <div className={contentClass}>
           <ParseTip
             isSimpleMode={isSimpleMode}
@@ -360,11 +368,13 @@ const ChatItem: React.FC<Props> = ({
                   queryMode={parseInfo.queryMode}
                   sqlInfo={parseInfo.sqlInfo}
                   sqlTimeCost={parseTimeCost?.sqlTime}
+                  executeErrorMsg={executeErrorMsg}
                 />
               )}
               <ExecuteItem
                 isSimpleMode={isSimpleMode}
                 queryId={parseInfo?.queryId}
+                question={msg}
                 queryMode={parseInfo?.queryMode}
                 executeLoading={executeLoading}
                 entitySwitchLoading={entitySwitchLoading}

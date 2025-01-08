@@ -103,6 +103,21 @@ CREATE TABLE IF NOT EXISTS `s2_chat_memory` (
     ) ;
 COMMENT ON TABLE s2_chat_memory IS 'chat memory table ';
 
+CREATE TABLE IF NOT EXISTS `s2_chat_model`
+(
+    id          int AUTO_INCREMENT,
+    name        varchar(100)  null,
+    description varchar(500) null,
+   `config` varchar(500) NOT  NULL ,
+   `created_at` TIMESTAMP NOT  NULL ,
+   `created_by` varchar(100) NOT  NULL ,
+   `updated_at` TIMESTAMP NOT  NULL ,
+   `updated_by` varchar(100) NOT  NULL,
+   `admin` varchar(500) NOT  NULL,
+   `viewer` varchar(500) DEFAULT  NULL,
+    PRIMARY KEY (`id`)
+); COMMENT ON TABLE s2_chat_model IS 'chat model table';
+
 create table IF NOT EXISTS s2_user
 (
     id       INT AUTO_INCREMENT,
@@ -156,7 +171,7 @@ CREATE TABLE IF NOT EXISTS `s2_model` (
     `viewer` varchar(3000) DEFAULT NULL  , -- domain available users
     `view_org` varchar(3000) DEFAULT NULL  , -- domain available organization
     `entity` varchar(500) DEFAULT NULL  , -- domain entity info
-    `drill_down_dimensions` varchar(500) DEFAULT NULL  , -- drill down dimensions info
+    `drill_down_dimensions` TEXT DEFAULT NULL  , -- drill down dimensions info
     `database_id` INT NOT  NULL ,
     `model_detail` LONGVARCHAR NOT  NULL ,
     `depends` varchar(500) DEFAULT NULL ,
@@ -373,21 +388,18 @@ CREATE TABLE IF NOT EXISTS s2_agent
     description varchar(500) null,
     status       int null,
     examples    varchar(500) null,
-    config      varchar(2000)  null,
+    tool_config varchar(2000)  null,
     llm_config varchar(2000)  null,
-    model_config varchar(6000) null,
-    prompt_config varchar(5000)  null,
-    multi_turn_config varchar(2000)  null,
+    chat_model_config varchar(6000) null,
     visual_config varchar(2000)  null,
     created_by  varchar(100) null,
     created_at  TIMESTAMP  null,
     updated_by  varchar(100) null,
     updated_at  TIMESTAMP null,
     enable_search int null,
-    enable_memory_review int null,
+    enable_feedback int null,
     PRIMARY KEY (`id`)
 ); COMMENT ON TABLE s2_agent IS 'agent information table';
-
 
 -------demo for semantic and chat
 CREATE TABLE IF NOT EXISTS `s2_user_department` (
@@ -670,3 +682,19 @@ CREATE TABLE IF NOT EXISTS `s2_term` (
     PRIMARY KEY (`id`)
     );
 COMMENT ON TABLE s2_term IS 'term info';
+
+CREATE TABLE IF NOT EXISTS `s2_user_token` (
+   `id` INT NOT NULL AUTO_INCREMENT,
+   `name` VARCHAR(255) NOT NULL,
+    `user_name` VARCHAR(255)  NOT NULL,
+    `expire_time` INT NOT NULL,
+    `token` text NOT NULL,
+    `salt` VARCHAR(255)  default NULL,
+    `create_time` DATETIME NOT NULL,
+    `create_by` VARCHAR(255) NOT NULL,
+    `update_time` DATETIME default NULL,
+    `update_by` VARCHAR(255) NOT NULL,
+    `expire_date_time` DATETIME NOT NULL,
+    PRIMARY KEY (`id`)
+    );
+COMMENT ON TABLE s2_user_token IS 'user token info';

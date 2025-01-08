@@ -3,8 +3,8 @@ package com.tencent.supersonic.headless.server.facade.rest;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import com.tencent.supersonic.auth.api.authentication.pojo.User;
 import com.tencent.supersonic.auth.api.authentication.utils.UserHolder;
+import com.tencent.supersonic.common.pojo.User;
 import com.tencent.supersonic.headless.api.pojo.SemanticParseInfo;
 import com.tencent.supersonic.headless.api.pojo.request.QueryNLReq;
 import com.tencent.supersonic.headless.api.pojo.request.QuerySqlReq;
@@ -23,47 +23,38 @@ import org.springframework.web.bind.annotation.RestController;
 @Slf4j
 public class ChatQueryApiController {
 
-    @Autowired private ChatLayerService chatLayerService;
+    @Autowired
+    private ChatLayerService chatLayerService;
 
-    @Autowired private SemanticLayerService semanticLayerService;
+    @Autowired
+    private SemanticLayerService semanticLayerService;
 
     @PostMapping("/chat/search")
-    public Object search(
-            @RequestBody QueryNLReq queryNLReq,
-            HttpServletRequest request,
-            HttpServletResponse response)
-            throws Exception {
+    public Object search(@RequestBody QueryNLReq queryNLReq, HttpServletRequest request,
+            HttpServletResponse response) throws Exception {
         queryNLReq.setUser(UserHolder.findUser(request, response));
         return chatLayerService.retrieve(queryNLReq);
     }
 
     @PostMapping("/chat/map")
-    public Object map(
-            @RequestBody QueryNLReq queryNLReq,
-            HttpServletRequest request,
+    public Object map(@RequestBody QueryNLReq queryNLReq, HttpServletRequest request,
             HttpServletResponse response) {
         queryNLReq.setUser(UserHolder.findUser(request, response));
-        return chatLayerService.performMapping(queryNLReq);
+        return chatLayerService.map(queryNLReq);
     }
 
     @PostMapping("/chat/parse")
-    public Object parse(
-            @RequestBody QueryNLReq queryNLReq,
-            HttpServletRequest request,
-            HttpServletResponse response)
-            throws Exception {
+    public Object parse(@RequestBody QueryNLReq queryNLReq, HttpServletRequest request,
+            HttpServletResponse response) throws Exception {
         queryNLReq.setUser(UserHolder.findUser(request, response));
-        return chatLayerService.performParsing(queryNLReq);
+        return chatLayerService.parse(queryNLReq);
     }
 
     @PostMapping("/chat")
-    public Object queryByNL(
-            @RequestBody QueryNLReq queryNLReq,
-            HttpServletRequest request,
-            HttpServletResponse response)
-            throws Exception {
+    public Object queryByNL(@RequestBody QueryNLReq queryNLReq, HttpServletRequest request,
+            HttpServletResponse response) throws Exception {
         User user = UserHolder.findUser(request, response);
-        ParseResp parseResp = chatLayerService.performParsing(queryNLReq);
+        ParseResp parseResp = chatLayerService.parse(queryNLReq);
         if (parseResp.getState().equals(ParseResp.ParseState.COMPLETED)) {
             SemanticParseInfo parseInfo = parseResp.getSelectedParses().get(0);
             QuerySqlReq sqlReq = new QuerySqlReq();

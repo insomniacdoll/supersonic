@@ -1,13 +1,14 @@
 package com.tencent.supersonic.demo;
 
 import com.google.common.collect.Lists;
-import com.tencent.supersonic.auth.api.authentication.pojo.User;
 import com.tencent.supersonic.auth.api.authorization.service.AuthService;
 import com.tencent.supersonic.chat.server.service.AgentService;
 import com.tencent.supersonic.chat.server.service.ChatManageService;
 import com.tencent.supersonic.chat.server.service.ChatQueryService;
 import com.tencent.supersonic.chat.server.service.PluginService;
-import com.tencent.supersonic.common.service.SystemConfigService;
+import com.tencent.supersonic.common.config.ChatModel;
+import com.tencent.supersonic.common.pojo.User;
+import com.tencent.supersonic.common.service.ChatModelService;
 import com.tencent.supersonic.common.util.AESEncryptionUtil;
 import com.tencent.supersonic.headless.api.pojo.DataSetModelConfig;
 import com.tencent.supersonic.headless.api.pojo.DrillDownDimension;
@@ -21,7 +22,6 @@ import com.tencent.supersonic.headless.api.pojo.response.DatabaseResp;
 import com.tencent.supersonic.headless.api.pojo.response.DimensionResp;
 import com.tencent.supersonic.headless.api.pojo.response.MetricResp;
 import com.tencent.supersonic.headless.api.pojo.response.ModelResp;
-import com.tencent.supersonic.headless.server.service.CanvasService;
 import com.tencent.supersonic.headless.server.service.DataSetService;
 import com.tencent.supersonic.headless.server.service.DatabaseService;
 import com.tencent.supersonic.headless.server.service.DimensionService;
@@ -33,12 +33,14 @@ import com.tencent.supersonic.headless.server.service.TagMetaService;
 import com.tencent.supersonic.headless.server.service.TagObjectService;
 import com.tencent.supersonic.headless.server.service.TermService;
 import com.tencent.supersonic.headless.server.service.impl.DictWordService;
+import dev.langchain4j.provider.ModelProvider;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.autoconfigure.jdbc.DataSourceProperties;
+import org.springframework.core.env.Environment;
 import org.springframework.util.CollectionUtils;
 
 import java.util.List;
@@ -46,37 +48,56 @@ import java.util.stream.Collectors;
 
 @Slf4j
 public abstract class S2BaseDemo implements CommandLineRunner {
-    protected DatabaseResp demoDatabaseResp;
 
-    protected User user = User.getFakeUser();
-    @Autowired protected DatabaseService databaseService;
-    @Autowired protected DomainService domainService;
-    @Autowired protected ModelService modelService;
-    @Autowired protected ModelRelaService modelRelaService;
-    @Autowired protected DimensionService dimensionService;
-    @Autowired protected MetricService metricService;
-    @Autowired protected TagMetaService tagMetaService;
-    @Autowired protected AuthService authService;
-    @Autowired protected DataSetService dataSetService;
-    @Autowired protected TermService termService;
-    @Autowired protected PluginService pluginService;
-    @Autowired protected DataSourceProperties dataSourceProperties;
-    @Autowired protected TagObjectService tagObjectService;
-    @Autowired protected ChatQueryService chatQueryService;
-    @Autowired protected ChatManageService chatManageService;
-    @Autowired protected AgentService agentService;
-    @Autowired protected SystemConfigService sysParameterService;
-    @Autowired protected CanvasService canvasService;
-    @Autowired protected DictWordService dictWordService;
+    protected DatabaseResp demoDatabase;
+    protected ChatModel demoChatModel;
+    protected User defaultUser = User.getDefaultUser();
+
+    @Autowired
+    protected DatabaseService databaseService;
+    @Autowired
+    protected DomainService domainService;
+    @Autowired
+    protected ModelService modelService;
+    @Autowired
+    protected ModelRelaService modelRelaService;
+    @Autowired
+    protected DimensionService dimensionService;
+    @Autowired
+    protected MetricService metricService;
+    @Autowired
+    protected TagMetaService tagMetaService;
+    @Autowired
+    protected AuthService authService;
+    @Autowired
+    protected DataSetService dataSetService;
+    @Autowired
+    protected TermService termService;
+    @Autowired
+    protected PluginService pluginService;
+    @Autowired
+    protected DataSourceProperties dataSourceProperties;
+    @Autowired
+    protected TagObjectService tagObjectService;
+    @Autowired
+    protected ChatQueryService chatQueryService;
+    @Autowired
+    protected ChatManageService chatManageService;
+    @Autowired
+    protected AgentService agentService;
+    @Autowired
+    protected DictWordService dictWordService;
+    @Autowired
+    protected ChatModelService chatModelService;
+    @Autowired
+    protected Environment environment;
 
     @Value("${s2.demo.names:S2VisitsDemo}")
     protected List<String> demoList;
 
-    @Value("${s2.demo.enableLLM:true}")
-    protected boolean demoEnableLlm;
-
     public void run(String... args) {
-        demoDatabaseResp = addDatabaseIfNotExist();
+        demoDatabase = addDatabaseIfNotExist();
+        demoChatModel = addChatModelIfNotExist();
         if (demoList != null && demoList.contains(getClass().getSimpleName())) {
             if (checkNeedToRun()) {
                 doRun();
@@ -89,14 +110,14 @@ public abstract class S2BaseDemo implements CommandLineRunner {
     abstract boolean checkNeedToRun();
 
     protected DatabaseResp addDatabaseIfNotExist() {
-        List<DatabaseResp> databaseList = databaseService.getDatabaseList(User.getFakeUser());
+        List<DatabaseResp> databaseList = databaseService.getDatabaseList(defaultUser);
         if (!CollectionUtils.isEmpty(databaseList)) {
             return databaseList.get(0);
         }
         String url = dataSourceProperties.getUrl();
         DatabaseReq databaseReq = new DatabaseReq();
-        databaseReq.setName("数据实例");
-        databaseReq.setDescription("样例数据库实例");
+        databaseReq.setName("H2数据库DEMO");
+        databaseReq.setDescription("样例数据库实例仅用于体验，正式使用请切换持久化数据库");
         if (StringUtils.isNotBlank(url)
                 && url.toLowerCase().contains(DataType.MYSQL.getFeature().toLowerCase())) {
             databaseReq.setType(DataType.MYSQL.getFeature());
@@ -106,9 +127,32 @@ public abstract class S2BaseDemo implements CommandLineRunner {
         }
         databaseReq.setUrl(url);
         databaseReq.setUsername(dataSourceProperties.getUsername());
-        databaseReq.setPassword(
-                AESEncryptionUtil.aesEncryptECB(dataSourceProperties.getPassword()));
-        return databaseService.createOrUpdateDatabase(databaseReq, user);
+        databaseReq
+                .setPassword(AESEncryptionUtil.aesEncryptECB(dataSourceProperties.getPassword()));
+        return databaseService.createOrUpdateDatabase(databaseReq, defaultUser);
+    }
+
+    protected ChatModel addChatModelIfNotExist() {
+        List<ChatModel> chatModels = chatModelService.getChatModels();
+        if (chatModels.size() > 0) {
+            return chatModels.get(0);
+        } else {
+            ChatModel chatModel = new ChatModel();
+            chatModel.setName("OpenAI模型DEMO");
+            chatModel.setDescription("由langchain4j社区提供仅用于体验(单次请求最大token数1000), 正式使用请切换大模型");
+            chatModel.setConfig(ModelProvider.DEMO_CHAT_MODEL);
+            if (StringUtils.isNotBlank(environment.getProperty("OPENAI_BASE_URL"))) {
+                chatModel.getConfig().setBaseUrl(environment.getProperty("OPENAI_BASE_URL"));
+            }
+            if (StringUtils.isNotBlank(environment.getProperty("OPENAI_API_KEY"))) {
+                chatModel.getConfig().setApiKey(environment.getProperty("OPENAI_API_KEY"));
+            }
+            if (StringUtils.isNotBlank(environment.getProperty("OPENAI_MODEL_NAME"))) {
+                chatModel.getConfig().setModelName(environment.getProperty("OPENAI_MODEL_NAME"));
+            }
+            chatModel = chatModelService.createChatModel(chatModel, defaultUser);
+            return chatModel;
+        }
     }
 
     protected MetricResp getMetric(String bizName, ModelResp model) {
@@ -125,15 +169,11 @@ public abstract class S2BaseDemo implements CommandLineRunner {
             dataSetModelConfig.setId(modelResp.getId());
             MetaFilter metaFilter = new MetaFilter();
             metaFilter.setModelIds(Lists.newArrayList(modelResp.getId()));
-            List<Long> metrics =
-                    metricService.getMetrics(metaFilter).stream()
-                            .map(MetricResp::getId)
-                            .collect(Collectors.toList());
+            List<Long> metrics = metricService.getMetrics(metaFilter).stream()
+                    .map(MetricResp::getId).collect(Collectors.toList());
             dataSetModelConfig.setMetrics(metrics);
-            List<Long> dimensions =
-                    dimensionService.getDimensions(metaFilter).stream()
-                            .map(DimensionResp::getId)
-                            .collect(Collectors.toList());
+            List<Long> dimensions = dimensionService.getDimensions(metaFilter).stream()
+                    .map(DimensionResp::getId).collect(Collectors.toList());
             dataSetModelConfig.setMetrics(metrics);
             dataSetModelConfig.setDimensions(dimensions);
             dataSetModelConfigs.add(dataSetModelConfig);
@@ -145,7 +185,7 @@ public abstract class S2BaseDemo implements CommandLineRunner {
         TagReq tagReq = new TagReq();
         tagReq.setTagDefineType(tagDefineType);
         tagReq.setItemId(itemId);
-        tagMetaService.create(tagReq, User.getFakeUser());
+        tagMetaService.create(tagReq, User.getDefaultUser());
     }
 
     protected DimensionResp getDimension(String bizName, ModelResp model) {

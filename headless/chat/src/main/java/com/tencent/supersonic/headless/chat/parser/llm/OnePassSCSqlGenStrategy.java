@@ -1,18 +1,22 @@
 package com.tencent.supersonic.headless.chat.parser.llm;
 
 import com.google.common.collect.Lists;
-import com.tencent.supersonic.common.config.PromptConfig;
+import com.tencent.supersonic.common.pojo.ChatApp;
 import com.tencent.supersonic.common.pojo.Text2SQLExemplar;
+import com.tencent.supersonic.common.pojo.enums.AppModule;
+import com.tencent.supersonic.common.util.ChatAppManager;
 import com.tencent.supersonic.headless.chat.query.llm.s2sql.LLMReq;
 import com.tencent.supersonic.headless.chat.query.llm.s2sql.LLMResp;
-import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.model.chat.ChatLanguageModel;
 import dev.langchain4j.model.input.Prompt;
 import dev.langchain4j.model.input.PromptTemplate;
-import dev.langchain4j.model.output.Response;
+import dev.langchain4j.model.output.structured.Description;
+import dev.langchain4j.service.AiServices;
+import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.util.HashMap;
@@ -24,61 +28,73 @@ import java.util.concurrent.ConcurrentHashMap;
 @Slf4j
 public class OnePassSCSqlGenStrategy extends SqlGenStrategy {
 
-    private static final String INSTRUCTION =
-            ""
-                    + "\n#Role: You are a data analyst experienced in SQL languages."
-                    + "#Task: You will be provided with a natural language question asked by users,"
+    private static final Logger keyPipelineLog = LoggerFactory.getLogger("keyPipeline");
+
+    public static final String APP_KEY = "S2SQL_PARSER";
+    public static final String INSTRUCTION =
+            "#Role: You are a data analyst experienced in SQL languages."
+                    + "\n#Task: You will be provided with a natural language question asked by users,"
                     + "please convert it to a SQL query so that relevant data could be returned "
-                    + "by executing the SQL query against underlying database."
-                    + "\n#Rules:"
-                    + "1.ALWAYS generate column specified in the `Schema`, DO NOT hallucinate."
-                    + "2.ALWAYS specify date filter using `>`,`<`,`>=`,`<=` operator."
-                    + "3.ALWAYS calculate the absolute date range by yourself."
-                    + "4.DO NOT include date filter in the where clause if not explicitly expressed in the `Question`."
-                    + "5.DO NOT miss the AGGREGATE operator of metrics, always add it if needed."
-                    + "6.ONLY respond with the converted SQL statement."
-                    + "\n#Exemplars:\n{{exemplar}}"
-                    + "Question:{{question}},Schema:{{schema}},SideInfo:{{information}},SQL:";
+                    + "by executing the SQL query against underlying database." + "\n#Rules:"
+                    + "\n1.ALWAYS generate columns and values specified in the `Schema`, DO NOT hallucinate."
+                    + "\n2.ALWAYS be cautious, word in the `Schema` does not mean it must appear in the SQL."
+                    + "\n3.ALWAYS specify date filter using `>`,`<`,`>=`,`<=` operator."
+                    + "\n4.DO NOT include date filter in the where clause if not explicitly expressed in the `Question`."
+                    + "\n5.DO NOT calculate date range using functions."
+                    + "\n6.DO NOT miss the AGGREGATE operator of metrics, always add it as needed."
+                    + "\n7.ALWAYS use `with` statement if nested aggregation is needed."
+                    + "\n8.ALWAYS enclose alias created by `AS` command in underscores."
+                    + "\n9.ALWAYS translate alias created by `AS` command to the same language as the `#Question`."
+                    + "\n#Exemplars: {{exemplar}}"
+                    + "\n#Query: Question:{{question}},Schema:{{schema}},SideInfo:{{information}}";
+
+    public OnePassSCSqlGenStrategy() {
+        ChatAppManager.register(APP_KEY, ChatApp.builder().prompt(INSTRUCTION).name("语义SQL解析")
+                .appModule(AppModule.CHAT).description("通过大模型做语义解析生成S2SQL").enable(true).build());
+    }
+
+    @Data
+    static class SemanticSql {
+        @Description("thought or remarks to tell users about the sql, make it short.")
+        private String thought;
+
+        @Description("sql to generate")
+        private String sql;
+    }
+
+    interface SemanticSqlExtractor {
+        SemanticSql generateSemanticSql(String text);
+    }
 
     @Override
     public LLMResp generate(LLMReq llmReq) {
         LLMResp llmResp = new LLMResp();
         llmResp.setQuery(llmReq.getQueryText());
         // 1.recall exemplars
-        keyPipelineLog.info("OnePassSCSqlGenStrategy llmReq:\n{}", llmReq);
+        log.debug("OnePassSCSqlGenStrategy llmReq:\n{}", llmReq);
         List<List<Text2SQLExemplar>> exemplarsList = promptHelper.getFewShotExemplars(llmReq);
 
         // 2.generate sql generation prompt for each self-consistency inference
+        ChatApp chatApp = llmReq.getChatAppConfig().get(APP_KEY);
+        ChatLanguageModel chatLanguageModel = getChatLanguageModel(chatApp.getChatModelConfig());
+        SemanticSqlExtractor extractor =
+                AiServices.create(SemanticSqlExtractor.class, chatLanguageModel);
+
         Map<Prompt, List<Text2SQLExemplar>> prompt2Exemplar = new HashMap<>();
         for (List<Text2SQLExemplar> exemplars : exemplarsList) {
             llmReq.setDynamicExemplars(exemplars);
-            Prompt prompt = generatePrompt(llmReq, llmResp);
+            Prompt prompt = generatePrompt(llmReq, llmResp, chatApp);
             prompt2Exemplar.put(prompt, exemplars);
         }
 
         // 3.perform multiple self-consistency inferences parallelly
         Map<String, Prompt> output2Prompt = new ConcurrentHashMap<>();
-        prompt2Exemplar
-                .keySet()
-                .parallelStream()
-                .forEach(
-                        prompt -> {
-                            keyPipelineLog.info(
-                                    "OnePassSCSqlGenStrategy reqPrompt:\n{}",
-                                    prompt.toUserMessage());
-                            ChatLanguageModel chatLanguageModel =
-                                    getChatLanguageModel(llmReq.getModelConfig());
-                            Response<AiMessage> response =
-                                    chatLanguageModel.generate(prompt.toUserMessage());
-                            String sqlOutput =
-                                    StringUtils.normalizeSpace(response.content().text());
-                            // replace ```
-                            String sqlOutputFormat =
-                                    sqlOutput.replaceAll("(?s)```sql\\s*(.*?)\\s*```", "$1").trim();
-                            output2Prompt.put(sqlOutputFormat, prompt);
-                            keyPipelineLog.info(
-                                    "OnePassSCSqlGenStrategy modelResp:\n{}", sqlOutputFormat);
-                        });
+        prompt2Exemplar.keySet().parallelStream().forEach(prompt -> {
+            SemanticSql s2Sql = extractor.generateSemanticSql(prompt.toUserMessage().singleText());
+            output2Prompt.put(s2Sql.getSql(), prompt);
+            keyPipelineLog.info("OnePassSCSqlGenStrategy modelReq:\n{} \nmodelResp:\n{}",
+                    prompt.text(), s2Sql);
+        });
 
         // 4.format response.
         Pair<String, Map<String, Double>> sqlMapPair =
@@ -91,16 +107,12 @@ public class OnePassSCSqlGenStrategy extends SqlGenStrategy {
         return llmResp;
     }
 
-    private Prompt generatePrompt(LLMReq llmReq, LLMResp llmResp) {
+    private Prompt generatePrompt(LLMReq llmReq, LLMResp llmResp, ChatApp chatApp) {
         StringBuilder exemplars = new StringBuilder();
         for (Text2SQLExemplar exemplar : llmReq.getDynamicExemplars()) {
-            String exemplarStr =
-                    String.format(
-                            "Question:%s,Schema:%s,SideInfo:%s,SQL:%s\n",
-                            exemplar.getQuestion(),
-                            exemplar.getDbSchema(),
-                            exemplar.getSideInfo(),
-                            exemplar.getSql());
+            String exemplarStr = String.format("\nQuestion:%s,Schema:%s,SideInfo:%s,SQL:%s",
+                    exemplar.getQuestion(), exemplar.getDbSchema(), exemplar.getSideInfo(),
+                    exemplar.getSql());
             exemplars.append(exemplarStr);
         }
         String dataSemantics = promptHelper.buildSchemaStr(llmReq);
@@ -115,17 +127,13 @@ public class OnePassSCSqlGenStrategy extends SqlGenStrategy {
         variable.put("information", sideInformation);
 
         // use custom prompt template if provided.
-        PromptConfig promptConfig = llmReq.getPromptConfig();
-        String promptTemplate = INSTRUCTION;
-        if (promptConfig != null && StringUtils.isNotBlank(promptConfig.getPromptTemplate())) {
-            promptTemplate = promptConfig.getPromptTemplate();
-        }
+        String promptTemplate = chatApp.getPrompt();
         return PromptTemplate.from(promptTemplate).apply(variable);
     }
 
     @Override
     public void afterPropertiesSet() {
-        SqlGenStrategyFactory.addSqlGenerationForFactory(
-                LLMReq.SqlGenType.ONE_PASS_SELF_CONSISTENCY, this);
+        SqlGenStrategyFactory
+                .addSqlGenerationForFactory(LLMReq.SqlGenType.ONE_PASS_SELF_CONSISTENCY, this);
     }
 }

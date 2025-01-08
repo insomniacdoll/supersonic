@@ -1,8 +1,8 @@
 package com.tencent.supersonic.headless.core.utils;
 
 import com.google.common.collect.Lists;
-import com.tencent.supersonic.common.pojo.Constants;
 import com.tencent.supersonic.common.pojo.DateConf;
+import com.tencent.supersonic.common.pojo.enums.DatePeriodEnum;
 import com.tencent.supersonic.common.pojo.enums.TimeDimensionEnum;
 import org.apache.commons.lang3.StringUtils;
 
@@ -15,11 +15,8 @@ import java.util.stream.Collectors;
 /** transform query results to return the users */
 public class DataTransformUtils {
 
-    public static List<Map<String, Object>> transform(
-            List<Map<String, Object>> originalData,
-            String metric,
-            List<String> groups,
-            DateConf dateConf) {
+    public static List<Map<String, Object>> transform(List<Map<String, Object>> originalData,
+            String metric, List<String> groups, DateConf dateConf) {
         List<String> dateList = dateConf.getDateList();
         List<Map<String, Object>> transposedData = new ArrayList<>();
         for (Map<String, Object> originalRow : originalData) {
@@ -29,14 +26,12 @@ public class DataTransformUtils {
                     transposedRow.put(key, originalRow.get(key));
                 }
             }
-            transposedRow.put(
-                    String.valueOf(originalRow.get(getTimeDimension(dateConf))),
+            transposedRow.put(String.valueOf(originalRow.get(getTimeDimension(dateConf))),
                     originalRow.get(metric));
             transposedData.add(transposedRow);
         }
-        Map<String, List<Map<String, Object>>> dataMerge =
-                transposedData.stream()
-                        .collect(Collectors.groupingBy(row -> getRowKey(row, groups)));
+        Map<String, List<Map<String, Object>>> dataMerge = transposedData.stream()
+                .collect(Collectors.groupingBy(row -> getRowKey(row, groups)));
         List<Map<String, Object>> resultData = Lists.newArrayList();
         for (List<Map<String, Object>> data : dataMerge.values()) {
             Map<String, Object> rowData = new HashMap<>();
@@ -66,9 +61,9 @@ public class DataTransformUtils {
     }
 
     private static String getTimeDimension(DateConf dateConf) {
-        if (Constants.MONTH.equals(dateConf.getPeriod())) {
+        if (DatePeriodEnum.MONTH.equals(dateConf.getPeriod())) {
             return TimeDimensionEnum.MONTH.getName();
-        } else if (Constants.WEEK.equals(dateConf.getPeriod())) {
+        } else if (DatePeriodEnum.WEEK.equals(dateConf.getPeriod())) {
             return TimeDimensionEnum.WEEK.getName();
         } else {
             return TimeDimensionEnum.DAY.getName();
