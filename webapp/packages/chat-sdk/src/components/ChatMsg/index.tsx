@@ -180,6 +180,7 @@ const ChatMsg: React.FC<Props> = ({
       case MsgContentTypeEnum.TABLE:
         return (
           <Table
+            question={question}
             data={{ ...data, queryColumns: columns, queryResults: dataSource }}
             loading={loading}
           />
@@ -214,13 +215,14 @@ const ChatMsg: React.FC<Props> = ({
         );
       case MsgContentTypeEnum.MARKDOWN:
         return (
-          <div style={{ maxHeight: 800, overflow: 'scroll' }}>
+          <div style={{ maxHeight: 800 }}>
             <MarkDown markdown={data.textResult} loading={loading} />
           </div>
         );
       default:
         return (
           <Table
+            question={question}
             data={{ ...data, queryColumns: columns, queryResults: dataSource }}
             loading={loading}
           />

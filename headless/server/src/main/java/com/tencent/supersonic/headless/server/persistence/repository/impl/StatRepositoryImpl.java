@@ -1,16 +1,20 @@
 package com.tencent.supersonic.headless.server.persistence.repository.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tencent.supersonic.common.pojo.enums.TypeEnums;
 import com.tencent.supersonic.headless.api.pojo.QueryStat;
 import com.tencent.supersonic.headless.api.pojo.request.ItemUseReq;
 import com.tencent.supersonic.headless.api.pojo.response.ItemUseResp;
+import com.tencent.supersonic.headless.server.persistence.dataobject.QueryStatDO;
 import com.tencent.supersonic.headless.server.persistence.mapper.StatMapper;
 import com.tencent.supersonic.headless.server.persistence.repository.StatRepository;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Repository;
 
 import java.util.ArrayList;
@@ -36,14 +40,16 @@ public class StatRepositoryImpl implements StatRepository {
 
     @Override
     public Boolean createRecord(QueryStat queryStatInfo) {
-        return statMapper.createRecord(queryStatInfo);
+        QueryStatDO queryStatDO = new QueryStatDO();
+        BeanUtils.copyProperties(queryStatInfo, queryStatDO);
+        return statMapper.insertOrUpdate(queryStatDO);
     }
 
     @Override
     @SneakyThrows
     public List<ItemUseResp> getStatInfo(ItemUseReq itemUseReq) {
         List<ItemUseResp> result = new ArrayList<>();
-        List<QueryStat> statInfos = statMapper.getStatInfo(itemUseReq);
+        List<QueryStatDO> statInfos = getQueryStats(itemUseReq);
         Map<String, Long> map = new ConcurrentHashMap<>();
         statInfos.stream().forEach(stat -> {
             String dimensions = stat.getDimensions();
@@ -66,9 +72,24 @@ public class StatRepositoryImpl implements StatRepository {
                 .collect(Collectors.toList());
     }
 
-    @Override
-    public List<QueryStat> getQueryStatInfoWithoutCache(ItemUseReq itemUseCommend) {
-        return statMapper.getStatInfo(itemUseCommend);
+    private List<QueryStatDO> getQueryStats(ItemUseReq itemUseReq) {
+        QueryWrapper<QueryStatDO> queryWrapper = new QueryWrapper<>();
+        if (Objects.nonNull(itemUseReq.getModelId())) {
+            queryWrapper.lambda().eq(QueryStatDO::getModelId, itemUseReq.getModelId());
+        }
+        if (Objects.nonNull(itemUseReq.getModelIds()) && !itemUseReq.getModelIds().isEmpty()) {
+            queryWrapper.lambda().in(QueryStatDO::getModelId, itemUseReq.getModelIds());
+        }
+        if (Objects.nonNull(itemUseReq.getMetric())) {
+            queryWrapper.lambda().like(QueryStatDO::getMetrics, itemUseReq.getMetric());
+        }
+        if (Objects.nonNull(itemUseReq.getDataSetId())) {
+            queryWrapper.lambda().eq(QueryStatDO::getDataSetId, itemUseReq.getDataSetId());
+        }
+        if (CollectionUtils.isNotEmpty(itemUseReq.getDataSetIds())) {
+            queryWrapper.lambda().in(QueryStatDO::getDataSetId, itemUseReq.getDataSetIds());
+        }
+        return statMapper.selectList(queryWrapper);
     }
 
     private void updateStatMapInfo(Map<String, Long> map, String dimensions, String type,
@@ -92,14 +113,4 @@ public class StatRepositoryImpl implements StatRepository {
         }
     }
 
-    private void updateStatMapInfo(Map<String, Long> map, Long modelId, String type) {
-        if (Objects.nonNull(modelId)) {
-            String key = type + AT_SYMBOL + AT_SYMBOL + modelId;
-            if (map.containsKey(key)) {
-                map.put(key, map.get(key) + 1);
-            } else {
-                map.put(key, 1L);
-            }
-        }
-    }
 }

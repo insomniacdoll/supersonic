@@ -24,6 +24,11 @@ import java.util.stream.Collectors;
 public class QueryRecommendProcessor implements ParseResultProcessor {
 
     @Override
+    public boolean accept(ParseContext parseContext) {
+        return true;
+    }
+
+    @Override
     public void process(ParseContext parseContext) {
         CompletableFuture.runAsync(() -> doProcess(parseContext));
     }
@@ -56,8 +61,7 @@ public class QueryRecommendProcessor implements ParseResultProcessor {
     private void updateChatQuery(ChatQueryDO chatQueryDO) {
         ChatQueryRepository chatQueryRepository = ContextUtils.getBean(ChatQueryRepository.class);
         UpdateWrapper<ChatQueryDO> updateWrapper = new UpdateWrapper<>();
-        updateWrapper.eq("question_id", chatQueryDO.getQuestionId());
-        updateWrapper.set("similar_queries", chatQueryDO.getSimilarQueries());
+        updateWrapper.lambda().eq(ChatQueryDO::getQuestionId, chatQueryDO.getQuestionId());
         chatQueryRepository.updateChatQuery(chatQueryDO, updateWrapper);
     }
 }

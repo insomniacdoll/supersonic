@@ -15,10 +15,7 @@ import static java.time.LocalDate.now;
 
 public class DataUtils {
 
-    public static final Integer metricAgentId = 1;
-    public static final Integer tagAgentId = 2;
     public static final Integer ONE_TURNS_CHAT_ID = 10;
-    public static final Integer MULTI_TURNS_CHAT_ID = 11;
     private static final User user_test = User.getDefaultUser();
 
     public static User getUser() {
@@ -37,10 +34,12 @@ public class DataUtils {
         return User.get(3L, "tom");
     }
 
-    public static ChatParseReq getChatParseReq(Integer id, String query, boolean enableLLM) {
+    public static ChatParseReq getChatParseReq(Integer id, Integer agentId, String query,
+            boolean enableLLM) {
         ChatParseReq chatParseReq = new ChatParseReq();
         chatParseReq.setQueryText(query);
         chatParseReq.setChatId(id);
+        chatParseReq.setAgentId(agentId);
         chatParseReq.setUser(user_test);
         chatParseReq.setDisableLLM(!enableLLM);
         return chatParseReq;
@@ -75,11 +74,13 @@ public class DataUtils {
     public static DateConf getDateConf(DateConf.DateMode dateMode, Integer unit,
             DatePeriodEnum period, String startDate, String endDate) {
         DateConf dateInfo = new DateConf();
+        dateInfo.setDateField("imp_date");
         dateInfo.setUnit(unit);
         dateInfo.setDateMode(dateMode);
         dateInfo.setPeriod(period);
         dateInfo.setStartDate(startDate);
         dateInfo.setEndDate(endDate);
+        dateInfo.setDateField("imp_date");
         return dateInfo;
     }
 
@@ -91,7 +92,4 @@ public class DataUtils {
         return result;
     }
 
-    public static Long getMetricAgentView() {
-        return 1L;
-    }
 }

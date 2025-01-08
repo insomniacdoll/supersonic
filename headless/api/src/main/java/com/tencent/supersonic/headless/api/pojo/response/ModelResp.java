@@ -1,16 +1,9 @@
 package com.tencent.supersonic.headless.api.pojo.response;
 
 import com.google.common.collect.Lists;
-import com.tencent.supersonic.headless.api.pojo.Dim;
-import com.tencent.supersonic.headless.api.pojo.DrillDownDimension;
-import com.tencent.supersonic.headless.api.pojo.Field;
-import com.tencent.supersonic.headless.api.pojo.Identify;
-import com.tencent.supersonic.headless.api.pojo.ModelDetail;
-import com.tencent.supersonic.headless.api.pojo.SchemaItem;
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-import lombok.ToString;
+import com.tencent.supersonic.headless.api.pojo.*;
+import com.tencent.supersonic.headless.api.pojo.enums.IdentifyType;
+import lombok.*;
 import org.springframework.util.CollectionUtils;
 
 import java.util.ArrayList;
@@ -25,6 +18,7 @@ import java.util.stream.Collectors;
 @ToString(callSuper = true)
 @AllArgsConstructor
 @NoArgsConstructor
+@Builder
 public class ModelResp extends SchemaItem {
 
     private Long domainId;
@@ -61,22 +55,15 @@ public class ModelResp extends SchemaItem {
         return isOpen != null && isOpen == 1;
     }
 
-    public Identify getPrimaryIdentify() {
-        if (modelDetail == null) {
-            return null;
-        }
-        if (CollectionUtils.isEmpty(modelDetail.getIdentifiers())) {
-            return null;
-        }
-        for (Identify identify : modelDetail.getIdentifiers()) {
-            if (!CollectionUtils.isEmpty(identify.getEntityNames())) {
-                return identify;
-            }
-        }
-        return null;
+    public List<Measure> getMeasures() {
+        return modelDetail != null ? modelDetail.getMeasures() : Lists.newArrayList();
     }
 
-    public List<Dim> getTimeDimension() {
+    public List<Identify> getIdentifiers() {
+        return modelDetail != null ? modelDetail.getIdentifiers() : Lists.newArrayList();
+    }
+
+    public List<Dimension> getTimeDimension() {
         if (modelDetail == null) {
             return Lists.newArrayList();
         }
@@ -93,6 +80,16 @@ public class ModelResp extends SchemaItem {
                     .collect(Collectors.toSet()));
         }
         return fieldSet;
+    }
+
+    public IdentifyType getIdentifyType(String fieldName) {
+        List<Identify> identifiers = modelDetail.getIdentifiers();
+        for (Identify identify : identifiers) {
+            if (Objects.equals(identify.getFieldName(), fieldName)) {
+                return IdentifyType.valueOf(identify.getType());
+            }
+        }
+        return null;
     }
 
     @Override

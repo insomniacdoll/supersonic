@@ -7,6 +7,7 @@ import { KnowledgeConfigTypeEnum, KnowledgeConfigStatusEnum } from '../enum';
 import BatchCtrlDropDownButton from '@/components/BatchCtrlDropDownButton';
 import {
   updateDimension,
+  updateDimensionAliasValue,
   getDictData,
   searchKnowledgeConfigQuery,
   editDictConfig,
@@ -160,30 +161,17 @@ const DimensionValueSettingModal: React.FC<CreateFormProps> = ({
   const renderFooter = () => {
     return (
       <>
-        <Button onClick={onCancel}>取消</Button>
+        {/* <Button onClick={onCancel}>取消</Button> */}
         {menuKey === 'default' && (
           <>
-            {/* <Button
-              type="primary"
-              loading={llmLoading}
-              onClick={() => {
-                generatorDimensionValue();
-              }}
-            >
-              <Space>
-                智能填充
-                <Tooltip title="智能填充将根据维度相关信息，使用大语言模型获取可能被使用的维度值">
-                  <InfoCircleOutlined />
-                </Tooltip>
-              </Space>
-            </Button> */}
             <Button
               type="primary"
               onClick={() => {
-                handleSubmit();
+                // handleSubmit();
+                onCancel();
               }}
             >
-              完成
+              确 定
             </Button>
           </>
         )}
@@ -321,25 +309,9 @@ const DimensionValueSettingModal: React.FC<CreateFormProps> = ({
     });
   };
 
-  // const tabItem = [
-  //   {
-  //     label: '维度值管理',
-  //     key: 'default',
-  //     children: (
-
-  //     ),
-  //   },
-  //   {
-  //     label: '维度值设置',
-  //     key: 'setting',
-  //     children: <DimensionValueSettingForm dataItem={dimensionItem} />,
-  //   },
-  // ];
-
-  // const handleMenuChange = (key: string) => {
-  //   setMenuKey(key);
-  // };
-
+  const modifyDimensionValue = async (params) => {
+    const { code, data } = await updateDimensionAliasValue(params);
+  };
   return (
     <Modal
       width={1200}
@@ -372,13 +344,21 @@ const DimensionValueSettingModal: React.FC<CreateFormProps> = ({
               rowKey="value"
               tableDataSource={tableDataSource}
               columnList={columns}
-              onDataSourceChange={(tableData) => {
-                const dimValueMaps = tableData.map((item: TableDataSource) => {
-                  return {
-                    ...item,
-                  };
+              // onDataSourceChange={(tableData) => {
+              //   const dimValueMaps = tableData.map((item: TableDataSource) => {
+              //     return {
+              //       ...item,
+              //     };
+              //   });
+              //   setDimValueMaps(dimValueMaps);
+              // }}
+              onRecordSave={(record) => {
+                modifyDimensionValue({
+                  id: dimensionItem.id,
+                  dimValueMaps: {
+                    ...record,
+                  },
                 });
-                setDimValueMaps(dimValueMaps);
               }}
               hideCtrlBtn={['deleteBtn']}
               editableProTableProps={{

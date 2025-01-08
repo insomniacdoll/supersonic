@@ -148,11 +148,6 @@ public class RetrieveServiceImpl implements RetrieveService {
         Long dataSetId = NatureHelper.getDataSetId(nature);
         SchemaElementType schemaElementType = NatureHelper.convertToElementType(nature);
 
-        // Skip if the schema element type is ENTITY
-        if (SchemaElementType.ENTITY.equals(schemaElementType)) {
-            return searchResults;
-        }
-
         // Create a base search result
         SearchResult baseSearchResult = createBaseSearchResult(dataSetId, dataSetIdToName,
                 matchText, wordName, schemaElementType);
@@ -181,7 +176,8 @@ public class RetrieveServiceImpl implements RetrieveService {
 
     private SearchResult createBaseSearchResult(Long dataSetId, Map<Long, String> dataSetIdToName,
             MatchText matchText, String wordName, SchemaElementType schemaElementType) {
-        return SearchResult.builder().modelId(dataSetId).modelName(dataSetIdToName.get(dataSetId))
+        return SearchResult.builder().dataSetId(dataSetId)
+                .dataSetName(dataSetIdToName.get(dataSetId))
                 .recommend(matchText.getRegText() + wordName).schemaElementType(schemaElementType)
                 .subRecommend(wordName).build();
     }
@@ -206,7 +202,7 @@ public class RetrieveServiceImpl implements RetrieveService {
 
     private SearchResult createMetricSearchResult(Long modelId, Map<Long, String> modelToName,
             MatchText matchText, String wordName, String metric) {
-        return SearchResult.builder().modelId(modelId).modelName(modelToName.get(modelId))
+        return SearchResult.builder().dataSetId(modelId).dataSetName(modelToName.get(modelId))
                 .recommend(matchText.getRegText() + wordName + DictWordType.SPACE + metric)
                 .subRecommend(wordName + DictWordType.SPACE + metric).isComplete(false).build();
     }
@@ -281,7 +277,7 @@ public class RetrieveServiceImpl implements RetrieveService {
                 String subRecommendText = hanlpMapResult.getName();
 
                 SearchResult searchResult =
-                        SearchResult.builder().modelId(dataSetId).modelName(modelName)
+                        SearchResult.builder().dataSetId(dataSetId).dataSetName(modelName)
                                 .recommend(recommendText).subRecommend(subRecommendText)
                                 .schemaElementType(schemaElementType).build();
 

@@ -16,6 +16,8 @@ public class DbAdaptorFactory {
         dbAdaptorMap.put(EngineType.H2.getName(), new H2Adaptor());
         dbAdaptorMap.put(EngineType.POSTGRESQL.getName(), new PostgresqlAdaptor());
         dbAdaptorMap.put(EngineType.OTHER.getName(), new DefaultDbAdaptor());
+        dbAdaptorMap.put(EngineType.DUCKDB.getName(), new DuckdbAdaptor());
+        dbAdaptorMap.put(EngineType.HANADB.getName(), new HanadbAdaptor());
     }
 
     public static DbAdaptor getEngineAdaptor(String engineType) {

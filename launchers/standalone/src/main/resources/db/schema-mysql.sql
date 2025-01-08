@@ -1,68 +1,3 @@
-CREATE TABLE IF NOT EXISTS `s2_user_department` (
-      `user_name` varchar(200) NOT NULL,
-       `department` varchar(200) NOT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-CREATE TABLE IF NOT EXISTS `s2_pv_uv_statis` (
-      `imp_date` varchar(200) NOT NULL,
-      `user_name` varchar(200) NOT NULL,
-      `page` varchar(200) NOT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-CREATE TABLE IF NOT EXISTS `s2_stay_time_statis` (
-       `imp_date` varchar(200) NOT NULL,
-       `user_name` varchar(200) NOT NULL,
-       `stay_hours` DOUBLE NOT NULL,
-       `page` varchar(200) NOT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-CREATE TABLE IF NOT EXISTS `singer` (
-    `singer_name` varchar(200) NOT NULL,
-    `act_area` varchar(200) NOT NULL,
-    `song_name` varchar(200) NOT NULL,
-    `genre` varchar(200) NOT NULL,
-    `js_play_cnt` bigint DEFAULT NULL,
-    `down_cnt` bigint DEFAULT NULL,
-    `favor_cnt` bigint DEFAULT NULL
-)ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- benchmark
-CREATE TABLE IF NOT EXISTS `genre` (
-    `g_name` varchar(20) NOT NULL , -- genre name
-    `rating` INT ,
-    `most_popular_in` varchar(50) ,
-    PRIMARY KEY (`g_name`)
-)ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-CREATE TABLE IF NOT EXISTS `artist` (
-    `artist_name` varchar(50) NOT NULL , -- genre name
-    `citizenship` varchar(20) ,
-    `gender` varchar(20) ,
-    `g_name` varchar(50)
-)ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-CREATE TABLE IF NOT EXISTS `files` (
-     `f_id` bigINT NOT NULL,
-     `artist_name` varchar(50) ,
-    `file_size` varchar(20) ,
-    `duration` varchar(20) ,
-    `formats` varchar(20) ,
-    PRIMARY KEY (`f_id`)
-)ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-CREATE TABLE IF NOT EXISTS `song` (
-    `imp_date` varchar(50) ,
-    `song_name` varchar(50) ,
-    `artist_name` varchar(50) ,
-    `country` varchar(20) ,
-    `f_id` bigINT ,
-    `g_name` varchar(20) ,
-    `rating` int ,
-    `languages` varchar(20) ,
-    `releasedate` varchar(50) ,
-    `resolution` bigINT NOT NULL
-)ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
 CREATE TABLE IF NOT EXISTS `s2_agent` (
     `id` int(11) NOT NULL AUTO_INCREMENT,
     `name` varchar(100) COLLATE utf8_unicode_ci DEFAULT NULL,
@@ -80,6 +15,8 @@ CREATE TABLE IF NOT EXISTS `s2_agent` (
     `created_at` datetime DEFAULT NULL,
     `updated_by` varchar(100) COLLATE utf8_unicode_ci DEFAULT NULL,
     `updated_at` datetime DEFAULT NULL,
+    `admin` varchar(1000) COLLATE utf8_unicode_ci DEFAULT NULL,
+    `viewer` varchar(1000) COLLATE utf8_unicode_ci DEFAULT NULL,
     PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;
 
@@ -140,13 +77,14 @@ CREATE TABLE IF NOT EXISTS `s2_chat_memory` (
     `id` INT NOT NULL AUTO_INCREMENT,
     `question` varchar(655)   COMMENT '用户问题' ,
     `side_info` TEXT COMMENT '辅助信息' ,
+    `query_id`  BIGINT    COMMENT '问答ID' ,
     `agent_id`  INT    COMMENT '助理ID' ,
     `db_schema`  TEXT    COMMENT 'Schema映射' ,
     `s2_sql` TEXT   COMMENT '大模型解析SQL' ,
-    `status` char(10)   COMMENT '状态' ,
-    `llm_review` char(10)    COMMENT '大模型评估结果' ,
+    `status` varchar(10)   COMMENT '状态' ,
+    `llm_review` varchar(10)    COMMENT '大模型评估结果' ,
     `llm_comment`   TEXT COMMENT '大模型评估意见' ,
-    `human_review` char(10) COMMENT '管理员评估结果',
+    `human_review` varchar(10) COMMENT '管理员评估结果',
     `human_comment` TEXT    COMMENT '管理员评估意见',
     `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP  ,
     `updated_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP ,
@@ -158,7 +96,7 @@ CREATE TABLE IF NOT EXISTS `s2_chat_memory` (
 CREATE TABLE IF NOT EXISTS `s2_chat_context` (
    `chat_id` bigint(20) NOT NULL COMMENT 'context chat id',
    `modified_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT 'row modify time',
-   `user` varchar(64) DEFAULT NULL COMMENT 'row modify user',
+   `query_user` varchar(64) DEFAULT NULL COMMENT 'row modify user',
    `query_text` text COMMENT 'query text',
    `semantic_parse` text COMMENT 'parse data',
    `ext_data` text COMMENT 'extend data',
@@ -390,7 +328,7 @@ CREATE TABLE IF NOT EXISTS `s2_query_stat_info` (
       `trace_id` varchar(200) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '查询标识',
       `model_id` bigint(20) DEFAULT NULL,
       `data_set_id` bigint(20) DEFAULT NULL,
-      `user` varchar(200) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '执行sql的用户',
+      `query_user` varchar(200) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '执行sql的用户',
       `created_at` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
       `query_type` varchar(200) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '查询对应的场景',
       `query_type_back` int(10) DEFAULT '0' COMMENT '查询类型, 0-正常查询, 1-预刷类型',
@@ -398,7 +336,7 @@ CREATE TABLE IF NOT EXISTS `s2_query_stat_info` (
       `sql_cmd_md5` varchar(200) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT 'sql md5值',
       `query_struct_cmd` mediumtext COLLATE utf8mb4_unicode_ci COMMENT '对应查询的struct',
       `struct_cmd_md5` varchar(200) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT 'sql md5值',
-      `sql` mediumtext COLLATE utf8mb4_unicode_ci COMMENT '对应查询的sql',
+      `query_sql` mediumtext COLLATE utf8mb4_unicode_ci COMMENT '对应查询的sql',
       `sql_md5` varchar(200) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT 'sql md5值',
       `query_engine` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '查询引擎',
       `elapsed_ms` bigint(10) DEFAULT NULL COMMENT '查询耗时',
@@ -421,26 +359,6 @@ CREATE TABLE IF NOT EXISTS `s2_query_stat_info` (
       PRIMARY KEY (`id`),
       KEY `domain_index` (`model_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='查询统计信息表';
-
-CREATE TABLE IF NOT EXISTS `s2_semantic_pasre_info` (
-      `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
-      `trace_id` varchar(200) NOT NULL COMMENT '查询标识',
-      `domain_id` bigint(20) NOT NULL COMMENT '主体域ID',
-      `dimensions` mediumtext COMMENT '查询相关的维度信息',
-      `metrics` mediumtext COMMENT '查询相关的指标信息',
-      `orders` mediumtext COMMENT '查询相关的排序信息',
-      `filters` mediumtext COMMENT '查询相关的过滤信息',
-      `date_info` mediumtext COMMENT '查询相关的日期信息',
-      `limit` bigint(20) NOT NULL COMMENT '查询相关的limit信息',
-      `native_query` tinyint(1) NOT NULL DEFAULT '0' COMMENT '1-明细查询,0-聚合查询',
-      `sql` mediumtext COMMENT '解析后的sql',
-      `created_at` datetime NOT NULL COMMENT '创建时间',
-      `created_by` varchar(100) NOT NULL COMMENT '创建人',
-      `status` tinyint NOT NULL COMMENT '运行状态',
-      `elapsed_ms` bigint(10) DEFAULT NULL COMMENT 'sql解析耗时',
-      PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8 COMMENT='语义层sql解析信息表';
-
 
 CREATE TABLE IF NOT EXISTS `s2_canvas`
 (
@@ -604,7 +522,7 @@ CREATE TABLE IF NOT EXISTS `s2_term` (
     PRIMARY KEY (`id`)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8 COMMENT ='术语表';
 
-CREATE TABLE `s2_user_token` (
+CREATE TABLE IF NOT EXISTS `s2_user_token` (
      `id` bigint NOT NULL AUTO_INCREMENT,
      `name` VARCHAR(255) NOT NULL,
      `user_name` VARCHAR(255)  NOT NULL,

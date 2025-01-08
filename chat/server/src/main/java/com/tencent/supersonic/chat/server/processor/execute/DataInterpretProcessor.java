@@ -32,7 +32,7 @@ public class DataInterpretProcessor implements ExecuteResultProcessor {
             + "#Role: You are a data expert who communicates with business users everyday."
             + "\n#Task: Your will be provided with a question asked by a user and the relevant "
             + "result data queried from the databases, please interpret the data and organize a brief answer."
-            + "\n#Rules: " + "\n1.The `#Answer` must use the same language as the `#Question`."
+            + "\n#Rules: " + "\n1.ALWAYS respond in the use the same language as the `#Question`."
             + "\n2.ALWAYS reference some key data in the `#Answer`."
             + "\n#Question:{{question}} #Data:{{data}} #Answer:";
 
@@ -43,12 +43,17 @@ public class DataInterpretProcessor implements ExecuteResultProcessor {
 
 
     @Override
-    public void process(ExecuteContext executeContext, QueryResult queryResult) {
+    public boolean accept(ExecuteContext executeContext) {
         Agent agent = executeContext.getAgent();
         ChatApp chatApp = agent.getChatAppConfig().get(APP_KEY);
-        if (Objects.isNull(chatApp) || !chatApp.isEnable()) {
-            return;
-        }
+        return Objects.nonNull(chatApp) && chatApp.isEnable();
+    }
+
+    @Override
+    public void process(ExecuteContext executeContext) {
+        QueryResult queryResult = executeContext.getResponse();
+        Agent agent = executeContext.getAgent();
+        ChatApp chatApp = agent.getChatAppConfig().get(APP_KEY);
 
         Map<String, Object> variable = new HashMap<>();
         variable.put("question", executeContext.getRequest().getQueryText());
@@ -62,7 +67,7 @@ public class DataInterpretProcessor implements ExecuteResultProcessor {
         keyPipelineLog.info("DataInterpretProcessor modelReq:\n{} \nmodelResp:\n{}", prompt.text(),
                 anwser);
         if (StringUtils.isNotBlank(anwser)) {
-            queryResult.setTextResult(anwser);
+            queryResult.setTextSummary(anwser);
         }
     }
 }

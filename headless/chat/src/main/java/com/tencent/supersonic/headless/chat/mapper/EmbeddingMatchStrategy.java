@@ -16,16 +16,16 @@ import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 import static com.tencent.supersonic.headless.chat.mapper.MapperConfig.EMBEDDING_MAPPER_NUMBER;
 import static com.tencent.supersonic.headless.chat.mapper.MapperConfig.EMBEDDING_MAPPER_ROUND_NUMBER;
 import static com.tencent.supersonic.headless.chat.mapper.MapperConfig.EMBEDDING_MAPPER_THRESHOLD;
-import static com.tencent.supersonic.headless.chat.mapper.MapperConfig.EMBEDDING_MAPPER_THRESHOLD_MIN;
 
 /**
  * EmbeddingMatchStrategy uses vector database to perform similarity search against the embeddings
@@ -41,7 +41,7 @@ public class EmbeddingMatchStrategy extends BatchMatchStrategy<EmbeddingResult> 
     @Override
     public List<EmbeddingResult> detectByBatch(ChatQueryContext chatQueryContext,
             Set<Long> detectDataSetIds, Set<String> detectSegments) {
-        Set<EmbeddingResult> results = new HashSet<>();
+        Set<EmbeddingResult> results = ConcurrentHashMap.newKeySet();
         int embeddingMapperBatch = Integer
                 .valueOf(mapperConfig.getParameterValue(MapperConfig.EMBEDDING_MAPPER_BATCH));
 
@@ -53,23 +53,31 @@ public class EmbeddingMatchStrategy extends BatchMatchStrategy<EmbeddingResult> 
         List<List<String>> queryTextsSubList =
                 Lists.partition(queryTextsList, embeddingMapperBatch);
 
+        List<Callable<Void>> tasks = new ArrayList<>();
         for (List<String> queryTextsSub : queryTextsSubList) {
+            tasks.add(createTask(chatQueryContext, detectDataSetIds, queryTextsSub, results));
+        }
+        executeTasks(tasks);
+        return new ArrayList<>(results);
+    }
+
+    private Callable<Void> createTask(ChatQueryContext chatQueryContext, Set<Long> detectDataSetIds,
+            List<String> queryTextsSub, Set<EmbeddingResult> results) {
+        return () -> {
             List<EmbeddingResult> oneRoundResults =
                     detectByQueryTextsSub(detectDataSetIds, queryTextsSub, chatQueryContext);
-            selectResultInOneRound(results, oneRoundResults);
-        }
-        return new ArrayList<>(results);
+            synchronized (results) {
+                selectResultInOneRound(results, oneRoundResults);
+            }
+            return null;
+        };
     }
 
     private List<EmbeddingResult> detectByQueryTextsSub(Set<Long> detectDataSetIds,
             List<String> queryTextsSub, ChatQueryContext chatQueryContext) {
         Map<Long, List<Long>> modelIdToDataSetIds = chatQueryContext.getModelIdToDataSetIds();
-        double embeddingThreshold =
+        double threshold =
                 Double.valueOf(mapperConfig.getParameterValue(EMBEDDING_MAPPER_THRESHOLD));
-        double embeddingThresholdMin =
-                Double.valueOf(mapperConfig.getParameterValue(EMBEDDING_MAPPER_THRESHOLD_MIN));
-        double threshold = getThreshold(embeddingThreshold, embeddingThresholdMin,
-                chatQueryContext.getRequest().getMapModeEnum());
 
         // step1. build query params
         RetrieveQuery retrieveQuery = RetrieveQuery.builder().queryTextsList(queryTextsSub).build();

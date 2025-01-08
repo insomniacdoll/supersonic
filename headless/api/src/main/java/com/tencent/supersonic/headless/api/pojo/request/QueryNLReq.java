@@ -11,24 +11,26 @@ import com.tencent.supersonic.headless.api.pojo.SemanticParseInfo;
 import com.tencent.supersonic.headless.api.pojo.enums.MapModeEnum;
 import lombok.Data;
 
+import java.io.Serializable;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
 @Data
-public class QueryNLReq extends SemanticQueryReq {
+public class QueryNLReq extends SemanticQueryReq implements Serializable {
     private String queryText;
     private Set<Long> dataSetIds = Sets.newHashSet();
     private User user;
     private QueryFilters queryFilters;
     private boolean saveAnswer = true;
-    private Text2SQLType text2SQLType = Text2SQLType.RULE_AND_LLM;
+    private Text2SQLType text2SQLType = Text2SQLType.LLM_OR_RULE;
     private MapModeEnum mapModeEnum = MapModeEnum.STRICT;
     private QueryDataType queryDataType = QueryDataType.ALL;
     private Map<String, ChatApp> chatAppConfig;
     private List<Text2SQLExemplar> dynamicExemplars = Lists.newArrayList();
     private SemanticParseInfo contextParseInfo;
     private SemanticParseInfo selectedParseInfo;
+    private boolean descriptionMapped;
 
     @Override
     public String toCustomizedString() {

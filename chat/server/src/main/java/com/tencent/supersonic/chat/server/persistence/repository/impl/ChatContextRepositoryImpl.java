@@ -35,18 +35,13 @@ public class ChatContextRepositoryImpl implements ChatContextRepository {
 
     @Override
     public void updateContext(ChatContext chatCtx) {
-        ChatContextDO context = cast(chatCtx);
-        if (chatContextMapper.getContextByChatId(chatCtx.getChatId()) == null) {
-            chatContextMapper.addContext(context);
-        } else {
-            chatContextMapper.updateContext(context);
-        }
+        chatContextMapper.insertOrUpdate(cast(chatCtx));
     }
 
     private ChatContext cast(ChatContextDO contextDO) {
         ChatContext chatContext = new ChatContext();
         chatContext.setChatId(contextDO.getChatId());
-        chatContext.setUser(contextDO.getUser());
+        chatContext.setUser(contextDO.getQueryUser());
         chatContext.setQueryText(contextDO.getQueryText());
         if (contextDO.getSemanticParse() != null && !contextDO.getSemanticParse().isEmpty()) {
             SemanticParseInfo semanticParseInfo =
@@ -60,7 +55,7 @@ public class ChatContextRepositoryImpl implements ChatContextRepository {
         ChatContextDO chatContextDO = new ChatContextDO();
         chatContextDO.setChatId(chatContext.getChatId());
         chatContextDO.setQueryText(chatContext.getQueryText());
-        chatContextDO.setUser(chatContext.getUser());
+        chatContextDO.setQueryUser(chatContext.getUser());
         if (chatContext.getParseInfo() != null) {
             Gson g = new Gson();
             chatContextDO.setSemanticParse(g.toJson(chatContext.getParseInfo()));

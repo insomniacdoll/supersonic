@@ -12,6 +12,7 @@ import com.tencent.supersonic.common.pojo.enums.QueryType;
 import com.tencent.supersonic.common.util.ContextUtils;
 import com.tencent.supersonic.common.util.DateModeUtils;
 import com.tencent.supersonic.common.util.SqlFilterUtils;
+import com.tencent.supersonic.headless.api.pojo.SchemaElement;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import net.sf.jsqlparser.JSQLParserException;
@@ -42,6 +43,7 @@ import java.util.stream.Collectors;
 @Slf4j
 public class QueryStructReq extends SemanticQueryReq {
 
+    private List<SchemaElement> dimensions = new ArrayList<>();
     private List<String> groups = new ArrayList<>();
     private List<Aggregator> aggregators = new ArrayList<>();
     private List<Order> orders = new ArrayList<>();
@@ -49,7 +51,7 @@ public class QueryStructReq extends SemanticQueryReq {
     private List<Filter> metricFilters = new ArrayList<>();
     private DateConf dateInfo;
     private long limit = Constants.DEFAULT_DETAIL_LIMIT;
-    private QueryType queryType = QueryType.ID;
+    private QueryType queryType = QueryType.DETAIL;
     private boolean convertToSql = true;
 
     public List<String> getGroups() {
@@ -186,36 +188,33 @@ public class QueryStructReq extends SemanticQueryReq {
         List<Aggregator> aggregators = queryStructReq.getAggregators();
         if (!CollectionUtils.isEmpty(aggregators)) {
             for (Aggregator aggregator : aggregators) {
-                selectItems.add(buildAggregatorSelectItem(aggregator, queryStructReq));
+                selectItems.add(buildAggregatorSelectItem(aggregator));
             }
         }
 
         return selectItems;
     }
 
-    private SelectItem buildAggregatorSelectItem(Aggregator aggregator,
-            QueryStructReq queryStructReq) {
+    private SelectItem buildAggregatorSelectItem(Aggregator aggregator) {
         String columnName = aggregator.getColumn();
-        if (queryStructReq.getQueryType().isNativeAggQuery()) {
-            return new SelectItem(new Column(columnName));
-        } else {
-            Function function = new Function();
-            AggOperatorEnum func = aggregator.getFunc();
-            if (AggOperatorEnum.UNKNOWN.equals(func)) {
-                func = AggOperatorEnum.SUM;
-            }
-            function.setName(func.getOperator());
-            if (AggOperatorEnum.COUNT_DISTINCT.equals(func)) {
-                function.setName("count");
-                function.setDistinct(true);
-            }
-            function.setParameters(new ExpressionList(new Column(columnName)));
-            SelectItem selectExpressionItem = new SelectItem(function);
-            String alias = StringUtils.isNotBlank(aggregator.getAlias()) ? aggregator.getAlias()
-                    : columnName;
-            selectExpressionItem.setAlias(new Alias(alias));
-            return selectExpressionItem;
+        Function function = new Function();
+        AggOperatorEnum func = aggregator.getFunc();
+        if (AggOperatorEnum.UNKNOWN.equals(func)) {
+            func = AggOperatorEnum.SUM;
         }
+        function.setName(func.getOperator());
+        if (AggOperatorEnum.COUNT_DISTINCT.equals(func)) {
+            function.setName("count");
+            function.setDistinct(true);
+        }
+        function.setParameters(new ExpressionList(new Column(columnName)));
+        SelectItem selectExpressionItem = new SelectItem(function);
+        String alias =
+                StringUtils.isNotBlank(aggregator.getAlias()) ? aggregator.getAlias() : columnName;
+        if (!alias.equals(columnName)) {
+            selectExpressionItem.setAlias(new Alias(alias));
+        }
+        return selectExpressionItem;
     }
 
     private List<OrderByElement> buildOrderByElements(QueryStructReq queryStructReq) {
@@ -239,7 +238,7 @@ public class QueryStructReq extends SemanticQueryReq {
 
     private GroupByElement buildGroupByElement(QueryStructReq queryStructReq) {
         List<String> groups = queryStructReq.getGroups();
-        if (!CollectionUtils.isEmpty(groups) && !queryStructReq.getQueryType().isNativeAggQuery()) {
+        if (!CollectionUtils.isEmpty(groups) && !queryStructReq.getAggregators().isEmpty()) {
             GroupByElement groupByElement = new GroupByElement();
             for (String group : groups) {
                 groupByElement.addGroupByExpression(new Column(group));

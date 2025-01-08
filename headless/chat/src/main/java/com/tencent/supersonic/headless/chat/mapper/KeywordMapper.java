@@ -8,12 +8,15 @@ import com.tencent.supersonic.headless.api.pojo.SchemaMapInfo;
 import com.tencent.supersonic.headless.api.pojo.response.S2Term;
 import com.tencent.supersonic.headless.chat.ChatQueryContext;
 import com.tencent.supersonic.headless.chat.knowledge.DatabaseMapResult;
+import com.tencent.supersonic.headless.chat.knowledge.DictWord;
 import com.tencent.supersonic.headless.chat.knowledge.HanlpMapResult;
+import com.tencent.supersonic.headless.chat.knowledge.KnowledgeBaseService;
 import com.tencent.supersonic.headless.chat.knowledge.builder.BaseWordBuilder;
 import com.tencent.supersonic.headless.chat.knowledge.helper.HanlpHelper;
 import com.tencent.supersonic.headless.chat.knowledge.helper.NatureHelper;
 import com.tencent.supersonic.headless.chat.utils.EditDistanceUtils;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.CollectionUtils;
 
 import java.util.HashSet;
@@ -33,32 +36,32 @@ public class KeywordMapper extends BaseMapper {
     @Override
     public void doMap(ChatQueryContext chatQueryContext) {
         String queryText = chatQueryContext.getRequest().getQueryText();
-        // 1.hanlpDict Match
+
+        // 1. hanlpDict Match
         List<S2Term> terms =
                 HanlpHelper.getTerms(queryText, chatQueryContext.getModelIdToDataSetIds());
         HanlpDictMatchStrategy hanlpMatchStrategy =
                 ContextUtils.getBean(HanlpDictMatchStrategy.class);
+        List<HanlpMapResult> hanlpMatchResults = getMatches(chatQueryContext, hanlpMatchStrategy);
+        convertMapResultToMapInfo(hanlpMatchResults, chatQueryContext, terms);
 
-        List<HanlpMapResult> matchResults = getMatches(chatQueryContext, hanlpMatchStrategy);
-
-        convertHanlpMapResultToMapInfo(matchResults, chatQueryContext, terms);
-
-        // 2.database Match
+        // 2. database Match
         DatabaseMatchStrategy databaseMatchStrategy =
                 ContextUtils.getBean(DatabaseMatchStrategy.class);
-        List<DatabaseMapResult> databaseResults =
+        List<DatabaseMapResult> databaseMatchResults =
                 getMatches(chatQueryContext, databaseMatchStrategy);
-        convertDatabaseMapResultToMapInfo(chatQueryContext, databaseResults);
+        convertMapResultToMapInfo(chatQueryContext, databaseMatchResults);
     }
 
-    private void convertHanlpMapResultToMapInfo(List<HanlpMapResult> mapResults,
+    private void convertMapResultToMapInfo(List<HanlpMapResult> mapResults,
             ChatQueryContext chatQueryContext, List<S2Term> terms) {
         if (CollectionUtils.isEmpty(mapResults)) {
             return;
         }
+
         HanlpHelper.transLetterOriginal(mapResults);
-        Map<String, Long> wordNatureToFrequency = terms.stream()
-                .collect(Collectors.toMap(entry -> entry.getWord() + entry.getNature(),
+        Map<String, Long> wordNatureToFrequency =
+                terms.stream().collect(Collectors.toMap(term -> term.getWord() + term.getNature(),
                         term -> Long.valueOf(term.getFrequency()), (value1, value2) -> value2));
 
         for (HanlpMapResult hanlpMapResult : mapResults) {
@@ -74,21 +77,42 @@ public class KeywordMapper extends BaseMapper {
                 Long elementID = NatureHelper.getElementID(nature);
                 SchemaElement element = getSchemaElement(dataSetId, elementType, elementID,
                         chatQueryContext.getSemanticSchema());
-                if (element == null) {
+                if (Objects.isNull(element)) {
                     continue;
                 }
+
                 Long frequency = wordNatureToFrequency.get(hanlpMapResult.getName() + nature);
                 SchemaElementMatch schemaElementMatch = SchemaElementMatch.builder()
                         .element(element).frequency(frequency).word(hanlpMapResult.getName())
                         .similarity(hanlpMapResult.getSimilarity())
                         .detectWord(hanlpMapResult.getDetectWord()).build();
-
+                // doDimValueAliasLogic 将维度值别名进行替换成真实维度值
+                doDimValueAliasLogic(schemaElementMatch);
                 addToSchemaMap(chatQueryContext.getMapInfo(), dataSetId, schemaElementMatch);
             }
         }
     }
 
-    private void convertDatabaseMapResultToMapInfo(ChatQueryContext chatQueryContext,
+    private void doDimValueAliasLogic(SchemaElementMatch schemaElementMatch) {
+        SchemaElement element = schemaElementMatch.getElement();
+        if (SchemaElementType.VALUE.equals(element.getType())) {
+            Long dimId = element.getId();
+            String word = schemaElementMatch.getWord();
+            Map<Long, List<DictWord>> dimValueAlias = KnowledgeBaseService.getDimValueAlias();
+            if (Objects.nonNull(dimId) && StringUtils.isNotEmpty(word)
+                    && dimValueAlias.containsKey(dimId)) {
+                Map<String, DictWord> aliasAndDictMap = dimValueAlias.get(dimId).stream()
+                        .collect(Collectors.toMap(dictWord -> dictWord.getAlias(),
+                                dictWord -> dictWord, (v1, v2) -> v2));
+                if (aliasAndDictMap.containsKey(word)) {
+                    String wordTech = aliasAndDictMap.get(word).getWord();
+                    schemaElementMatch.setWord(wordTech);
+                }
+            }
+        }
+    }
+
+    private void convertMapResultToMapInfo(ChatQueryContext chatQueryContext,
             List<DatabaseMapResult> mapResults) {
         for (DatabaseMapResult match : mapResults) {
             SchemaElement schemaElement = match.getSchemaElement();

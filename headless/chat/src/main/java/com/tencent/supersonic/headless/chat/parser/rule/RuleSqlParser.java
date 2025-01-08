@@ -19,13 +19,12 @@ import java.util.List;
 @Slf4j
 public class RuleSqlParser implements SemanticParser {
 
-    private static final List<SemanticParser> auxiliaryParsers = Arrays
-            .asList(new ContextInheritParser(), new TimeRangeParser(), new AggregateTypeParser());
+    private static final List<SemanticParser> auxiliaryParsers =
+            Arrays.asList(new TimeRangeParser(), new AggregateTypeParser());
 
     @Override
     public void parse(ChatQueryContext chatQueryContext) {
-        if (!chatQueryContext.getRequest().getText2SQLType().enableRule()
-                || !chatQueryContext.getCandidateQueries().isEmpty()) {
+        if (!chatQueryContext.getCandidateQueries().isEmpty()) {
             return;
         }
         SchemaMapInfo mapInfo = chatQueryContext.getMapInfo();
@@ -35,15 +34,13 @@ public class RuleSqlParser implements SemanticParser {
             List<SchemaElementMatch> elementMatches = mapInfo.getMatchedElements(dataSetId);
             List<RuleSemanticQuery> queries =
                     RuleSemanticQuery.resolve(dataSetId, elementMatches, chatQueryContext);
-            for (RuleSemanticQuery query : queries) {
-                query.fillParseInfo(chatQueryContext);
-                chatQueryContext.getCandidateQueries().add(query);
-            }
-            candidateQueries.addAll(chatQueryContext.getCandidateQueries());
-            chatQueryContext.getCandidateQueries().clear();
+            candidateQueries.addAll(queries);
         }
         chatQueryContext.setCandidateQueries(candidateQueries);
 
         auxiliaryParsers.forEach(p -> p.parse(chatQueryContext));
+
+        candidateQueries.forEach(query -> query.buildS2Sql(
+                chatQueryContext.getDataSetSchema(query.getParseInfo().getDataSetId())));
     }
 }

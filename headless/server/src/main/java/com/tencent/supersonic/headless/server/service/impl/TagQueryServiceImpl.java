@@ -2,8 +2,7 @@ package com.tencent.supersonic.headless.server.service.impl;
 
 import com.tencent.supersonic.common.pojo.DateConf;
 import com.tencent.supersonic.common.pojo.User;
-import com.tencent.supersonic.common.pojo.enums.TimeDimensionEnum;
-import com.tencent.supersonic.headless.api.pojo.Dim;
+import com.tencent.supersonic.headless.api.pojo.Dimension;
 import com.tencent.supersonic.headless.api.pojo.SchemaElementType;
 import com.tencent.supersonic.headless.api.pojo.ValueDistribution;
 import com.tencent.supersonic.headless.api.pojo.enums.TagDefineType;
@@ -26,12 +25,7 @@ import org.springframework.util.StringUtils;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
+import java.util.*;
 
 @Service
 @Slf4j
@@ -93,7 +87,7 @@ public class TagQueryServiceImpl implements TagQueryService {
     private void correctDateConf(ItemValueReq itemValueReq, TagResp tag, User user)
             throws Exception {
         ModelResp model = modelService.getModel(tag.getModelId());
-        List<Dim> timeDimension = model.getTimeDimension();
+        List<Dimension> timeDimension = model.getTimeDimension();
         if (CollectionUtils.isEmpty(timeDimension)) {
             itemValueReq.setDateConf(null);
             return;
@@ -112,24 +106,24 @@ public class TagQueryServiceImpl implements TagQueryService {
         itemValueReq.setDateConf(dateConf);
     }
 
-    private String queryTagDate(Dim dim) {
+    private String queryTagDate(Dimension dim) {
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern(dim.getDateFormat());
         return LocalDate.now().plusDays(-dayBefore).format(formatter);
     }
 
-    private String queryTagDateFromDbBySql(Dim dim, TagResp tag, ItemValueReq itemValueReq,
+    private String queryTagDateFromDbBySql(Dimension dim, TagResp tag, ItemValueReq itemValueReq,
             User user) {
 
         String sqlPattern = "select max(%s)  as %s from tbl where %s is not null";
-        String sql = String.format(sqlPattern, TimeDimensionEnum.DAY.getName(), maxDateAlias,
-                tag.getBizName());
+        String sql = String.format(sqlPattern, itemValueReq.getDateConf().getDateField(),
+                maxDateAlias, tag.getBizName());
 
         // 添加时间过滤信息
         log.info("[queryTagDateFromDbBySql] calculate the maximum time start");
         if (Objects.nonNull(itemValueReq) && itemValueReq.getDateConf().getUnit() > 1) {
             ModelResp model = modelService.getModel(tag.getModelId());
             if (Objects.nonNull(model)) {
-                List<Dim> timeDims = model.getTimeDimension();
+                List<Dimension> timeDims = model.getTimeDimension();
                 if (!CollectionUtils.isEmpty(timeDims)) {
                     String dateFormat = timeDims.get(0).getDateFormat();
                     if (StringUtils.isEmpty(dateFormat)) {
@@ -140,8 +134,8 @@ public class TagQueryServiceImpl implements TagQueryService {
                     String end = LocalDate.now().minusDays(0)
                             .format(DateTimeFormatter.ofPattern(dateFormat));
                     sql = sql + String.format(" and ( %s > '%s' and %s <= '%s' )",
-                            TimeDimensionEnum.DAY.getName(), start, TimeDimensionEnum.DAY.getName(),
-                            end);
+                            itemValueReq.getDateConf().getDateField(), start,
+                            itemValueReq.getDateConf().getDateField(), end);
                 }
             }
         }

@@ -42,12 +42,12 @@ const ROUTES = [
     component: './Agent',
     envEnableList: [ENV_KEY.CHAT],
   },
-  // {
-  //   path: '/plugin',
-  //   name: 'plugin',
-  //   component: './ChatPlugin',
-  //   envEnableList: [ENV_KEY.CHAT],
-  // },
+  {
+    path: '/plugin',
+    name: 'plugin',
+    component: './ChatPlugin',
+    envEnableList: [ENV_KEY.CHAT],
+  },
   {
     path: '/model/metric/edit/:metricId',
     name: 'metricEdit',
@@ -57,31 +57,75 @@ const ROUTES = [
   },
   {
     path: '/model/',
-    component: './SemanticModel/DomainManager',
+    component: './SemanticModel/',
     name: 'semanticModel',
     envEnableList: [ENV_KEY.SEMANTIC],
     routes: [
       {
-        path: '/model/:domainId/:modelId',
-        component: './SemanticModel/DomainManager',
-        // name: 'semanticModel',
-        envEnableList: [ENV_KEY.SEMANTIC],
+        path: '/model/',
+        redirect: '/model/domain',
       },
       {
-        path: '/model/:domainId/:modelId/:menuKey',
-        component: './SemanticModel/DomainManager',
-        // name: 'semanticModel',
+        path: '/model/domain/',
+        component: './SemanticModel/OverviewContainer',
+        routes: [
+          {
+            path: '/model/domain/:domainId',
+            component: './SemanticModel/DomainManager',
+            routes: [
+              {
+                path: '/model/domain/:domainId/:menuKey',
+                component: './SemanticModel/DomainManager',
+              },
+            ],
+          },
+          {
+            path: '/model/domain/manager/:domainId/:modelId',
+            component: './SemanticModel/ModelManager',
+            routes: [
+              {
+                path: '/model/domain/manager/:domainId/:modelId/:menuKey',
+                component: './SemanticModel/ModelManager',
+              },
+            ],
+          },
+        ],
+      },
+      {
+        path: '/model/dataset/:domainId/:datasetId',
+        component: './SemanticModel/View/components/Detail',
         envEnableList: [ENV_KEY.SEMANTIC],
+        routes: [
+          {
+            path: '/model/dataset/:domainId/:datasetId/:menuKey',
+            component: './SemanticModel/View/components/Detail',
+          },
+        ],
+      },
+      {
+        path: '/model/metric/:domainId/:modelId/:metricId',
+        component: './SemanticModel/Metric/Edit',
+        envEnableList: [ENV_KEY.SEMANTIC],
+        // routes: [
+        //   {
+        //     path: '/model/manager/:domainId/:modelId/:menuKey',
+        //     component: './SemanticModel/ModelManager',
+        //   },
+        // ],
+      },
+      {
+        path: '/model/dimension/:domainId/:modelId/:dimensionId',
+        component: './SemanticModel/Dimension/Detail',
+        envEnableList: [ENV_KEY.SEMANTIC],
+        // routes: [
+        //   {
+        //     path: '/model/manager/:domainId/:modelId/:menuKey',
+        //     component: './SemanticModel/ModelManager',
+        //   },
+        // ],
       },
     ],
   },
-
-  // {
-  //   path: '/model/:domainId/:modelId/:menuKey',
-  //   component: './SemanticModel/DomainManager',
-  //   name: 'semanticModel',
-  //   envEnableList: [ENV_KEY.SEMANTIC],
-  // },
 
   {
     path: '/metric',
@@ -115,12 +159,12 @@ const ROUTES = [
       },
     ],
   },
-
   {
     path: '/tag',
     name: 'tag',
     component: './SemanticModel/Insights',
     envEnableList: [ENV_KEY.SEMANTIC],
+    hideInMenu: process.env.SHOW_TAG ? false : true,
     routes: [
       {
         path: '/tag',
@@ -169,11 +213,7 @@ const ROUTES = [
   },
   {
     path: '/',
-    redirect: APP_TARGET === 'inner' ? '/model' : '/chat',
-    envRedirect: {
-      [ENV_KEY.CHAT]: '/chat',
-      [ENV_KEY.SEMANTIC]: '/model',
-    },
+    redirect: '/model',
   },
   {
     path: '/401',

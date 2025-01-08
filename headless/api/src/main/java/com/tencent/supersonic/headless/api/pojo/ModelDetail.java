@@ -18,13 +18,15 @@ public class ModelDetail {
 
     private String queryType;
 
+    private String dbType;
+
     private String sqlQuery;
 
     private String tableQuery;
 
     private List<Identify> identifiers = Lists.newArrayList();
 
-    private List<Dim> dimensions = Lists.newArrayList();
+    private List<Dimension> dimensions = Lists.newArrayList();
 
     private List<Measure> measures = Lists.newArrayList();
 
@@ -39,12 +41,11 @@ public class ModelDetail {
         return sqlQuery;
     }
 
-    public List<Dim> filterTimeDims() {
+    public List<Dimension> filterTimeDims() {
         if (CollectionUtils.isEmpty(dimensions)) {
             return Lists.newArrayList();
         }
-        return dimensions.stream()
-                .filter(dim -> DimensionType.partition_time.name().equalsIgnoreCase(dim.getType()))
+        return dimensions.stream().filter(dim -> DimensionType.partition_time.equals(dim.getType()))
                 .collect(Collectors.toList());
     }
 

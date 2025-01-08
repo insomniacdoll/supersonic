@@ -1,11 +1,15 @@
 package com.tencent.supersonic.chat.server.memory;
 
 import com.tencent.supersonic.chat.api.pojo.enums.MemoryReviewResult;
+import com.tencent.supersonic.chat.api.pojo.enums.MemoryStatus;
+import com.tencent.supersonic.chat.api.pojo.request.ChatMemoryFilter;
+import com.tencent.supersonic.chat.api.pojo.request.ChatMemoryUpdateReq;
 import com.tencent.supersonic.chat.server.agent.Agent;
-import com.tencent.supersonic.chat.server.persistence.dataobject.ChatMemoryDO;
+import com.tencent.supersonic.chat.server.pojo.ChatMemory;
 import com.tencent.supersonic.chat.server.service.AgentService;
 import com.tencent.supersonic.chat.server.service.MemoryService;
 import com.tencent.supersonic.common.pojo.ChatApp;
+import com.tencent.supersonic.common.pojo.User;
 import com.tencent.supersonic.common.pojo.enums.AppModule;
 import com.tencent.supersonic.common.util.ChatAppManager;
 import com.tencent.supersonic.headless.server.utils.ModelConfigHelper;
@@ -21,6 +25,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.util.Collections;
+import java.util.List;
 import java.util.Objects;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -57,24 +62,36 @@ public class MemoryReviewTask {
 
     @Scheduled(fixedDelay = 60 * 1000)
     public void review() {
-        memoryService.getMemoriesForLlmReview().stream().forEach(memory -> {
-            try {
-                processMemory(memory);
-            } catch (Exception e) {
-                log.error("Exception occurred while processing memory with id {}: {}",
-                        memory.getId(), e.getMessage(), e);
+        List<Agent> agentList = agentService.getAgents();
+        for (Agent agent : agentList) {
+            if (!agent.enableMemoryReview()) {
+                continue;
             }
-        });
+            ChatMemoryFilter chatMemoryFilter =
+                    ChatMemoryFilter.builder().agentId(agent.getId()).build();
+            memoryService.getMemories(chatMemoryFilter).forEach(memory -> {
+                try {
+                    processMemory(memory, agent);
+                } catch (Exception e) {
+                    log.error("Exception occurred while processing memory with id {}: {}",
+                            memory.getId(), e.getMessage(), e);
+                }
+            });
+        }
     }
 
-    private void processMemory(ChatMemoryDO m) {
-        Agent chatAgent = agentService.getAgent(m.getAgentId());
-        if (Objects.isNull(chatAgent)) {
+    private void processMemory(ChatMemory m, Agent agent) {
+        if (Objects.isNull(agent)) {
             log.warn("Agent id {} not found or memory review disabled", m.getAgentId());
             return;
         }
 
-        ChatApp chatApp = chatAgent.getChatAppConfig().get(APP_KEY);
+        // if either LLM or human has reviewed, just return
+        if (Objects.nonNull(m.getLlmReviewRet()) || Objects.nonNull(m.getHumanReviewRet())) {
+            return;
+        }
+
+        ChatApp chatApp = agent.getChatAppConfig().get(APP_KEY);
         if (Objects.isNull(chatApp) || !chatApp.isEnable()) {
             return;
         }
@@ -90,25 +107,28 @@ public class MemoryReviewTask {
                     response);
             processResponse(response, m);
         } else {
-            log.debug("ChatLanguageModel not found for agent:{}", chatAgent.getId());
+            log.debug("ChatLanguageModel not found for agent:{}", agent.getId());
         }
     }
 
-    private String createPromptString(ChatMemoryDO m, String promptTemplate) {
+    private String createPromptString(ChatMemory m, String promptTemplate) {
         return String.format(promptTemplate, m.getQuestion(), m.getDbSchema(), m.getSideInfo(),
                 m.getS2sql());
     }
 
-    private void processResponse(String response, ChatMemoryDO m) {
+    private void processResponse(String response, ChatMemory m) {
         Matcher matcher = OUTPUT_PATTERN.matcher(response);
         if (matcher.find()) {
             m.setLlmReviewRet(MemoryReviewResult.getMemoryReviewResult(matcher.group(1)));
             m.setLlmReviewCmt(matcher.group(2));
             // directly enable memory if the LLM determines it positive
             if (MemoryReviewResult.POSITIVE.equals(m.getLlmReviewRet())) {
-                memoryService.enableMemory(m);
+                m.setStatus(MemoryStatus.ENABLED);
             }
-            memoryService.updateMemory(m);
+            ChatMemoryUpdateReq memoryUpdateReq = ChatMemoryUpdateReq.builder().id(m.getId())
+                    .status(m.getStatus()).llmReviewRet(m.getLlmReviewRet())
+                    .llmReviewCmt(m.getLlmReviewCmt()).build();
+            memoryService.updateMemory(memoryUpdateReq, User.getDefaultUser());
         }
     }
 }

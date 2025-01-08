@@ -7,13 +7,10 @@ import com.tencent.supersonic.headless.api.pojo.enums.SchemaType;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.apache.commons.lang3.StringUtils;
 
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-
-import static com.tencent.supersonic.common.pojo.Constants.UNDERLINE;
 
 @Data
 @AllArgsConstructor
@@ -25,19 +22,11 @@ public class SemanticSchemaResp {
     private SchemaType schemaType;
     private List<MetricSchemaResp> metrics = Lists.newArrayList();
     private List<DimSchemaResp> dimensions = Lists.newArrayList();
-    private List<TagResp> tags = Lists.newArrayList();
     private List<ModelRela> modelRelas = Lists.newArrayList();
     private List<ModelResp> modelResps = Lists.newArrayList();
     private DataSetResp dataSetResp;
     private DatabaseResp databaseResp;
     private QueryType queryType;
-
-    public String getSchemaKey() {
-        if (dataSetId == null) {
-            return String.format("%s_%s", schemaType, StringUtils.join(modelIds, UNDERLINE));
-        }
-        return String.format("%s_%s", schemaType, dataSetId);
-    }
 
     public MetricSchemaResp getMetric(String bizName) {
         return metrics.stream().filter(metric -> bizName.equalsIgnoreCase(metric.getBizName()))
@@ -75,4 +64,5 @@ public class SemanticSchemaResp {
         }
         return names;
     }
+
 }

@@ -7,17 +7,17 @@ import com.tencent.supersonic.common.pojo.enums.EventType;
 import com.tencent.supersonic.headless.chat.knowledge.DictWord;
 import com.tencent.supersonic.headless.chat.knowledge.helper.HanlpHelper;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.ApplicationListener;
+import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 
 @Component
 @Slf4j
-public class SchemaDictUpdateListener implements ApplicationListener<DataEvent> {
+public class SchemaDictUpdateListener {
 
-    @Async
-    @Override
+    @Async("eventExecutor")
+    @EventListener
     public void onApplicationEvent(DataEvent dataEvent) {
         if (CollectionUtils.isEmpty(dataEvent.getDataItems())) {
             return;
@@ -27,7 +27,7 @@ public class SchemaDictUpdateListener implements ApplicationListener<DataEvent> 
             dictWord.setWord(dataItem.getName());
             String sign = DictWordType.NATURE_SPILT;
             String suffixNature = DictWordType.getSuffixNature(dataItem.getType());
-            String nature = sign + dataItem.getModelId() + dataItem.getId() + suffixNature;
+            String nature = sign + dataItem.getModelId() + sign + dataItem.getId() + suffixNature;
             String natureWithFrequency = nature + " " + Constants.DEFAULT_FREQUENCY;
             dictWord.setNature(nature);
             dictWord.setNatureWithFrequency(natureWithFrequency);

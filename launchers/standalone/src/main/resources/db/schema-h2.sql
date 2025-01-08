@@ -3,7 +3,7 @@ CREATE TABLE IF NOT EXISTS `s2_chat_context`
 (
     `chat_id`        BIGINT NOT NULL , -- context chat id
     `modified_at`    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP , -- row modify time
-    `user`           varchar(64) DEFAULT NULL , -- row modify user
+    `query_user`           varchar(64) DEFAULT NULL , -- row modify user
     `query_text`     LONGVARCHAR DEFAULT NULL , -- query text
     `semantic_parse` LONGVARCHAR DEFAULT NULL , -- parse data
     `ext_data`       LONGVARCHAR DEFAULT NULL , -- extend data
@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS `s2_chat_query`
     `create_time`       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     `query_text`          mediumtext,
     `user_name`         varchar(150)  DEFAULT NULL COMMENT '',
-    `query_state`             int(1) DEFAULT NULL,
+    `query_state`             int DEFAULT NULL,
     `chat_id`           BIGINT NOT NULL , -- context chat id
     `query_result` mediumtext NOT NULL ,
     `score`             int DEFAULT '0',
@@ -61,7 +61,7 @@ CREATE TABLE IF NOT EXISTS `s2_chat_statistics`
     `user_name`         varchar(150)  DEFAULT NULL COMMENT '',
     `query_text`          varchar(200),
     `interface_name`         varchar(100)  DEFAULT NULL COMMENT '',
-    `cost` INT(6) NOT NULL ,
+    `cost` INT NOT NULL ,
     `type` INT NOT NULL ,
     `create_time`       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
@@ -86,14 +86,15 @@ COMMENT ON TABLE s2_chat_config IS 'chat config information table ';
 CREATE TABLE IF NOT EXISTS `s2_chat_memory` (
     `id` INT NOT NULL AUTO_INCREMENT,
     `question` varchar(655)    ,
+    `query_id`  BIGINT    ,
     `agent_id`  INT    ,
     `db_schema`  TEXT    ,
     `s2_sql` TEXT   ,
     `side_info` TEXT    ,
-    `status` char(10)   ,
-    `llm_review` char(10)   ,
+    `status` varchar(10)   ,
+    `llm_review` varchar(10)   ,
     `llm_comment`   TEXT,
-    `human_review` char(10) ,
+    `human_review` varchar(10) ,
     `human_comment` TEXT    ,
     `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP  ,
     `updated_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP ,
@@ -290,7 +291,7 @@ CREATE TABLE IF NOT EXISTS `s2_query_stat_info` (
   `trace_id` varchar(200) DEFAULT NULL, -- query unique identifier
   `model_id` INT DEFAULT NULL,
   `data_set_id` INT DEFAULT NULL,
-  `user`    varchar(200) DEFAULT NULL,
+  `query_user`    varchar(200) DEFAULT NULL,
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ,
   `query_type` varchar(200) DEFAULT NULL, -- the corresponding scene
   `query_type_back` INT DEFAULT '0' , -- query type, 0-normal query, 1-pre-refresh type
@@ -298,7 +299,7 @@ CREATE TABLE IF NOT EXISTS `s2_query_stat_info` (
   `sql_cmd_md5` varchar(200) DEFAULT NULL, -- sql type request parameter md5
   `query_struct_cmd`LONGVARCHAR , -- struct type request parameter
   `struct_cmd_md5` varchar(200) DEFAULT NULL, -- struct type request parameter md5值
-  `sql`LONGVARCHAR ,
+  `query_sql` LONGVARCHAR ,
   `sql_md5` varchar(200) DEFAULT NULL, -- sql md5
   `query_engine` varchar(20) DEFAULT NULL,
   `elapsed_ms` bigINT DEFAULT NULL,
@@ -321,28 +322,6 @@ CREATE TABLE IF NOT EXISTS `s2_query_stat_info` (
   PRIMARY KEY (`id`)
 ) ;
 COMMENT ON TABLE s2_query_stat_info IS 'query statistics table';
-
-
-CREATE TABLE IF NOT EXISTS `s2_semantic_pasre_info` (
-    `id` INT NOT NULL AUTO_INCREMENT,
-    `trace_id` varchar(200) NOT NULL  ,
-    `model_id` INT  NOT NULL ,
-    `dimensions`LONGVARCHAR ,
-    `metrics`LONGVARCHAR ,
-    `orders`LONGVARCHAR ,
-    `filters`LONGVARCHAR ,
-    `date_info`LONGVARCHAR ,
-    `limit` INT NOT NULL ,
-    `native_query` TINYINT NOT NULL DEFAULT '0' ,
-    `sql`LONGVARCHAR ,
-    `created_at` TIMESTAMP  NOT NULL ,
-    `created_by` varchar(100) NOT NULL ,
-    `status` INT NOT NULL ,
-    `elapsed_ms` bigINT DEFAULT NULL ,
-    PRIMARY KEY (`id`)
-    );
-COMMENT ON TABLE s2_semantic_pasre_info IS 'semantic layer sql parsing information table';
-
 
 CREATE TABLE IF NOT EXISTS `s2_available_date_info` (
     `id` INT NOT NULL  AUTO_INCREMENT ,
@@ -398,43 +377,10 @@ CREATE TABLE IF NOT EXISTS s2_agent
     updated_at  TIMESTAMP null,
     enable_search int null,
     enable_feedback int null,
+    admin varchar(1000),
+    viewer varchar(1000),
     PRIMARY KEY (`id`)
 ); COMMENT ON TABLE s2_agent IS 'agent information table';
-
--------demo for semantic and chat
-CREATE TABLE IF NOT EXISTS `s2_user_department` (
-    `user_name` varchar(200) NOT NULL,
-    `department` varchar(200) NOT NULL, -- department of user
-     PRIMARY KEY (`user_name`,`department`)
-    );
-COMMENT ON TABLE s2_user_department IS 'user_department_info';
-
-CREATE TABLE IF NOT EXISTS `s2_pv_uv_statis` (
-    `imp_date` varchar(200) NOT NULL,
-    `user_name` varchar(200) NOT NULL,
-    `page` varchar(200) NOT NULL
-    );
-COMMENT ON TABLE s2_pv_uv_statis IS 's2_pv_uv_statis';
-
-CREATE TABLE IF NOT EXISTS `s2_stay_time_statis` (
-    `imp_date` varchar(200) NOT NULL,
-    `user_name` varchar(200) NOT NULL,
-    `stay_hours` DOUBLE NOT NULL,
-    `page` varchar(200) NOT NULL
-    );
-COMMENT ON TABLE s2_stay_time_statis IS 's2_stay_time_statis_info';
-
-CREATE TABLE IF NOT EXISTS `singer` (
-    `singer_name` varchar(200) NOT NULL,
-    `act_area` varchar(200) NOT NULL,
-    `song_name` varchar(200) NOT NULL,
-    `genre` varchar(200) NOT NULL,
-    `js_play_cnt` bigINT DEFAULT NULL,
-    `down_cnt` bigINT DEFAULT NULL,
-    `favor_cnt` bigINT DEFAULT NULL,
-     PRIMARY KEY (`singer_name`)
-    );
-COMMENT ON TABLE singer IS 'singer_info';
 
 CREATE TABLE IF NOT EXISTS `s2_dictionary_conf` (
    `id` INT NOT NULL AUTO_INCREMENT,
@@ -463,96 +409,6 @@ CREATE TABLE IF NOT EXISTS `s2_dictionary_task` (
    PRIMARY KEY (`id`)
 );
 COMMENT ON TABLE s2_dictionary_task IS 'dictionary task information table';
-
-
-
--- benchmark
-CREATE TABLE IF NOT EXISTS `genre` (
-    `g_name` varchar(20) NOT NULL , -- genre name
-    `rating` INT ,
-    `most_popular_in` varchar(50) ,
-    PRIMARY KEY (`g_name`)
-    );
-COMMENT ON TABLE genre IS 'genre';
-
-CREATE TABLE IF NOT EXISTS `artist` (
-    `artist_name` varchar(50) NOT NULL , -- genre name
-    `citizenship` varchar(20) ,
-    `gender` varchar(20) ,
-    `g_name` varchar(50),
-    PRIMARY KEY (`artist_name`,`citizenship`)
-    );
-COMMENT ON TABLE artist IS 'artist';
-
-CREATE TABLE IF NOT EXISTS `files` (
-    `f_id` bigINT NOT NULL,
-    `artist_name` varchar(50) ,
-    `file_size` varchar(20) ,
-    `duration` varchar(20) ,
-    `formats` varchar(20) ,
-    PRIMARY KEY (`f_id`)
-    );
-COMMENT ON TABLE files IS 'files';
-
-CREATE TABLE IF NOT EXISTS `song` (
-    `imp_date` varchar(50) ,
-    `song_name` varchar(50) ,
-    `artist_name` varchar(50) ,
-    `country` varchar(20) ,
-    `f_id` bigINT ,
-    `g_name` varchar(20) ,
-    `rating` INT ,
-    `languages` varchar(20) ,
-    `releasedate` varchar(50) ,
-    `resolution` bigINT NOT NULL,
-     PRIMARY KEY (`imp_date`,`song_name`)
-    );
-COMMENT ON TABLE song IS 'song';
-
-CREATE TABLE IF NOT EXISTS `company` (
-    `imp_date` varchar(50) ,
-    `company_id` varchar(50) NOT NULL ,
-    `company_name` varchar(50) NOT NULL ,
-    `headquarter_address` varchar(50) NOT NULL ,
-    `company_established_time` varchar(20) NOT NULL ,
-    `founder` varchar(20) NOT NULL ,
-    `ceo` varchar(20) NOT NULL ,
-    `annual_turnover` bigint(15)  ,
-    `employee_count` int(7) ,
-    PRIMARY KEY (`company_id`)
-    );
-
-CREATE TABLE IF NOT EXISTS `brand` (
-    `imp_date` varchar(50) ,
-    `brand_id` varchar(50) NOT NULL ,
-    `brand_name` varchar(50) NOT NULL ,
-    `brand_established_time` varchar(20) NOT NULL ,
-    `company_id` varchar(50) NOT NULL ,
-    `legal_representative` varchar(20) NOT NULL ,
-    `registered_capital` bigint(15)  ,
-    PRIMARY KEY (`brand_id`)
-    );
-
-CREATE TABLE IF NOT EXISTS `company_revenue` (
-    `imp_date` varchar(50) ,
-    `company_id` varchar(50) NOT NULL ,
-    `brand_id` varchar(50) NOT NULL ,
-    `revenue_proportion` double NOT NULL,
-    `profit_proportion` double NOT NULL ,
-    `expenditure_proportion` double NOT NULL
-    );
-
-CREATE TABLE IF NOT EXISTS `company_brand_revenue` (
-    `imp_date` varchar(50) ,
-    `year_time` varchar(10) NOT NULL ,
-    `brand_id` varchar(50) NOT NULL ,
-    `revenue` bigint(15) NOT NULL,
-    `profit` bigint(15) NOT NULL ,
-    `revenue_growth_year_on_year` double NOT NULL ,
-    `profit_growth_year_on_year` double NOT NULL
-    );
-
-
 
 CREATE TABLE IF NOT EXISTS s2_system_config
 (

@@ -6,26 +6,27 @@ import com.tencent.supersonic.chat.api.pojo.request.ChatParseReq;
 import com.tencent.supersonic.chat.server.agent.Agent;
 import com.tencent.supersonic.chat.server.agent.VisualConfig;
 import com.tencent.supersonic.chat.server.persistence.dataobject.AgentDO;
-import com.tencent.supersonic.chat.server.persistence.dataobject.ChatMemoryDO;
 import com.tencent.supersonic.chat.server.persistence.mapper.AgentDOMapper;
+import com.tencent.supersonic.chat.server.pojo.ChatMemory;
 import com.tencent.supersonic.chat.server.service.AgentService;
 import com.tencent.supersonic.chat.server.service.ChatQueryService;
 import com.tencent.supersonic.chat.server.service.MemoryService;
 import com.tencent.supersonic.common.config.ChatModel;
 import com.tencent.supersonic.common.pojo.ChatApp;
 import com.tencent.supersonic.common.pojo.User;
+import com.tencent.supersonic.common.pojo.enums.AuthType;
 import com.tencent.supersonic.common.service.ChatModelService;
 import com.tencent.supersonic.common.util.JsonUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
 
 import java.util.List;
 import java.util.Objects;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -41,7 +42,30 @@ public class AgentServiceImpl extends ServiceImpl<AgentDOMapper, AgentDO> implem
     @Autowired
     private ChatModelService chatModelService;
 
-    private ExecutorService executorService = Executors.newFixedThreadPool(1);
+    @Autowired
+    @Qualifier("chatExecutor")
+    private ThreadPoolExecutor executor;
+
+    @Override
+    public List<Agent> getAgents(User user, AuthType authType) {
+        return getAgentDOList().stream().map(this::convert)
+                .filter(agent -> filterByAuth(agent, user, authType)).collect(Collectors.toList());
+    }
+
+    private boolean filterByAuth(Agent agent, User user, AuthType authType) {
+        if (user.isSuperAdmin() || user.getName().equals(agent.getCreatedBy())) {
+            return true;
+        }
+        authType = authType == null ? AuthType.VIEWER : authType;
+        switch (authType) {
+            case ADMIN:
+                return agent.contains(user, Agent::getAdmins);
+            case VIEWER:
+            default:
+                return agent.contains(user, Agent::getAdmins)
+                        || agent.contains(user, Agent::getViewers);
+        }
+    }
 
     @Override
     public List<Agent> getAgents() {
@@ -86,7 +110,7 @@ public class AgentServiceImpl extends ServiceImpl<AgentDOMapper, AgentDO> implem
      * @param agent
      */
     private void executeAgentExamplesAsync(Agent agent) {
-        executorService.execute(() -> doExecuteAgentExamples(agent));
+        executor.execute(() -> doExecuteAgentExamples(agent));
     }
 
     private synchronized void doExecuteAgentExamples(Agent agent) {
@@ -99,7 +123,7 @@ public class AgentServiceImpl extends ServiceImpl<AgentDOMapper, AgentDO> implem
         ChatMemoryFilter chatMemoryFilter =
                 ChatMemoryFilter.builder().agentId(agent.getId()).questions(examples).build();
         List<String> memoriesExisted = memoryService.getMemories(chatMemoryFilter).stream()
-                .map(ChatMemoryDO::getQuestion).collect(Collectors.toList());
+                .map(ChatMemory::getQuestion).collect(Collectors.toList());
         for (String example : examples) {
             if (memoriesExisted.contains(example)) {
                 continue;
@@ -135,6 +159,8 @@ public class AgentServiceImpl extends ServiceImpl<AgentDOMapper, AgentDO> implem
                 c.setChatModelConfig(chatModelService.getChatModel(c.getChatModelId()).getConfig());
             }
         });
+        agent.setAdmins(JsonUtil.toList(agentDO.getAdmin(), String.class));
+        agent.setViewers(JsonUtil.toList(agentDO.getViewer(), String.class));
         return agent;
     }
 
@@ -145,6 +171,8 @@ public class AgentServiceImpl extends ServiceImpl<AgentDOMapper, AgentDO> implem
         agentDO.setExamples(JsonUtil.toString(agent.getExamples()));
         agentDO.setChatModelConfig(JsonUtil.toString(agent.getChatAppConfig()));
         agentDO.setVisualConfig(JsonUtil.toString(agent.getVisualConfig()));
+        agentDO.setAdmin(JsonUtil.toString(agent.getAdmins()));
+        agentDO.setViewer(JsonUtil.toString(agent.getViewers()));
         if (agentDO.getStatus() == null) {
             agentDO.setStatus(1);
         }

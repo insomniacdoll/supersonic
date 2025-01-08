@@ -7,9 +7,7 @@ import com.tencent.supersonic.common.pojo.Filter;
 import com.tencent.supersonic.common.pojo.Order;
 import com.tencent.supersonic.common.pojo.enums.AggOperatorEnum;
 import com.tencent.supersonic.common.pojo.enums.AggregateTypeEnum;
-import com.tencent.supersonic.common.pojo.enums.DatePeriodEnum;
 import com.tencent.supersonic.common.pojo.enums.QueryType;
-import com.tencent.supersonic.common.pojo.enums.TimeDimensionEnum;
 import com.tencent.supersonic.headless.api.pojo.SchemaElement;
 import com.tencent.supersonic.headless.api.pojo.SemanticParseInfo;
 import com.tencent.supersonic.headless.api.pojo.SqlInfo;
@@ -17,20 +15,12 @@ import com.tencent.supersonic.headless.api.pojo.request.QueryFilter;
 import com.tencent.supersonic.headless.api.pojo.request.QueryMultiStructReq;
 import com.tencent.supersonic.headless.api.pojo.request.QuerySqlReq;
 import com.tencent.supersonic.headless.api.pojo.request.QueryStructReq;
-import com.tencent.supersonic.headless.chat.query.QueryManager;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.util.CollectionUtils;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Objects;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -51,24 +41,15 @@ public class QueryReqBuilder {
                         chatFilter.getOperator(), chatFilter.getValue()))
                 .collect(Collectors.toList());
         queryStructReq.setMetricFilters(metricFilters);
-
-        addDateDimension(parseInfo);
-
-        if (isDateFieldAlreadyPresent(parseInfo, getDateField(parseInfo.getDateInfo()))) {
-            parseInfo.getDimensions().removeIf(schemaElement -> schemaElement.isPartitionTime());
-        }
         queryStructReq.setGroups(parseInfo.getDimensions().stream().map(SchemaElement::getBizName)
                 .collect(Collectors.toList()));
         queryStructReq.setLimit(parseInfo.getLimit());
-        // only one metric is queried at once
-        Set<SchemaElement> metrics = parseInfo.getMetrics();
-        if (!CollectionUtils.isEmpty(metrics)) {
-            SchemaElement metricElement = parseInfo.getMetrics().iterator().next();
-            Set<Order> order =
-                    getOrder(parseInfo.getOrders(), parseInfo.getAggType(), metricElement);
-            queryStructReq
-                    .setAggregators(getAggregatorByMetric(parseInfo.getAggType(), metricElement));
-            queryStructReq.setOrders(new ArrayList<>(order));
+
+        for (SchemaElement metricElement : parseInfo.getMetrics()) {
+            queryStructReq.getAggregators()
+                    .addAll(getAggregatorByMetric(parseInfo.getAggType(), metricElement));
+            queryStructReq.setOrders(new ArrayList<>(
+                    getOrder(parseInfo.getOrders(), parseInfo.getAggType(), metricElement)));
         }
 
         deletionDuplicated(queryStructReq);
@@ -158,49 +139,10 @@ public class QueryReqBuilder {
         return aggregateType.name();
     }
 
-    private static void addDateDimension(SemanticParseInfo parseInfo) {
-        if (parseInfo == null || parseInfo.getDateInfo() == null) {
-            return;
-        }
-
-        if (shouldSkipAddingDateDimension(parseInfo)) {
-            return;
-        }
-
-        String dateField = getDateField(parseInfo.getDateInfo());
-        if (isDateFieldAlreadyPresent(parseInfo, dateField)) {
-            return;
-        }
-
-        SchemaElement dimension = new SchemaElement();
-        dimension.setBizName(dateField);
-
-        if (QueryManager.isMetricQuery(parseInfo.getQueryMode())) {
-            addDimension(parseInfo, dimension);
-        }
-    }
-
-    private static boolean shouldSkipAddingDateDimension(SemanticParseInfo parseInfo) {
-        return parseInfo.getAggType() != null
-                && (parseInfo.getAggType().equals(AggregateTypeEnum.MAX)
-                        || parseInfo.getAggType().equals(AggregateTypeEnum.MIN))
-                && !CollectionUtils.isEmpty(parseInfo.getDimensions());
-    }
-
     private static boolean isDateFieldAlreadyPresent(SemanticParseInfo parseInfo,
             String dateField) {
         return parseInfo.getDimensions().stream()
                 .anyMatch(dimension -> dimension.getBizName().equalsIgnoreCase(dateField));
-    }
-
-    private static void addDimension(SemanticParseInfo parseInfo, SchemaElement dimension) {
-        List<String> timeDimensions = Arrays.asList(TimeDimensionEnum.DAY.getName(),
-                TimeDimensionEnum.WEEK.getName(), TimeDimensionEnum.MONTH.getName());
-        Set<SchemaElement> dimensions = parseInfo.getDimensions().stream()
-                .filter(d -> !timeDimensions.contains(d.getBizName().toLowerCase()))
-                .collect(Collectors.toSet());
-        dimensions.add(dimension);
-        parseInfo.setDimensions(dimensions);
     }
 
     public static Set<Order> getOrder(Set<Order> existingOrders, AggregateTypeEnum aggregator,
@@ -229,14 +171,7 @@ public class QueryReqBuilder {
         if (Objects.isNull(dateConf)) {
             return "";
         }
-        String dateField = TimeDimensionEnum.DAY.getName();
-        if (DatePeriodEnum.MONTH.equals(dateConf.getPeriod())) {
-            dateField = TimeDimensionEnum.MONTH.getName();
-        }
-        if (DatePeriodEnum.WEEK.equals(dateConf.getPeriod())) {
-            dateField = TimeDimensionEnum.WEEK.getName();
-        }
-        return dateField;
+        return dateConf.getDateField();
     }
 
     public static QueryStructReq buildStructRatioReq(SemanticParseInfo parseInfo,

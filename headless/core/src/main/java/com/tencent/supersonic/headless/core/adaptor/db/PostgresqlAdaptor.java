@@ -5,6 +5,7 @@ import com.tencent.supersonic.common.jsqlparser.SqlReplaceHelper;
 import com.tencent.supersonic.common.pojo.Constants;
 import com.tencent.supersonic.common.pojo.enums.TimeDimensionEnum;
 import com.tencent.supersonic.headless.api.pojo.DBColumn;
+import com.tencent.supersonic.headless.api.pojo.enums.FieldType;
 import com.tencent.supersonic.headless.core.pojo.ConnectInfo;
 import lombok.extern.slf4j.Slf4j;
 import net.sf.jsqlparser.expression.StringValue;
@@ -47,7 +48,7 @@ public class PostgresqlAdaptor extends BaseDbAdaptor {
     }
 
     @Override
-    public String functionNameCorrector(String sql) {
+    public String rewriteSql(String sql) {
         Map<String, String> functionMap = new HashMap<>();
         functionMap.put("MONTH".toLowerCase(), "TO_CHAR");
         functionMap.put("DAY".toLowerCase(), "TO_CHAR");
@@ -77,7 +78,9 @@ public class PostgresqlAdaptor extends BaseDbAdaptor {
             }
             return o;
         });
-        return SqlReplaceHelper.replaceFunction(sql, functionMap, functionCall);
+        sql = SqlReplaceHelper.replaceFunction(sql, functionMap, functionCall);
+        sql = sql.replaceAll("`", "\"");
+        return sql;
     }
 
     public List<String> getTables(ConnectInfo connectionInfo, String schemaName)
@@ -105,8 +108,42 @@ public class PostgresqlAdaptor extends BaseDbAdaptor {
             String columnName = columns.getString("COLUMN_NAME");
             String dataType = columns.getString("TYPE_NAME");
             String remarks = columns.getString("REMARKS");
-            dbColumns.add(new DBColumn(columnName, dataType, remarks));
+            FieldType fieldType = classifyColumnType(dataType);
+            dbColumns.add(new DBColumn(columnName, dataType, remarks, fieldType));
         }
         return dbColumns;
     }
+
+    @Override
+    public FieldType classifyColumnType(String typeName) {
+        switch (typeName.toUpperCase()) {
+            case "INT":
+            case "INTEGER":
+            case "BIGINT":
+            case "SMALLINT":
+            case "SERIAL":
+            case "BIGSERIAL":
+            case "SMALLSERIAL":
+            case "REAL":
+            case "DOUBLE PRECISION":
+            case "NUMERIC":
+            case "DECIMAL":
+                return FieldType.measure;
+            case "DATE":
+            case "TIME":
+            case "TIMESTAMP":
+            case "TIMESTAMPTZ":
+            case "INTERVAL":
+                return FieldType.time;
+            case "VARCHAR":
+            case "CHAR":
+            case "TEXT":
+            case "CHARACTER VARYING":
+            case "CHARACTER":
+            case "UUID":
+            default:
+                return FieldType.categorical;
+        }
+    }
+
 }

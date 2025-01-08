@@ -105,6 +105,8 @@ public class DimensionConverter {
         dimensionResp.setType(getType(dimensionDO.getType()));
         dimensionResp.setTypeEnum(TypeEnums.DIMENSION);
         dimensionResp.setIsTag(dimensionDO.getIsTag());
+        dimensionResp.setDomainId(modelRespMap
+                .getOrDefault(dimensionResp.getModelId(), new ModelResp()).getDomainId());
         return dimensionResp;
     }
 
@@ -116,7 +118,7 @@ public class DimensionConverter {
         try {
             // Support compatibility with legacy data.
             IdentifyType.valueOf(type.toLowerCase());
-            return DimensionType.identify;
+            return DimensionType.primary_key;
         } catch (IllegalArgumentException e) {
             return DimensionType.valueOf(type);
         }
