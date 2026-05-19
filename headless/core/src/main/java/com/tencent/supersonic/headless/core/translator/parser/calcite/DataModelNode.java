@@ -14,6 +14,7 @@ import com.tencent.supersonic.headless.core.pojo.JoinRelation;
 import com.tencent.supersonic.headless.core.pojo.Ontology;
 import com.tencent.supersonic.headless.core.pojo.OntologyQuery;
 import com.tencent.supersonic.headless.core.translator.parser.Constants;
+import com.tencent.supersonic.headless.core.utils.SqlVariableParseUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.calcite.sql.SqlDataTypeSpec;
 import org.apache.calcite.sql.SqlNode;
@@ -34,17 +35,28 @@ public class DataModelNode extends SemanticNode {
         if (dataModel.getModelDetail().getSqlQuery() != null
                 && !dataModel.getModelDetail().getSqlQuery().isEmpty()) {
             sqlTable = dataModel.getModelDetail().getSqlQuery();
+            // if model has sqlVariables, parse sqlVariables
+            if (Objects.nonNull(dataModel.getModelDetail().getSqlVariables())
+                    && !(CollectionUtils.isEmpty(dataModel.getModelDetail().getSqlVariables()))) {
+                sqlTable = SqlVariableParseUtils.parse(sqlTable,
+                        dataModel.getModelDetail().getSqlVariables(), Lists.newArrayList());
+            }
         } else if (dataModel.getModelDetail().getTableQuery() != null
                 && !dataModel.getModelDetail().getTableQuery().isEmpty()) {
-            if (dataModel.getModelDetail().getDbType()
-                    .equalsIgnoreCase(EngineType.POSTGRESQL.getName())) {
-                String fullTableName = String.join(".public.",
-                        dataModel.getModelDetail().getTableQuery().split("\\."));
-                sqlTable = "select * from " + fullTableName;
+            sqlTable = "SELECT * FROM " + dataModel.getModelDetail().getTableQuery();
+        }
+
+        // String filterSql = dataModel.getFilterSql();
+        String filterSql = dataModel.getModelDetail().getFilterSql();
+        if (filterSql != null && !filterSql.isEmpty()) {
+            boolean sqlContainWhere = sqlTable.toUpperCase().matches("(?s).*\\bWHERE\\b.*");
+            if (sqlContainWhere) {
+                sqlTable = String.format("%s AND %s", sqlTable, filterSql);
             } else {
-                sqlTable = "select * from " + dataModel.getModelDetail().getTableQuery();
+                sqlTable = String.format("%s WHERE %s", sqlTable, filterSql);
             }
         }
+
         if (sqlTable.isEmpty()) {
             throw new Exception("DataModelNode build error [tableSqlNode not found]");
         }

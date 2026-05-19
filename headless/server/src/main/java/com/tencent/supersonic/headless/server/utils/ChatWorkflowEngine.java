@@ -8,6 +8,7 @@ import com.tencent.supersonic.headless.api.pojo.request.SemanticQueryReq;
 import com.tencent.supersonic.headless.api.pojo.response.ParseResp;
 import com.tencent.supersonic.headless.api.pojo.response.SemanticTranslateResp;
 import com.tencent.supersonic.headless.chat.ChatQueryContext;
+import com.tencent.supersonic.headless.chat.corrector.LLMPhysicalSqlCorrector;
 import com.tencent.supersonic.headless.chat.corrector.SemanticCorrector;
 import com.tencent.supersonic.headless.chat.mapper.SchemaMapper;
 import com.tencent.supersonic.headless.chat.parser.SemanticParser;
@@ -34,8 +35,8 @@ public class ChatWorkflowEngine {
     private final List<SemanticCorrector> semanticCorrectors =
             CoreComponentFactory.getSemanticCorrectors();
 
-    public void start(ChatWorkflowState initialState, ChatQueryContext queryCtx,
-            ParseResp parseResult) {
+    public void start(ChatWorkflowState initialState, ChatQueryContext queryCtx) {
+        ParseResp parseResult = queryCtx.getParseResp();
         queryCtx.setChatWorkflowState(initialState);
         while (queryCtx.getChatWorkflowState() != ChatWorkflowState.FINISHED) {
             switch (queryCtx.getChatWorkflowState()) {
@@ -61,14 +62,14 @@ public class ChatWorkflowEngine {
                                 .map(SemanticQuery::getParseInfo).collect(Collectors.toList());
                         parseResult.setSelectedParses(parseInfos);
                         if (queryCtx.needSQL()) {
-                            queryCtx.setChatWorkflowState(ChatWorkflowState.CORRECTING);
+                            queryCtx.setChatWorkflowState(ChatWorkflowState.S2SQL_CORRECTING);
                         } else {
                             parseResult.setState(ParseResp.ParseState.COMPLETED);
                             queryCtx.setChatWorkflowState(ChatWorkflowState.FINISHED);
                         }
                     }
                     break;
-                case CORRECTING:
+                case S2SQL_CORRECTING:
                     performCorrecting(queryCtx);
                     queryCtx.setChatWorkflowState(ChatWorkflowState.TRANSLATING);
                     break;
@@ -76,6 +77,10 @@ public class ChatWorkflowEngine {
                     long start = System.currentTimeMillis();
                     performTranslating(queryCtx, parseResult);
                     parseResult.getParseTimeCost().setSqlTime(System.currentTimeMillis() - start);
+                    queryCtx.setChatWorkflowState(ChatWorkflowState.PHYSICAL_SQL_CORRECTING);
+                    break;
+                case PHYSICAL_SQL_CORRECTING:
+                    performPhysicalSqlCorrecting(queryCtx);
                     queryCtx.setChatWorkflowState(ChatWorkflowState.FINISHED);
                     break;
                 default:
@@ -109,7 +114,8 @@ public class ChatWorkflowEngine {
             for (SemanticQuery semanticQuery : candidateQueries) {
                 for (SemanticCorrector corrector : semanticCorrectors) {
                     corrector.correct(queryCtx, semanticQuery.getParseInfo());
-                    if (!ChatWorkflowState.CORRECTING.equals(queryCtx.getChatWorkflowState())) {
+                    if (!ChatWorkflowState.S2SQL_CORRECTING
+                            .equals(queryCtx.getChatWorkflowState())) {
                         break;
                     }
                 }
@@ -152,13 +158,35 @@ public class ChatWorkflowEngine {
                         StringUtils.normalizeSpace(parseInfo.getSqlInfo().getCorrectedS2SQL()),
                         StringUtils.normalizeSpace(parseInfo.getSqlInfo().getQuerySQL()));
             } catch (Exception e) {
-                log.warn("get sql info failed:{}", parseInfo, e);
+                log.warn("get sql info failed:{}", e);
                 errorMsg.add(String.format("S2SQL:%s %s", parseInfo.getSqlInfo().getParsedS2SQL(),
                         e.getMessage()));
             }
         });
         if (!errorMsg.isEmpty()) {
             parseResult.setErrorMsg(String.join("\n", errorMsg));
+        }
+    }
+
+    private void performPhysicalSqlCorrecting(ChatQueryContext queryCtx) {
+        List<SemanticQuery> candidateQueries = queryCtx.getCandidateQueries();
+        if (CollectionUtils.isNotEmpty(candidateQueries)) {
+            for (SemanticQuery semanticQuery : candidateQueries) {
+                for (SemanticCorrector corrector : semanticCorrectors) {
+                    if (corrector instanceof LLMPhysicalSqlCorrector) {
+                        corrector.correct(queryCtx, semanticQuery.getParseInfo());
+                        // 如果物理SQL被修正了，更新querySQL为修正后的版本
+                        SemanticParseInfo parseInfo = semanticQuery.getParseInfo();
+                        if (StringUtils.isNotBlank(parseInfo.getSqlInfo().getCorrectedQuerySQL())) {
+                            parseInfo.getSqlInfo()
+                                    .setQuerySQL(parseInfo.getSqlInfo().getCorrectedQuerySQL());
+                            log.info("Physical SQL corrected and updated querySQL: {}",
+                                    parseInfo.getSqlInfo().getQuerySQL());
+                        }
+                        break;
+                    }
+                }
+            }
         }
     }
 }

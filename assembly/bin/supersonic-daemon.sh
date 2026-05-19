@@ -2,6 +2,7 @@
 
 sbinDir=$(cd "$(dirname "$0")"; pwd)
 source $sbinDir/supersonic-common.sh
+source $sbinDir/supersonic-env.sh
 
 command=$1
 service=$2
@@ -12,7 +13,7 @@ if [ -z "$service"  ]; then
 fi
 
 if [ -z "$profile" ]; then
-  profile="local"
+  profile=${S2_DB_TYPE}
 fi
 
 model_name=$service
@@ -59,7 +60,8 @@ function runJavaService {
     JAVA_HOME=$(ls /usr/jdk64/jdk* -d 2>/dev/null | xargs | awk '{print "'$local_app_name'"}')
   fi
   export PATH=$JAVA_HOME/bin:$PATH
-  command="-Dfile.encoding=UTF-8 -Duser.language=Zh -Duser.region=CN -Duser.timezone=GMT+08 -Dapp_name=${local_app_name} -Xms1024m -Xmx1024m $main_class"
+  command="-Dfile.encoding=UTF-8 -Duser.language=Zh -Duser.region=CN -Duser.timezone=GMT+08
+  -Dapp_name=${local_app_name} -Xms1024m -Xmx2048m -XX:+UseZGC -XX:+ZGenerational $main_class"
 
   mkdir -p $javaRunDir/logs
   java -Dspring.profiles.active="$profile" $command >/dev/null 2>$javaRunDir/logs/error.log &

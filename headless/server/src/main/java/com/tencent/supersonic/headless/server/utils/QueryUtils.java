@@ -19,7 +19,6 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
-import static com.tencent.supersonic.common.pojo.Constants.JOIN_UNDERLINE;
 import static com.tencent.supersonic.common.pojo.Constants.UNIONALL;
 
 @Slf4j
@@ -72,11 +71,7 @@ public class QueryUtils {
     private void processColumn(QueryColumn column, Map<String, String> namePair,
             Map<String, String> nameTypePair, Map<String, MetricResp> metricRespMap,
             Map<String, DimensionResp> dimensionRespMap) {
-        String nameEn = getName(column.getNameEn());
-        if (nameEn.contains(JOIN_UNDERLINE)) {
-            nameEn = nameEn.split(JOIN_UNDERLINE)[1];
-        }
-        // set name
+        String nameEn = getName(column.getBizName());
         if (namePair.containsKey(nameEn)) {
             column.setName(namePair.get(nameEn));
         } else {
@@ -105,13 +100,35 @@ public class QueryUtils {
             column.setDataFormatType(metricRespMap.get(nameEn).getDataFormatType());
             column.setDataFormat(metricRespMap.get(nameEn).getDataFormat());
             column.setModelId(metricRespMap.get(nameEn).getModelId());
+        } else {
+            // if column nameEn contains metric name, use metric dataFormatType
+            metricRespMap.values().forEach(metric -> {
+                if (nameEn.contains(metric.getName()) || nameEn.contains(metric.getBizName())) {
+                    column.setDataFormatType(metric.getDataFormatType());
+                    column.setDataFormat(metric.getDataFormat());
+                    column.setModelId(metric.getModelId());
+                }
+                // if column nameEn contains metric alias, use metric dataFormatType
+                if (column.getDataFormatType() == null
+                        && StringUtils.isNotEmpty(metric.getAlias())) {
+                    for (String alias : metric.getAlias().split(",")) {
+                        if (nameEn.contains(alias)) {
+                            column.setDataFormatType(metric.getDataFormatType());
+                            column.setDataFormat(metric.getDataFormat());
+                            column.setModelId(metric.getModelId());
+                            break;
+                        }
+                    }
+                }
+            });
         }
+
         if (dimensionRespMap.containsKey(nameEn)) {
             column.setModelId(dimensionRespMap.get(nameEn).getModelId());
         }
         // set name by NameEn
-        if (StringUtils.isBlank(column.getName()) && StringUtils.isNotBlank(column.getNameEn())) {
-            column.setName(column.getNameEn());
+        if (StringUtils.isBlank(column.getName()) && StringUtils.isNotBlank(column.getBizName())) {
+            column.setName(column.getBizName());
         }
     }
 
@@ -119,10 +136,11 @@ public class QueryUtils {
         if (StringUtils.isBlank(type)) {
             return false;
         }
-        return type.equalsIgnoreCase("int") || type.equalsIgnoreCase("bigint")
-                || type.equalsIgnoreCase("float") || type.equalsIgnoreCase("double")
-                || type.equalsIgnoreCase("numeric") || type.toLowerCase().startsWith("decimal")
-                || type.toLowerCase().startsWith("uint") || type.toLowerCase().startsWith("int");
+        return type.toLowerCase().endsWith("int") || type.toLowerCase().startsWith("int")
+                || type.toLowerCase().endsWith("float") || type.toLowerCase().startsWith("float")
+                || type.toLowerCase().endsWith("double") || type.toLowerCase().startsWith("double")
+                || type.equalsIgnoreCase("real") || type.equalsIgnoreCase("numeric")
+                || type.toLowerCase().startsWith("decimal");
     }
 
     private String getName(String nameEn) {

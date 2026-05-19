@@ -1,20 +1,15 @@
 package com.tencent.supersonic.headless.chat.corrector;
 
+import com.tencent.supersonic.common.jsqlparser.FieldExpression;
 import com.tencent.supersonic.common.jsqlparser.SqlAddHelper;
 import com.tencent.supersonic.common.jsqlparser.SqlSelectHelper;
 import com.tencent.supersonic.common.jsqlparser.SqlValidHelper;
-import com.tencent.supersonic.common.util.ContextUtils;
 import com.tencent.supersonic.headless.api.pojo.SemanticParseInfo;
 import com.tencent.supersonic.headless.chat.ChatQueryContext;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.lang3.StringUtils;
-import org.springframework.core.env.Environment;
 import org.springframework.util.CollectionUtils;
 
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
 /** Perform SQL corrections on the "Select" section in S2SQL. */
 @Slf4j
@@ -45,21 +40,32 @@ public class SelectCorrector extends BaseSemanticCorrector {
         Set<String> selectFields = new HashSet<>(SqlSelectHelper.getSelectFields(correctS2SQL));
         Set<String> needAddFields = new HashSet<>(SqlSelectHelper.getGroupByFields(correctS2SQL));
 
-        // decide whether add order by expression field to select
-        Environment environment = ContextUtils.getBean(Environment.class);
-        String correctorAdditionalInfo = environment.getProperty(ADDITIONAL_INFORMATION);
-        if (StringUtils.isNotBlank(correctorAdditionalInfo)
-                && Boolean.parseBoolean(correctorAdditionalInfo)) {
-            needAddFields.addAll(SqlSelectHelper.getOrderByFields(correctS2SQL));
-        }
         if (CollectionUtils.isEmpty(selectFields) || CollectionUtils.isEmpty(needAddFields)) {
             return correctS2SQL;
         }
         needAddFields.removeAll(selectFields);
-        String addFieldsToSelectSql =
-                SqlAddHelper.addFieldsToSelect(correctS2SQL, new ArrayList<>(needAddFields));
-        semanticParseInfo.getSqlInfo().setCorrectedS2SQL(addFieldsToSelectSql);
-        return addFieldsToSelectSql;
+
+        if (!SqlSelectHelper.hasSubSelect(correctS2SQL)) { // 优化内容 ， 如果sql 条件包含了这个字段，而且是全等，则不再查询该字段
+            List<FieldExpression> tmp4 = SqlSelectHelper.getWhereExpressions(correctS2SQL);
+            Iterator<String> it = needAddFields.iterator();
+            while (it.hasNext()) {
+                String field = it.next();
+                long size = tmp4.stream()
+                        .filter(e -> e.getFieldName().equals(field) && "=".equals(e.getOperator()))
+                        .count();
+                if (size == 1) {
+                    it.remove();
+                }
+            }
+        }
+        if (needAddFields.size() > 0) {
+            String addFieldsToSelectSql =
+                    SqlAddHelper.addFieldsToSelect(correctS2SQL, new ArrayList<>(needAddFields));
+            semanticParseInfo.getSqlInfo().setCorrectedS2SQL(addFieldsToSelectSql);
+            return addFieldsToSelectSql;
+        } else {
+            return correctS2SQL;
+        }
     }
 
 }

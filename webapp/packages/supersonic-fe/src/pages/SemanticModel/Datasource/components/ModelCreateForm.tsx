@@ -268,7 +268,7 @@ const ModelCreateForm: React.FC<CreateFormProps> = ({
     if (!saveState && currentStep < 1) {
       forward();
     } else {
-      const { dbName, tableName } = submitForm;
+      const { catalog ,dbName, tableName } = submitForm;
       const queryParams = {
         ...submitForm,
         databaseId: databaseId || modelItem?.databaseId || formDatabaseId,
@@ -278,7 +278,7 @@ const ModelCreateForm: React.FC<CreateFormProps> = ({
         modelDetail: {
           ...submitForm,
           queryType: basicInfoFormMode === 'fast' ? 'table_query' : 'sql_query',
-          tableQuery: dbName && tableName ? `${dbName}.${tableName}` : '',
+          tableQuery: catalog && dbName && tableName ? `${catalog}.${dbName}.${tableName}` : (dbName && tableName ? `${dbName}.${tableName}` : ''),
           sqlQuery: sql,
           sqlVariables: sqlParams,
         },
@@ -299,21 +299,22 @@ const ModelCreateForm: React.FC<CreateFormProps> = ({
       return;
     }
 
-    const columnFields: any[] = columns.map((item: IDataSource.IExecuteSqlColumn) => {
+    const fieldMap = new Map(
+      fieldsClassifyList.map(field => [field.fieldName, field])
+    );
+    columns.forEach((item: IDataSource.IExecuteSqlColumn) => {
       const { type, nameEn, comment } = item;
-      const oldItem =
-        fieldsClassifyList.find((oItem) => {
-          return oItem.fieldName === item.nameEn;
-        }) || {};
-      return {
-        ...oldItem,
+      const existingField = fieldMap.get(nameEn);
+
+      fieldMap.set(nameEn, {
+        ...existingField,
         bizName: nameEn,
         fieldName: nameEn,
         dataType: type,
         comment,
-      };
+      });
     });
-    setFields(columnFields || []);
+    setFields(Array.from(fieldMap.values()));
   };
 
   const formatterIdentifiers = (identifiersList: any[] = []) => {
@@ -351,12 +352,24 @@ const ModelCreateForm: React.FC<CreateFormProps> = ({
     let columns = fieldColumns || [];
     if (queryType === 'table_query') {
       const tableQueryString = tableQuery || '';
-      const [dbName, tableName] = tableQueryString.split('.');
-      columns = await queryTableColumnList(modelItem.databaseId, dbName, tableName);
-      tableQueryInitValue = {
-        dbName,
-        tableName,
-      };
+      if (tableQueryString.split('.').length === 3) {
+        const [catalog, dbName, tableName] = tableQueryString.split('.');
+        columns = await queryTableColumnList(modelItem.databaseId, catalog, dbName, tableName);
+        tableQueryInitValue = {
+          catalog,
+          dbName,
+          tableName,
+        };
+      }
+      if (tableQueryString.split('.').length === 2) {
+        const [dbName, tableName] = tableQueryString.split('.');
+        columns = await queryTableColumnList(modelItem.databaseId, '', dbName, tableName);
+        tableQueryInitValue = {
+          catalog: '',
+          dbName,
+          tableName,
+        };
+      }
     }
     formatterInitData(columns, tableQueryInitValue);
   };
@@ -426,8 +439,8 @@ const ModelCreateForm: React.FC<CreateFormProps> = ({
     setFields(result);
   };
 
-  const queryTableColumnList = async (databaseId: number, dbName: string, tableName: string) => {
-    const { code, data, msg } = await getColumns(databaseId, dbName, tableName);
+  const queryTableColumnList = async (databaseId: number, catalog: string, dbName: string, tableName: string) => {
+    const { code, data, msg } = await getColumns(databaseId, catalog, dbName, tableName);
     if (code === 200) {
       const list = data || [];
       const columns = list.map((item: any, index: number) => {
@@ -563,10 +576,10 @@ const ModelCreateForm: React.FC<CreateFormProps> = ({
         }}
         onValuesChange={(value, values) => {
           const { tableName } = value;
-          const { dbName, databaseId } = values;
+          const { catalog, dbName, databaseId } = values;
           setFormDatabaseId(databaseId);
           if (tableName) {
-            queryTableColumnList(databaseId, dbName, tableName);
+            queryTableColumnList(databaseId, catalog, dbName, tableName);
           }
         }}
         className={styles.form}

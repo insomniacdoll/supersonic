@@ -51,6 +51,7 @@ const getCreateFieldName = (type: EnumDataSourceType) => {
     EnumDataSourceType.CATEGORICAL,
     EnumDataSourceType.TIME,
     EnumDataSourceType.PARTITION_TIME,
+    EnumDataSourceType.FOREIGN,
   ].includes(type as EnumDataSourceType)
     ? 'isCreateDimension'
     : 'isCreateMetric';
@@ -76,7 +77,7 @@ const ModelFieldForm: React.FC<Props> = ({
 
   const columns = [
     {
-      title: '英文名称',
+      title: '字段名称',
       dataIndex: 'fieldName',
       width: 250,
     },
@@ -101,7 +102,7 @@ const ModelFieldForm: React.FC<Props> = ({
               value={selectTypeValue}
               allowClear
               onChange={(value) => {
-                let defaultParams = {};
+                let defaultParams:any = {};
                 if (value === EnumDataSourceType.MEASURES) {
                   defaultParams = {
                     agg: AGG_OPTIONS[0].value,
@@ -127,12 +128,13 @@ const ModelFieldForm: React.FC<Props> = ({
                   };
                 } else {
                   defaultParams = {
+                    type: value,
                     agg: undefined,
                     dateFormat: undefined,
                     timeGranularity: undefined,
                   };
                 }
-                const isCreateName = getCreateFieldName(value);
+                const isCreateName = getCreateFieldName(defaultParams.type);
                 const editState = !isUndefined(record[isCreateName])
                   ? !!record[isCreateName]
                   : true;
@@ -204,29 +206,8 @@ const ModelFieldForm: React.FC<Props> = ({
     {
       title: '扩展配置',
       dataIndex: 'extender',
-      // width: 200,
       render: (_: any, record: FieldItem) => {
         const { type } = record;
-        // if (type === EnumDataSourceType.PRIMARY) {
-        //   return (
-        //     <Space>
-        //       <Select
-        //         style={{ minWidth: 150 }}
-        //         value={tagObjectId ? tagObjectId : undefined}
-        //         placeholder="请选择所属对象"
-        //         onChange={(value) => {
-        //           onTagObjectChange?.(value);
-        //         }}
-        //         options={tagObjectList.map((item: ISemantic.ITagObjectItem) => {
-        //           return {
-        //             label: item.name,
-        //             value: item.id,
-        //           };
-        //         })}
-        //       />
-        //     </Space>
-        //   );
-        // }
         if (type === EnumDataSourceType.MEASURES) {
           return (
             <Select

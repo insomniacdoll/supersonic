@@ -5,6 +5,7 @@ import com.tencent.supersonic.common.util.DateUtils;
 import lombok.Data;
 import org.springframework.util.CollectionUtils;
 
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -12,7 +13,7 @@ import java.util.Objects;
 import static java.time.LocalDate.now;
 
 @Data
-public class DateConf {
+public class DateConf implements Serializable {
 
     private static final long serialVersionUID = 3074129990945004340L;
 
@@ -59,9 +60,15 @@ public class DateConf {
             return false;
         }
         DateConf dateConf = (DateConf) o;
-        return dateMode == dateConf.dateMode && Objects.equals(startDate, dateConf.startDate)
-                && Objects.equals(endDate, dateConf.endDate) && Objects.equals(unit, dateConf.unit)
-                && Objects.equals(period, dateConf.period);
+        if (dateMode != dateConf.dateMode) {
+            return false;
+        }
+        if (dateMode == DateMode.RECENT) {
+            return Objects.equals(unit, dateConf.unit) && Objects.equals(period, dateConf.period);
+        } else {
+            return Objects.equals(startDate, dateConf.startDate)
+                    && Objects.equals(endDate, dateConf.endDate);
+        }
     }
 
     @Override

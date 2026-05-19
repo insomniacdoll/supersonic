@@ -10,7 +10,14 @@ import {
   SimilarQuestionType,
 } from '../../common/type';
 import { createContext, useEffect, useRef, useState } from 'react';
-import { chatExecute, chatParse, queryData, deleteQuery, switchEntity } from '../../service';
+import {
+  chatExecute,
+  chatParse,
+  queryData,
+  deleteQuery,
+  switchEntity,
+  getExecuteSummary,
+} from '../../service';
 import { PARSE_ERROR_TIP, PREFIX_CLS, SEARCH_EXCEPTION_TIP } from '../../common/constants';
 import { message, Spin } from 'antd';
 import IconFont from '../IconFont';
@@ -102,7 +109,6 @@ const ChatItem: React.FC<Props> = ({
     {}
   );
   const [isParserError, setIsParseError] = useState<boolean>(false);
-
   const resetState = () => {
     setParseLoading(false);
     setParseTimeCost(undefined);
@@ -170,7 +176,7 @@ const ChatItem: React.FC<Props> = ({
       setExecuteLoading(true);
     }
     try {
-      const res: any = await chatExecute(msg, conversationId!, parseInfoValue, agentId);
+      const res: any = await chatExecute(msg, conversationId!, parseInfoValue, agentId, true);
       const valid = updateData(res);
       onMsgDataLoaded?.(
         {
@@ -181,6 +187,20 @@ const ChatItem: React.FC<Props> = ({
         valid,
         isRefresh
       );
+      const queryId = parseInfoValue.queryId; // 伪流式 大模型输出
+      if (queryId != undefined && res.data.queryState != 'INVALID') {
+        const getSummary = async (data: any, queryId: number) => {
+          const res2: any = await getExecuteSummary(queryId);
+          if (res2.data.queryMode == null) {
+            res2.data = { ...data, textSummary: res2.data.textSummary };
+            setData(res2.data);
+            setTimeout(() => getSummary(data, queryId), 500);
+          } else {
+            setData(res2.data);
+          }
+        };
+        setTimeout(() => getSummary(res.data, queryId), 500);
+      }
     } catch (e) {
       const tip = SEARCH_EXCEPTION_TIP;
       setExecuteTip(SEARCH_EXCEPTION_TIP);
@@ -417,14 +437,17 @@ const ChatItem: React.FC<Props> = ({
 
   const onExportData = () => {
     const { queryColumns, queryResults } = data || {};
-    if (!!queryResults) {
+    if (!!queryResults && !!queryColumns) {
       const exportData = queryResults.map(item => {
-        return Object.keys(item).reduce((result, key) => {
-          const columnName = queryColumns?.find(column => column.nameEn === key)?.name || key;
-          result[columnName] = item[key];
+        return queryColumns.reduce((result, column) => {
+          result[column.name || column.nameEn] = item[column.nameEn];
           return result;
         }, {});
       });
+      if (exportData.length === 0) {
+        message.error('该条消息暂不支持该操作');
+        return;
+      }
       exportCsvFile(exportData);
     }
   };
@@ -441,6 +464,8 @@ const ChatItem: React.FC<Props> = ({
 
   const { register, call } = useMethodRegister(() => message.error('该条消息暂不支持该操作'));
 
+  let actualQueryText=parseInfo?.properties?.CONTEXT?.queryText //  2025-05-27 增加判空，防止出现上下文没有 queryText 的情况
+  actualQueryText=actualQueryText==null?msg:actualQueryText
   return (
     <ChartItemContext.Provider value={{ register, call }}>
       <div className={prefixCls}>
@@ -509,7 +534,7 @@ const ChatItem: React.FC<Props> = ({
                       <SqlItem
                         agentId={agentId}
                         queryId={parseInfo.queryId}
-                        question={msg}
+                        question={actualQueryText}
                         llmReq={llmReq}
                         llmResp={llmResp}
                         integrateSystem={integrateSystem}
@@ -522,7 +547,7 @@ const ChatItem: React.FC<Props> = ({
                   <ExecuteItem
                     isSimpleMode={isSimpleMode}
                     queryId={parseInfo?.queryId}
-                    question={msg}
+                    question={actualQueryText}
                     queryMode={parseInfo?.queryMode}
                     executeLoading={executeLoading}
                     executeTip={executeTip}

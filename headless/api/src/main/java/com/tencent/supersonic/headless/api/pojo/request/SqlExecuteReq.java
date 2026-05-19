@@ -12,7 +12,7 @@ import java.util.List;
 public class SqlExecuteReq {
     public static final String LIMIT_WRAPPER = " SELECT * FROM ( %s ) a LIMIT %d ";
 
-    @NotNull(message = "modelId can not be null")
+    @NotNull(message = "databaseId can not be null")
     private Long id;
 
     @NotBlank(message = "sql can not be blank")
@@ -23,9 +23,11 @@ public class SqlExecuteReq {
     private Integer limit = 1000;
 
     public String getSql() {
-        if (StringUtils.isNotBlank(sql) && sql.endsWith(";")) {
-            sql = sql.substring(0, sql.length() - 1);
+        if (StringUtils.isNotBlank(sql)) {
+            sql = sql.replaceAll("^[\\n]+|[\\n]+$", "");
+            sql = StringUtils.removeEnd(sql, ";");
         }
+
         return String.format(LIMIT_WRAPPER, sql, limit);
     }
 }

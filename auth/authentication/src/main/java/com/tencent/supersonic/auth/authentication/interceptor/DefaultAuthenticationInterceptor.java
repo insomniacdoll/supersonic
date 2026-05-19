@@ -3,13 +3,10 @@ package com.tencent.supersonic.auth.authentication.interceptor;
 import com.tencent.supersonic.auth.api.authentication.annotation.AuthenticationIgnore;
 import com.tencent.supersonic.auth.api.authentication.config.AuthenticationConfig;
 import com.tencent.supersonic.auth.api.authentication.pojo.UserWithPassword;
-import com.tencent.supersonic.auth.authentication.service.UserServiceImpl;
+import com.tencent.supersonic.auth.api.authentication.service.UserService;
 import com.tencent.supersonic.auth.authentication.utils.TokenService;
-import com.tencent.supersonic.common.pojo.User;
 import com.tencent.supersonic.common.pojo.exception.AccessException;
 import com.tencent.supersonic.common.util.ContextUtils;
-import com.tencent.supersonic.common.util.S2ThreadContext;
-import com.tencent.supersonic.common.util.ThreadContext;
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -19,12 +16,7 @@ import org.springframework.web.method.HandlerMethod;
 import java.lang.reflect.Method;
 import java.util.Optional;
 
-import static com.tencent.supersonic.auth.api.authentication.constant.UserConstants.TOKEN_IS_ADMIN;
-import static com.tencent.supersonic.auth.api.authentication.constant.UserConstants.TOKEN_USER_DISPLAY_NAME;
-import static com.tencent.supersonic.auth.api.authentication.constant.UserConstants.TOKEN_USER_EMAIL;
-import static com.tencent.supersonic.auth.api.authentication.constant.UserConstants.TOKEN_USER_ID;
-import static com.tencent.supersonic.auth.api.authentication.constant.UserConstants.TOKEN_USER_NAME;
-import static com.tencent.supersonic.auth.api.authentication.constant.UserConstants.TOKEN_USER_PASSWORD;
+import static com.tencent.supersonic.auth.api.authentication.constant.UserConstants.*;
 
 @Slf4j
 public class DefaultAuthenticationInterceptor extends AuthenticationInterceptor {
@@ -33,21 +25,12 @@ public class DefaultAuthenticationInterceptor extends AuthenticationInterceptor 
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response,
             Object handler) throws AccessException {
         authenticationConfig = ContextUtils.getBean(AuthenticationConfig.class);
-        userServiceImpl = ContextUtils.getBean(UserServiceImpl.class);
+        userService = ContextUtils.getBean(UserService.class);
         tokenService = ContextUtils.getBean(TokenService.class);
-        s2ThreadContext = ContextUtils.getBean(S2ThreadContext.class);
         if (!authenticationConfig.isEnabled()) {
-            setFakerUser(request);
             return true;
         }
-        if (isInternalRequest(request)) {
-            setFakerUser(request);
-            return true;
-        }
-        if (isAppRequest(request)) {
-            setFakerUser(request);
-            return true;
-        }
+
         if (handler instanceof HandlerMethod) {
             HandlerMethod handlerMethod = (HandlerMethod) handler;
             Method method = handlerMethod.getMethod();
@@ -68,33 +51,9 @@ public class DefaultAuthenticationInterceptor extends AuthenticationInterceptor 
 
         UserWithPassword user = getUserWithPassword(request);
         if (user != null) {
-            setContext(user.getName(), request);
             return true;
         }
         throw new AccessException("authentication failed, please login");
-    }
-
-    private void setFakerUser(HttpServletRequest request) {
-        String token = generateAdminToken(request);
-        reflectSetParam(request, authenticationConfig.getTokenHttpHeaderKey(), token);
-        setContext(User.getDefaultUser().getName(), request);
-    }
-
-    private void setContext(String userName, HttpServletRequest request) {
-        ThreadContext threadContext = ThreadContext.builder()
-                .token(request.getHeader(authenticationConfig.getTokenHttpHeaderKey()))
-                .userName(userName).build();
-        s2ThreadContext.set(threadContext);
-    }
-
-    public String generateAdminToken(HttpServletRequest request) {
-        UserWithPassword admin = new UserWithPassword("admin");
-        admin.setId(1L);
-        admin.setName("admin");
-        admin.setPassword("c3VwZXJzb25pY0BiaWNvbdktJJYWw6A3rEmBUPzbn/6DNeYnD+y3mAwDKEMS3KVT");
-        admin.setDisplayName("admin");
-        admin.setIsAdmin(1);
-        return tokenService.generateToken(UserWithPassword.convert(admin), request);
     }
 
     public UserWithPassword getUserWithPassword(HttpServletRequest request) {

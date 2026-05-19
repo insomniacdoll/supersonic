@@ -192,14 +192,14 @@ public class S2VisitsDemo extends S2BaseDemo {
         modelReq.setAdminOrgs(Collections.emptyList());
         List<Identify> identifiers = new ArrayList<>();
         ModelDetail modelDetail = new ModelDetail();
-        identifiers.add(new Identify("用户名", IdentifyType.foreign.name(), "user_name", 0));
+        identifiers.add(new Identify("用户名", IdentifyType.foreign.name(), "user_name", 1));
         modelDetail.setIdentifiers(identifiers);
 
         List<Dimension> dimensions = new ArrayList<>();
         Dimension dimension1 = new Dimension("数据日期", "imp_date", DimensionType.partition_time, 1);
         dimension1.setTypeParams(new DimensionTimeTypeParams());
         dimensions.add(dimension1);
-        Dimension dimension2 = new Dimension("", "page", DimensionType.categorical, 0);
+        Dimension dimension2 = new Dimension("", "page", DimensionType.categorical, 1);
         dimension2.setExpr("page");
         dimensions.add(dimension2);
         modelDetail.setDimensions(dimensions);
@@ -227,11 +227,11 @@ public class S2VisitsDemo extends S2BaseDemo {
         modelReq.setAdminOrgs(Collections.emptyList());
         List<Identify> identifiers = new ArrayList<>();
         ModelDetail modelDetail = new ModelDetail();
-        identifiers.add(new Identify("用户名", IdentifyType.foreign.name(), "user_name", 0));
+        identifiers.add(new Identify("用户名", IdentifyType.foreign.name(), "user_name", 1));
         modelDetail.setIdentifiers(identifiers);
 
         List<Dimension> dimensions = new ArrayList<>();
-        Dimension dimension1 = new Dimension("数据日期", "imp_date", DimensionType.partition_time, 0);
+        Dimension dimension1 = new Dimension("数据日期", "imp_date", DimensionType.partition_time, 1);
         dimension1.setTypeParams(new DimensionTimeTypeParams());
         dimensions.add(dimension1);
         Dimension dimension2 = new Dimension("页面", "visits_page", DimensionType.categorical, 1);
@@ -333,7 +333,6 @@ public class S2VisitsDemo extends S2BaseDemo {
         metricReq.setSensitiveLevel(SensitiveLevelEnum.HIGH.getCode());
         metricReq.setDescription("每个用户平均访问的次数");
         metricReq.setClassifications(Collections.singletonList("核心指标"));
-        metricReq.setAlias("平均访问次数");
         MetricDefineByMetricParams metricTypeParams = new MetricDefineByMetricParams();
         metricTypeParams.setExpr("pv/uv");
         List<MetricParam> metrics = new ArrayList<>();

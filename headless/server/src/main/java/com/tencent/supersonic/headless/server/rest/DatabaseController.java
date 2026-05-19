@@ -64,8 +64,10 @@ public class DatabaseController {
     }
 
     @DeleteMapping("/{id}")
-    public boolean deleteDatabase(@PathVariable("id") Long id) {
-        databaseService.deleteDatabase(id);
+    public boolean deleteDatabase(@PathVariable("id") Long id, HttpServletRequest request,
+            HttpServletResponse response) {
+        User user = UserHolder.findUser(request, response);
+        databaseService.deleteDatabase(id, user);
         return true;
     }
 
@@ -73,25 +75,33 @@ public class DatabaseController {
     public SemanticQueryResp executeSql(@RequestBody SqlExecuteReq sqlExecuteReq,
             HttpServletRequest request, HttpServletResponse response) {
         User user = UserHolder.findUser(request, response);
-        return databaseService.executeSql(sqlExecuteReq, sqlExecuteReq.getId(), user);
+        return databaseService.executeSql(sqlExecuteReq, user);
+    }
+
+    @RequestMapping("/getCatalogs")
+    public List<String> getCatalogs(@RequestParam("id") Long databaseId) throws SQLException {
+        return databaseService.getCatalogs(databaseId);
     }
 
     @RequestMapping("/getDbNames")
-    public List<String> getDbNames(@RequestParam("id") Long databaseId) throws SQLException {
-        return databaseService.getDbNames(databaseId);
+    public List<String> getDbNames(@RequestParam("id") Long databaseId,
+            @RequestParam(value = "catalog", required = false) String catalog) throws SQLException {
+        return databaseService.getDbNames(databaseId, catalog);
     }
 
     @RequestMapping("/getTables")
     public List<String> getTables(@RequestParam("databaseId") Long databaseId,
+            @RequestParam(value = "catalog", required = false) String catalog,
             @RequestParam("db") String db) throws SQLException {
-        return databaseService.getTables(databaseId, db);
+        return databaseService.getTables(databaseId, catalog, db);
     }
 
     @RequestMapping("/getColumnsByName")
     public List<DBColumn> getColumnsByName(@RequestParam("databaseId") Long databaseId,
+            @RequestParam(name = "catalog", required = false) String catalog,
             @RequestParam("db") String db, @RequestParam("table") String table)
             throws SQLException {
-        return databaseService.getColumns(databaseId, db, table);
+        return databaseService.getColumns(databaseId, catalog, db, table);
     }
 
     @PostMapping("/listColumnsBySql")

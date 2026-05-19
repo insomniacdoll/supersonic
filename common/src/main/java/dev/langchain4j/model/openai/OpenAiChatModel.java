@@ -52,7 +52,7 @@ import static dev.langchain4j.model.openai.InternalOpenAiHelper.toOpenAiMessages
 import static dev.langchain4j.model.openai.InternalOpenAiHelper.toOpenAiResponseFormat;
 import static dev.langchain4j.model.openai.InternalOpenAiHelper.toTools;
 import static dev.langchain4j.model.openai.InternalOpenAiHelper.tokenUsageFrom;
-import static dev.langchain4j.model.openai.OpenAiModelName.GPT_3_5_TURBO;
+import static dev.langchain4j.model.openai.OpenAiChatModelName.GPT_3_5_TURBO;
 import static dev.langchain4j.spi.ServiceHelper.loadFactories;
 import static java.time.Duration.ofSeconds;
 import static java.util.Collections.emptyList;
@@ -66,10 +66,10 @@ import static java.util.Collections.singletonList;
 @Slf4j
 public class OpenAiChatModel implements ChatLanguageModel, TokenCountEstimator {
 
-    public static final String ZHIPU = "bigmodel";
     private final OpenAiClient client;
     private final String baseUrl;
     private final String modelName;
+    private final String apiVersion;
     private final Double temperature;
     private final Double topP;
     private final List<String> stop;
@@ -89,12 +89,13 @@ public class OpenAiChatModel implements ChatLanguageModel, TokenCountEstimator {
 
     @Builder
     public OpenAiChatModel(String baseUrl, String apiKey, String organizationId, String modelName,
-            Double temperature, Double topP, List<String> stop, Integer maxTokens,
-            Double presencePenalty, Double frequencyPenalty, Map<String, Integer> logitBias,
-            String responseFormat, Boolean strictJsonSchema, Integer seed, String user,
-            Boolean strictTools, Boolean parallelToolCalls, Duration timeout, Integer maxRetries,
-            Proxy proxy, Boolean logRequests, Boolean logResponses, Tokenizer tokenizer,
-            Map<String, String> customHeaders, List<ChatModelListener> listeners) {
+            String apiVersion, Double temperature, Double topP, List<String> stop,
+            Integer maxTokens, Double presencePenalty, Double frequencyPenalty,
+            Map<String, Integer> logitBias, String responseFormat, Boolean strictJsonSchema,
+            Integer seed, String user, Boolean strictTools, Boolean parallelToolCalls,
+            Duration timeout, Integer maxRetries, Proxy proxy, Boolean logRequests,
+            Boolean logResponses, Tokenizer tokenizer, Map<String, String> customHeaders,
+            List<ChatModelListener> listeners) {
 
         baseUrl = getOrDefault(baseUrl, OPENAI_URL);
         if (OPENAI_DEMO_API_KEY.equals(apiKey)) {
@@ -105,11 +106,12 @@ public class OpenAiChatModel implements ChatLanguageModel, TokenCountEstimator {
         timeout = getOrDefault(timeout, ofSeconds(60));
 
         this.client = OpenAiClient.builder().openAiApiKey(apiKey).baseUrl(baseUrl)
-                .organizationId(organizationId).callTimeout(timeout).connectTimeout(timeout)
-                .readTimeout(timeout).writeTimeout(timeout).proxy(proxy).logRequests(logRequests)
-                .logResponses(logResponses).userAgent(DEFAULT_USER_AGENT)
+                .apiVersion(apiVersion).organizationId(organizationId).callTimeout(timeout)
+                .connectTimeout(timeout).readTimeout(timeout).writeTimeout(timeout).proxy(proxy)
+                .logRequests(logRequests).logResponses(logResponses).userAgent(DEFAULT_USER_AGENT)
                 .customHeaders(customHeaders).build();
-        this.modelName = getOrDefault(modelName, GPT_3_5_TURBO);
+        this.modelName = getOrDefault(modelName, GPT_3_5_TURBO.name());
+        this.apiVersion = apiVersion;
         this.temperature = getOrDefault(temperature, 0.7);
         this.topP = topP;
         this.stop = stop;
@@ -127,7 +129,7 @@ public class OpenAiChatModel implements ChatLanguageModel, TokenCountEstimator {
         this.strictTools = getOrDefault(strictTools, false);
         this.parallelToolCalls = parallelToolCalls;
         this.maxRetries = getOrDefault(maxRetries, 3);
-        this.tokenizer = getOrDefault(tokenizer, OpenAiTokenizer::new);
+        this.tokenizer = getOrDefault(tokenizer, () -> new OpenAiTokenizer(this.modelName));
         this.listeners = listeners == null ? emptyList() : new ArrayList<>(listeners);
     }
 
@@ -189,9 +191,7 @@ public class OpenAiChatModel implements ChatLanguageModel, TokenCountEstimator {
                 .responseFormat(responseFormat).seed(seed).user(user)
                 .parallelToolCalls(parallelToolCalls);
 
-        if (!(baseUrl.contains(ZHIPU))) {
-            requestBuilder.temperature(temperature);
-        }
+        requestBuilder.temperature(temperature);
 
         if (toolSpecifications != null && !toolSpecifications.isEmpty()) {
             requestBuilder.tools(toTools(toolSpecifications, strictTools));

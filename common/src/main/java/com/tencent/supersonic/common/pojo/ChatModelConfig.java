@@ -18,6 +18,7 @@ public class ChatModelConfig implements Serializable {
     private String baseUrl;
     private String apiKey;
     private String modelName;
+    private String apiVersion;
     private Double temperature = 0.0d;
     private Long timeOut = 60L;
     private String endpoint;
@@ -27,6 +28,8 @@ public class ChatModelConfig implements Serializable {
     private Boolean logRequests = false;
     private Boolean logResponses = false;
     private Boolean enableSearch = false;
+    private Boolean jsonFormat = false;
+    private String jsonFormatType = "json_schema";
 
     public String keyDecrypt() {
         return AESEncryptionUtil.aesDecryptECB(getApiKey());

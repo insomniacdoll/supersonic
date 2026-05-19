@@ -28,8 +28,7 @@ public class ModelConverter {
 
     public static ModelDO convert(ModelReq modelReq, User user) {
         ModelDO modelDO = new ModelDO();
-        // ModelDetail modelDetail = createModelDetail(modelReq);
-        ModelDetail modelDetail = modelReq.getModelDetail();
+        ModelDetail modelDetail = convert(modelReq);
         modelReq.createdBy(user.getName());
         BeanMapper.mapper(modelReq, modelDO);
         modelDO.setStatus(StatusEnum.ONLINE.getCode());
@@ -69,7 +68,7 @@ public class ModelConverter {
     }
 
     public static ModelDO convert(ModelDO modelDO, ModelReq modelReq, User user) {
-        ModelDetail modelDetail = updateModelDetail(modelReq);
+        ModelDetail modelDetail = convert(modelReq);
         BeanMapper.mapper(modelReq, modelDO);
         if (modelReq.getDrillDownDimensions() != null) {
             modelDO.setDrillDownDimensions(
@@ -111,7 +110,8 @@ public class ModelConverter {
         dimensionReq.setExpr(dim.getExpr());
         dimensionReq.setType(dim.getType().name());
         dimensionReq
-                .setDescription(Objects.isNull(dim.getDescription()) ? "" : dim.getDescription());
+                .setDescription(Objects.isNull(dim.getDescription()) ? dimensionReq.getDescription()
+                        : dim.getDescription());
         dimensionReq.setTypeParams(dim.getTypeParams());
         return dimensionReq;
     }
@@ -145,8 +145,9 @@ public class ModelConverter {
     public static ModelReq convert(ModelSchema modelSchema, ModelBuildReq modelBuildReq,
             String tableName) {
         ModelReq modelReq = new ModelReq();
-        modelReq.setName(modelBuildReq.getName());
-        modelReq.setBizName(modelBuildReq.getBizName());
+        modelReq.setName(modelBuildReq.getName() != null ? modelBuildReq.getName() : tableName);
+        modelReq.setBizName(
+                modelBuildReq.getBizName() != null ? modelBuildReq.getBizName() : tableName);
         modelReq.setDatabaseId(modelBuildReq.getDatabaseId());
         modelReq.setDomainId(modelBuildReq.getDomainId());
         ModelDetail modelDetail = new ModelDetail();
@@ -155,27 +156,50 @@ public class ModelConverter {
             modelDetail.setSqlQuery(modelBuildReq.getSql());
         } else {
             modelDetail.setQueryType(ModelDefineType.TABLE_QUERY.getName());
-            modelDetail.setTableQuery(String.format("%s.%s", modelBuildReq.getDb(), tableName));
-        }
-        for (ColumnSchema columnSchema : modelSchema.getColumnSchemas()) {
-            FieldType fieldType = columnSchema.getFiledType();
-            if (getIdentifyType(fieldType) != null) {
-                Identify identify = new Identify(columnSchema.getName(),
-                        getIdentifyType(fieldType).name(), columnSchema.getColumnName(), 1);
-                modelDetail.getIdentifiers().add(identify);
-            } else if (FieldType.measure.equals(fieldType)) {
-                Measure measure = new Measure(columnSchema.getName(),
-                        modelReq.getBizName() + "_" + columnSchema.getColumnName(),
-                        columnSchema.getColumnName(), columnSchema.getAgg().getOperator(), 1);
-                modelDetail.getMeasures().add(measure);
+            if (modelBuildReq.getDb() != null) {
+                modelDetail.setTableQuery(String.format("%s.%s", modelBuildReq.getDb(), tableName));
             } else {
-                Dimension dim = new Dimension(columnSchema.getName(),
-                        modelReq.getBizName() + "_" + columnSchema.getColumnName(),
-                        columnSchema.getColumnName(),
-                        DimensionType.valueOf(columnSchema.getFiledType().name()), 1);
-                modelDetail.getDimensions().add(dim);
+                modelDetail.setTableQuery(tableName);
             }
         }
+        List<Field> fields = new ArrayList<>();
+        for (SemanticColumn semanticColumn : modelSchema.getSemanticColumns()) {
+            FieldType fieldType = semanticColumn.getFiledType();
+            fields.add(new Field(semanticColumn.getColumnName(), semanticColumn.getDataType()));
+
+            if (getIdentifyType(fieldType) != null) {
+                Optional<Identify> optional = modelDetail.getIdentifiers().stream().filter(
+                        identify -> identify.getBizName().equals(semanticColumn.getColumnName()))
+                        .findAny();
+                if (optional.isEmpty()) {
+                    Identify identify = new Identify(semanticColumn.getName(),
+                            getIdentifyType(fieldType).name(), semanticColumn.getColumnName(), 1);
+                    modelDetail.getIdentifiers().add(identify);
+                }
+            } else if (FieldType.measure.equals(fieldType)) {
+                Optional<Measure> optional = modelDetail.getMeasures().stream().filter(
+                        measure -> measure.getBizName().equals(semanticColumn.getColumnName()))
+                        .findAny();
+                if (optional.isEmpty()) {
+                    Measure measure = new Measure(semanticColumn.getName(),
+                            semanticColumn.getColumnName(), semanticColumn.getExpr(),
+                            semanticColumn.getAgg().getOperator(), semanticColumn.getUnit(), 1);
+                    modelDetail.getMeasures().add(measure);
+                }
+            } else {
+                Optional<Dimension> optional = modelDetail.getDimensions().stream().filter(
+                        dimension -> dimension.getBizName().equals(semanticColumn.getColumnName()))
+                        .findAny();
+                if (optional.isEmpty()) {
+                    Dimension dim = new Dimension(semanticColumn.getName(),
+                            semanticColumn.getColumnName(), semanticColumn.getExpr(),
+                            DimensionType.valueOf(semanticColumn.getFiledType().name()), 1);
+                    modelDetail.getDimensions().add(dim);
+                }
+            }
+        }
+        modelDetail.setFields(fields);
+        modelDetail.setFilterSql(modelBuildReq.getFilterSql());
         modelReq.setModelDetail(modelDetail);
         return modelReq;
     }
@@ -264,42 +288,53 @@ public class ModelConverter {
                 .collect(Collectors.toList());
     }
 
-    private static ModelDetail createModelDetail(ModelReq modelReq) {
+    private static ModelDetail convert(ModelReq modelReq) {
         ModelDetail modelDetail = new ModelDetail();
         List<Measure> measures = modelReq.getModelDetail().getMeasures();
-        if (measures == null) {
-            measures = Lists.newArrayList();
-        }
-        for (Measure measure : measures) {
-            if (StringUtils.isBlank(measure.getBizName())) {
-                continue;
-            }
-            measure.setExpr(measure.getBizName());
-            measure.setBizName(String.format("%s_%s", modelReq.getBizName(), measure.getExpr()));
-        }
-        BeanMapper.mapper(modelReq.getModelDetail(), modelDetail);
-        return modelDetail;
-    }
+        List<Dimension> dimensions = modelReq.getModelDetail().getDimensions();
+        List<Identify> identifiers = modelReq.getModelDetail().getIdentifiers();
+        List<Field> fields = modelReq.getModelDetail().getFields();
+        List<String> fieldNames =
+                fields.stream().map(Field::getFieldName).collect(Collectors.toList());
 
-    private static ModelDetail updateModelDetail(ModelReq modelReq) {
-        ModelDetail modelDetail = new ModelDetail();
-        List<Measure> measures = modelReq.getModelDetail().getMeasures();
-        if (measures == null) {
-            measures = Lists.newArrayList();
-        }
-        for (Measure measure : measures) {
-            if (StringUtils.isBlank(measure.getBizName())) {
-                continue;
+        if (measures != null) {
+            for (Measure measure : measures) {
+                if (StringUtils.isNotBlank(measure.getBizName())
+                        && StringUtils.isBlank(measure.getExpr())) {
+                    measure.setExpr(measure.getBizName());
+                }
+                if (StringUtils.isNotBlank(measure.getBizName())
+                        && !fieldNames.contains(measure.getBizName())) {
+                    fields.add(new Field(measure.getBizName(), ""));
+                }
             }
-            // Compatible with front-end tmp
+        }
+        if (dimensions != null) {
+            for (Dimension dimension : dimensions) {
+                if (StringUtils.isNotBlank(dimension.getBizName())
+                        && StringUtils.isBlank(dimension.getExpr())) {
+                    dimension.setExpr(dimension.getBizName());
+                }
+                if (StringUtils.isNotBlank(dimension.getBizName())
+                        && !fieldNames.contains(dimension.getBizName())) {
+                    fields.add(new Field(dimension.getBizName(), ""));
+                }
+            }
+        }
+        if (identifiers != null) {
+            for (Identify identify : identifiers) {
+                if (StringUtils.isNotBlank(identify.getBizName())
+                        && StringUtils.isBlank(identify.getName())) {
+                    identify.setName(identify.getBizName());
+                }
+                identify.setIsCreateDimension(1);
+                if (StringUtils.isNotBlank(identify.getBizName())
+                        && !fieldNames.contains(identify.getBizName())) {
+                    fields.add(new Field(identify.getBizName(), ""));
+                }
+            }
+        }
 
-            String oriFieldName =
-                    measure.getBizName().replaceFirst(modelReq.getBizName() + "_", "");
-            measure.setExpr(oriFieldName);
-            if (!measure.getBizName().startsWith(modelReq.getBizName())) {
-                measure.setBizName(String.format("%s_%s", modelReq.getBizName(), oriFieldName));
-            }
-        }
         BeanMapper.mapper(modelReq.getModelDetail(), modelDetail);
         return modelDetail;
     }

@@ -10,6 +10,7 @@ import java.sql.DatabaseMetaData;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.List;
+import java.util.Properties;
 
 @Slf4j
 public class DuckdbAdaptor extends DefaultDbAdaptor {
@@ -19,11 +20,11 @@ public class DuckdbAdaptor extends DefaultDbAdaptor {
         return metaData.getTables(schemaName, null, null, new String[] {"TABLE", "VIEW"});
     }
 
-    public List<DBColumn> getColumns(ConnectInfo connectInfo, String schemaName, String tableName)
-            throws SQLException {
+    public List<DBColumn> getColumns(ConnectInfo connectInfo, String catalog, String schemaName,
+            String tableName) throws SQLException {
         List<DBColumn> dbColumns = Lists.newArrayList();
         DatabaseMetaData metaData = getDatabaseMetaData(connectInfo);
-        ResultSet columns = metaData.getColumns(schemaName, null, tableName, null);
+        ResultSet columns = metaData.getColumns(null, schemaName, tableName, null);
         while (columns.next()) {
             String columnName = columns.getString("COLUMN_NAME");
             String dataType = columns.getString("TYPE_NAME");
@@ -36,7 +37,15 @@ public class DuckdbAdaptor extends DefaultDbAdaptor {
 
     @Override
     public String rewriteSql(String sql) {
+        if (sql == null) {
+            return null;
+        }
         return sql.replaceAll("`", "");
+    }
+
+    @Override
+    public Properties getProperties(ConnectInfo connectionInfo) {
+        return new Properties();
     }
 
 }

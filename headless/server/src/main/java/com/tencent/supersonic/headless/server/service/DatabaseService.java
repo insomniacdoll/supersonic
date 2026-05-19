@@ -20,7 +20,7 @@ public interface DatabaseService {
 
     List<DatabaseResp> getDatabaseByType(DataType dataType);
 
-    SemanticQueryResp executeSql(SqlExecuteReq sqlExecuteReq, Long id, User user);
+    SemanticQueryResp executeSql(SqlExecuteReq sqlExecuteReq, User user);
 
     DatabaseResp getDatabase(Long id, User user);
 
@@ -34,15 +34,17 @@ public interface DatabaseService {
 
     List<DatabaseResp> getDatabaseList(User user);
 
-    void deleteDatabase(Long databaseId);
+    void deleteDatabase(Long databaseId, User user);
 
-    List<String> getDbNames(Long id) throws SQLException;
+    List<String> getCatalogs(Long id) throws SQLException;
 
-    List<String> getTables(Long id, String db) throws SQLException;
+    List<String> getDbNames(Long id, String catalog) throws SQLException;
+
+    List<String> getTables(Long id, String catalog, String db) throws SQLException;
 
     Map<String, List<DBColumn>> getDbColumns(ModelBuildReq modelBuildReq) throws SQLException;
 
-    List<DBColumn> getColumns(Long id, String db, String table) throws SQLException;
+    List<DBColumn> getColumns(Long id, String catalog, String db, String table) throws SQLException;
 
     List<DBColumn> getColumns(Long id, String sql) throws SQLException;
 }

@@ -79,6 +79,7 @@ export type SqlInfoType = {
   parsedS2SQL: string;
   correctedS2SQL: string;
   querySQL: string;
+  correctedQuerySQL?: string;
 };
 
 export type ChatContextType = {
@@ -179,6 +180,7 @@ export type ColumnType = {
   authorized: boolean;
   name: string;
   nameEn: string;
+  bizName: string;
   showType: string;
   type: string;
   dataFormatType: string;

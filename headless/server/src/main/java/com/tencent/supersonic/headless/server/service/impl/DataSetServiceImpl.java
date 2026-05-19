@@ -56,9 +56,9 @@ public class DataSetServiceImpl extends ServiceImpl<DataSetDOMapper, DataSetDO>
     public DataSetResp save(DataSetReq dataSetReq, User user) {
         dataSetReq.createdBy(user.getName());
         DataSetDO dataSetDO = convert(dataSetReq);
-        dataSetDO.setStatus(StatusEnum.ONLINE.getCode());
+        dataSetDO.setStatus(dataSetReq.getStatus() != null ? dataSetReq.getStatus()
+                : StatusEnum.ONLINE.getCode());
         DataSetResp dataSetResp = convert(dataSetDO);
-        // conflictCheck(dataSetResp);
         save(dataSetDO);
         dataSetResp.setId(dataSetDO.getId());
         return dataSetResp;
@@ -100,6 +100,20 @@ public class DataSetServiceImpl extends ServiceImpl<DataSetDOMapper, DataSetDO>
         }
         wrapper.lambda().ne(DataSetDO::getStatus, StatusEnum.DELETED.getCode());
         return list(wrapper).stream().map(this::convert).collect(Collectors.toList());
+    }
+
+    @Override
+    public List<DataSetResp> getDataSetList(Long domainId, List<Integer> statuCodesList) {
+        if (domainId == null || CollectionUtils.isEmpty(statuCodesList)) {
+            return List.of();
+        }
+        QueryWrapper<DataSetDO> wrapper = new QueryWrapper<>();
+        wrapper.lambda().eq(DataSetDO::getDomainId, domainId);
+        wrapper.lambda().in(DataSetDO::getStatus, statuCodesList);
+        wrapper.lambda().ne(DataSetDO::getStatus, StatusEnum.DELETED.getCode());
+
+        return list(wrapper).stream().map(this::convert).collect(Collectors.toList());
+
     }
 
     @Override

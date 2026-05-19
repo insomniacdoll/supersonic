@@ -1,4 +1,4 @@
-import { formatByDecimalPlaces, formatByThousandSeperator } from '../../../utils/utils';
+import { formatByDataFormatType, formatByThousandSeperator } from '../../../utils/utils';
 import { Table as AntTable } from 'antd';
 import { MsgDataType } from '../../../common/type';
 import { CLS_PREFIX } from '../../../common/constants';
@@ -19,16 +19,15 @@ const Table: React.FC<Props> = ({ data, size, loading, question, onApplyAuth }) 
 
   const prefixCls = `${CLS_PREFIX}-table`;
   const tableColumns: any[] = queryColumns.map(
-    ({ name, nameEn, showType, dataFormatType, dataFormat, authorized }) => {
+    ({ name, bizName, showType, dataFormatType, dataFormat, authorized }) => {
       return {
-        dataIndex: nameEn,
-        key: nameEn,
-        title: name || nameEn,
-        defaultSortOrder: 'descend',
+        dataIndex: bizName,
+        key: bizName,
+        title: name || bizName,
         sorter:
           showType === 'NUMBER'
             ? (a, b) => {
-                return a[nameEn] - b[nameEn];
+                return a[bizName] - b[bizName];
               }
             : undefined,
         render: (value: string | number) => {
@@ -42,12 +41,9 @@ const Table: React.FC<Props> = ({ data, size, loading, question, onApplyAuth }) 
               <div className={`${prefixCls}-formatted-value`}>
                 {`${
                   value
-                    ? formatByDecimalPlaces(
-                        dataFormat?.needMultiply100 ? +value * 100 : value,
-                        dataFormat?.decimalPlaces || 2
-                      )
-                    : 0
-                }%`}
+                    ? formatByDataFormatType(value, dataFormatType, dataFormat)
+                    : '0%'
+                }`}
               </div>
             );
           }
@@ -59,7 +55,7 @@ const Table: React.FC<Props> = ({ data, size, loading, question, onApplyAuth }) 
               </div>
             );
           }
-          if (nameEn.includes('photo')) {
+          if (bizName.includes('photo')) {
             return (
               <div className={`${prefixCls}-photo`}>
                 <img width={40} height={40} src={value as string} alt="" />
@@ -76,10 +72,11 @@ const Table: React.FC<Props> = ({ data, size, loading, question, onApplyAuth }) 
     return index % 2 !== 0 ? `${prefixCls}-even-row` : '';
   };
 
-  const dateColumn = queryColumns.find(column => column.type === 'DATE');
+  const dateColumn = queryColumns.find(column => column.type === 'DATE' || column.showType === 'DATE');
   const dataSource = dateColumn
-    ? queryResults.sort((a, b) => moment(a[dateColumn.nameEn]).diff(moment(b[dateColumn.nameEn])))
+    ? queryResults.sort((a, b) => moment(a[dateColumn.bizName]).diff(moment(b[dateColumn.bizName])))
     : queryResults;
+
   return (
     <div className={prefixCls}>
       {question && (

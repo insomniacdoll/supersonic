@@ -7,6 +7,7 @@ import com.tencent.supersonic.auth.api.authorization.request.QueryAuthResReq;
 import com.tencent.supersonic.auth.api.authorization.response.AuthorizedResourceResp;
 import com.tencent.supersonic.auth.api.authorization.service.AuthService;
 import com.tencent.supersonic.common.jsqlparser.SqlAddHelper;
+import com.tencent.supersonic.common.jsqlparser.SqlReplaceHelper;
 import com.tencent.supersonic.common.pojo.Filter;
 import com.tencent.supersonic.common.pojo.QueryAuthorization;
 import com.tencent.supersonic.common.pojo.User;
@@ -73,6 +74,15 @@ public class S2DataPermissionAspect {
         SemanticQueryReq queryReq = null;
         if (objects[0] instanceof SemanticQueryReq) {
             queryReq = (SemanticQueryReq) objects[0];
+            if (queryReq instanceof QuerySqlReq) {
+                QuerySqlReq sqlReq = (QuerySqlReq) queryReq;
+                if (sqlReq.getDataSetName() != null) {
+                    String escapedTable = SqlReplaceHelper.escapeTableName(sqlReq.getDataSetName());
+                    sqlReq.setSql(sqlReq.getSql().replaceAll(
+                            String.format(" %s ", sqlReq.getDataSetName()),
+                            String.format(" %s ", escapedTable)));
+                }
+            }
         }
         if (queryReq == null) {
             throw new InvalidArgumentException("queryReq is not Invalid");
@@ -325,13 +335,17 @@ public class S2DataPermissionAspect {
                 if (StringUtils.isNotEmpty(filter.getDescription())) {
                     descList.add(filter.getDescription());
                 }
-                exprList.add(filter.getExpressions().toString());
+                if (!"[]".equals(filter.getExpressions().toString())) {
+                    exprList.add(filter.getExpressions().toString());
+                }
             });
-            String promptInfo = "当前结果已经过行权限过滤，详细过滤条件如下:%s, 申请权限请联系管理员%s";
-            String message = String.format(promptInfo,
-                    CollectionUtils.isEmpty(descList) ? exprList : descList, admins);
-            queryResultWithColumns.setQueryAuthorization(
-                    new QueryAuthorization(modelResp.getName(), exprList, descList, message));
+            if (!CollectionUtils.isEmpty(exprList)) {
+                String promptInfo = "当前结果已经过行权限过滤，详细过滤条件如下:%s, 申请权限请联系管理员%s";
+                String message = String.format(promptInfo,
+                        CollectionUtils.isEmpty(descList) ? exprList : descList, admins);
+                queryResultWithColumns.setQueryAuthorization(
+                        new QueryAuthorization(modelResp.getName(), exprList, descList, message));
+            }
         }
     }
 }

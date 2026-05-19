@@ -1,6 +1,7 @@
 package com.tencent.supersonic.chat.server.service.impl;
 
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.tencent.supersonic.auth.api.authentication.service.UserService;
 import com.tencent.supersonic.chat.api.pojo.request.ChatMemoryFilter;
 import com.tencent.supersonic.chat.api.pojo.request.ChatParseReq;
 import com.tencent.supersonic.chat.server.agent.Agent;
@@ -21,11 +22,13 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.stream.Collectors;
 
@@ -37,10 +40,14 @@ public class AgentServiceImpl extends ServiceImpl<AgentDOMapper, AgentDO> implem
     private MemoryService memoryService;
 
     @Autowired
+    @Lazy
     private ChatQueryService chatQueryService;
 
     @Autowired
     private ChatModelService chatModelService;
+
+    @Autowired
+    private UserService userService;
 
     @Autowired
     @Qualifier("chatExecutor")
@@ -53,17 +60,19 @@ public class AgentServiceImpl extends ServiceImpl<AgentDOMapper, AgentDO> implem
     }
 
     private boolean filterByAuth(Agent agent, User user, AuthType authType) {
-        if (user.isSuperAdmin() || user.getName().equals(agent.getCreatedBy())) {
+        Set<String> orgIds = userService.getUserAllOrgId(user.getName());
+
+        if (user.isSuperAdmin() || agent.openToAll()
+                || user.getName().equals(agent.getCreatedBy())) {
             return true;
         }
         authType = authType == null ? AuthType.VIEWER : authType;
         switch (authType) {
             case ADMIN:
-                return agent.contains(user, Agent::getAdmins);
+                return checkAdminPermission(orgIds, user, agent);
             case VIEWER:
             default:
-                return agent.contains(user, Agent::getAdmins)
-                        || agent.contains(user, Agent::getViewers);
+                return checkViewPermission(orgIds, user, agent);
         }
     }
 
@@ -154,13 +163,18 @@ public class AgentServiceImpl extends ServiceImpl<AgentDOMapper, AgentDO> implem
                 JsonUtil.toMap(agentDO.getChatModelConfig(), String.class, ChatApp.class));
         agent.setVisualConfig(JsonUtil.toObject(agentDO.getVisualConfig(), VisualConfig.class));
         agent.getChatAppConfig().values().forEach(c -> {
-            ChatModel chatModel = chatModelService.getChatModel(c.getChatModelId());
-            if (Objects.nonNull(chatModel)) {
-                c.setChatModelConfig(chatModelService.getChatModel(c.getChatModelId()).getConfig());
+            if (c.isEnable()) {// 优化，减少访问数据库的次数
+                ChatModel chatModel = chatModelService.getChatModel(c.getChatModelId());
+                if (Objects.nonNull(chatModel)) {
+                    c.setChatModelConfig(chatModel.getConfig());
+                }
             }
         });
         agent.setAdmins(JsonUtil.toList(agentDO.getAdmin(), String.class));
         agent.setViewers(JsonUtil.toList(agentDO.getViewer(), String.class));
+        agent.setAdminOrgs(JsonUtil.toList(agentDO.getAdminOrg(), String.class));
+        agent.setViewOrgs(JsonUtil.toList(agentDO.getViewOrg(), String.class));
+        agent.setIsOpen(agentDO.getIsOpen());
         return agent;
     }
 
@@ -173,9 +187,56 @@ public class AgentServiceImpl extends ServiceImpl<AgentDOMapper, AgentDO> implem
         agentDO.setVisualConfig(JsonUtil.toString(agent.getVisualConfig()));
         agentDO.setAdmin(JsonUtil.toString(agent.getAdmins()));
         agentDO.setViewer(JsonUtil.toString(agent.getViewers()));
+        agentDO.setAdminOrg(JsonUtil.toString(agent.getAdminOrgs()));
+        agentDO.setViewOrg(JsonUtil.toString(agent.getViewOrgs()));
+        agentDO.setIsOpen(agent.getIsOpen());
         if (agentDO.getStatus() == null) {
             agentDO.setStatus(1);
         }
         return agentDO;
     }
+
+    private boolean checkAdminPermission(Set<String> orgIds, User user, Agent agent) {
+        List<String> admins = agent.getAdmins();
+        List<String> adminOrgs = agent.getAdminOrgs();
+        if (user.isSuperAdmin()) {
+            return true;
+        }
+        if (admins.contains(user.getName()) || agent.getCreatedBy().equals(user.getName())) {
+            return true;
+        }
+        if (CollectionUtils.isEmpty(adminOrgs)) {
+            return false;
+        }
+        for (String orgId : orgIds) {
+            if (adminOrgs.contains(orgId)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean checkViewPermission(Set<String> orgIds, User user, Agent agent) {
+        if (checkAdminPermission(orgIds, user, agent)) {
+            return true;
+        }
+        List<String> viewers = agent.getViewers();
+        List<String> viewOrgs = agent.getViewOrgs();
+        if (agent.openToAll()) {
+            return true;
+        }
+        if (viewers.contains(user.getName())) {
+            return true;
+        }
+        if (CollectionUtils.isEmpty(viewOrgs)) {
+            return false;
+        }
+        for (String orgId : orgIds) {
+            if (viewOrgs.contains(orgId)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
 }

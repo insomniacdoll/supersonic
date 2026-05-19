@@ -144,6 +144,15 @@ public class SqlSelectHelper {
         return result;
     }
 
+    public static Set<String> getAliasFields(String sql) {
+        List<PlainSelect> plainSelects = getPlainSelects(getPlainSelect(sql));
+        Set<String> aliasFields = new HashSet<>();
+        plainSelects.forEach(select -> {
+            aliasFields.addAll(getAliasFields(select));
+        });
+        return aliasFields;
+    }
+
     public static List<PlainSelect> getPlainSelect(Select selectStatement) {
         if (selectStatement == null) {
             return null;
@@ -219,7 +228,7 @@ public class SqlSelectHelper {
             statement = CCJSqlParserUtil.parse(sql);
         } catch (JSQLParserException e) {
             log.error("parse error, sql:{}", sql, e);
-            return null;
+            throw new RuntimeException(e);
         }
 
         if (statement instanceof ParenthesedSelect) {
@@ -285,7 +294,8 @@ public class SqlSelectHelper {
         }
         // do not account in aliases
         results.removeAll(aliases);
-        return new ArrayList<>(results);
+        return new ArrayList<>(
+                results.stream().map(r -> r.replaceAll("`", "")).collect(Collectors.toList()));
     }
 
     private static List<String> getFieldsByPlainSelect(PlainSelect plainSelect) {
@@ -450,6 +460,9 @@ public class SqlSelectHelper {
                 .map(fieldExpression -> fieldExpression.getFieldName()).filter(Objects::nonNull)
                 .collect(Collectors.toSet());
         result.addAll(collect);
+
+        Set<String> aliases = getAliasFields(plainSelect);
+        result.removeAll(aliases);
     }
 
     public static List<FieldExpression> getOrderByExpressions(String sql) {
@@ -654,8 +667,9 @@ public class SqlSelectHelper {
                 }
                 if (withSelect instanceof ParenthesedSelect) {
                     ParenthesedSelect parenthesedSelect = (ParenthesedSelect) withSelect;
-                    PlainSelect withPlainSelect = parenthesedSelect.getPlainSelect();
-                    plainSelectList.add(withPlainSelect);
+                    List<PlainSelect> plainSelects = new ArrayList<>();
+                    SqlReplaceHelper.getFromSelect(parenthesedSelect, plainSelects);
+                    plainSelectList.addAll(plainSelects);
                 }
             }
         }
@@ -704,6 +718,44 @@ public class SqlSelectHelper {
             SetOperationList setOperationList = (SetOperationList) selectStatement;
             if (!CollectionUtils.isEmpty(setOperationList.getSelects())) {
                 return (Table) ((PlainSelect) setOperationList.getSelects().get(0)).getFromItem();
+            }
+        }
+        return null;
+    }
+
+    public static Table getTable(FromItem fromItem) {
+        Table table = null;
+        if (fromItem instanceof Table) {
+            table = (Table) fromItem;
+        } else if (fromItem instanceof ParenthesedSelect) {
+            ParenthesedSelect parenthesedSelect = (ParenthesedSelect) fromItem;
+            if (parenthesedSelect.getSelect() instanceof PlainSelect) {
+                PlainSelect subSelect = (PlainSelect) parenthesedSelect.getSelect();
+                table = getTable(subSelect.getSelectBody());
+            } else if (parenthesedSelect.getSelect() instanceof SetOperationList) {
+                table = getTable(parenthesedSelect.getSelect());
+            }
+        }
+        return table;
+    }
+
+    public static Table getTable(Select select) {
+        if (select == null) {
+            return null;
+        }
+        List<PlainSelect> plainSelectList = getWithItem(select);
+        if (!CollectionUtils.isEmpty(plainSelectList)) {
+            List<PlainSelect> selectList = new ArrayList<>(plainSelectList);
+            Table table = getTable(selectList.get(0));
+            return table;
+        }
+        if (select instanceof PlainSelect) {
+            PlainSelect plainSelect = (PlainSelect) select;
+            return getTable(plainSelect.getFromItem());
+        } else if (select instanceof SetOperationList) {
+            SetOperationList setOperationList = (SetOperationList) select;
+            if (!CollectionUtils.isEmpty(setOperationList.getSelects())) {
+                return getTable(setOperationList.getSelects().get(0));
             }
         }
         return null;
@@ -881,7 +933,9 @@ public class SqlSelectHelper {
             collectSelects(withItem.getSelect(), selects);
         } else if (select instanceof ParenthesedSelect) {
             ParenthesedSelect parenthesedSelect = (ParenthesedSelect) select;
-            collectSelects(parenthesedSelect.getPlainSelect(), selects);
+            List<PlainSelect> plainSelects = new ArrayList<>();
+            SqlReplaceHelper.getFromSelect(parenthesedSelect, plainSelects);
+            plainSelects.forEach(s -> collectSelects(s, selects));
         }
     }
 
@@ -973,6 +1027,15 @@ public class SqlSelectHelper {
         for (SelectItem selectItem : selectItems) {
             selectItem.accept(visitor);
         }
+        if (plainSelect.getHaving() != null) {
+            plainSelect.getHaving().accept(visitor);
+        }
+        if (!CollectionUtils.isEmpty(plainSelect.getOrderByElements())) {
+            for (OrderByElement orderByElement : plainSelect.getOrderByElements()) {
+                orderByElement.getExpression().accept(visitor);
+            }
+        }
+
         return !visitor.getFunctionNames().isEmpty();
     }
 
