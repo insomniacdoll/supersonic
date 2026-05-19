@@ -18,13 +18,17 @@ public class ModelDetail {
 
     private String queryType;
 
+    private String dbType;
+
     private String sqlQuery;
 
     private String tableQuery;
 
+    private String filterSql;
+
     private List<Identify> identifiers = Lists.newArrayList();
 
-    private List<Dim> dimensions = Lists.newArrayList();
+    private List<Dimension> dimensions = Lists.newArrayList();
 
     private List<Measure> measures = Lists.newArrayList();
 
@@ -39,37 +43,12 @@ public class ModelDetail {
         return sqlQuery;
     }
 
-    public List<Dim> filterTimeDims() {
+    public List<Dimension> filterTimeDims() {
         if (CollectionUtils.isEmpty(dimensions)) {
             return Lists.newArrayList();
         }
-        return dimensions.stream()
-                .filter(dim -> DimensionType.time.name().equalsIgnoreCase(dim.getType()))
+        return dimensions.stream().filter(dim -> DimensionType.partition_time.equals(dim.getType()))
                 .collect(Collectors.toList());
-    }
-
-    public List<Field> getFields() {
-        if (!CollectionUtils.isEmpty(fields)) {
-            return fields;
-        }
-        List<Field> fieldList = Lists.newArrayList();
-        //Compatible with older versions
-        if (!CollectionUtils.isEmpty(identifiers)) {
-            fieldList.addAll(identifiers.stream()
-                    .map(identify -> Field.builder().fieldName(identify.getFieldName()).build())
-                    .collect(Collectors.toSet()));
-        }
-        if (!CollectionUtils.isEmpty(dimensions)) {
-            fieldList.addAll(dimensions.stream()
-                    .map(dim -> Field.builder().fieldName(dim.getFieldName()).build())
-                    .collect(Collectors.toSet()));
-        }
-        if (!CollectionUtils.isEmpty(measures)) {
-            fieldList.addAll(measures.stream()
-                    .map(measure -> Field.builder().fieldName(measure.getFieldName()).build())
-                    .collect(Collectors.toSet()));
-        }
-        return fieldList;
     }
 
 }

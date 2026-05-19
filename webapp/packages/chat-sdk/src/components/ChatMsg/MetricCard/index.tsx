@@ -1,5 +1,5 @@
 import { PREFIX_CLS } from '../../../common/constants';
-import { formatByDecimalPlaces, formatMetric, formatNumberWithCN } from '../../../utils/utils';
+import { formatByDataFormatType, formatMetric, formatNumberWithCN } from '../../../utils/utils';
 import ApplyAuth from '../ApplyAuth';
 import { MsgDataType } from '../../../common/type';
 import PeriodCompareItem from './PeriodCompareItem';
@@ -10,17 +10,18 @@ import { useState } from 'react';
 
 type Props = {
   data: MsgDataType;
+  question: string;
   loading: boolean;
   onApplyAuth?: (model: string) => void;
 };
 
-const MetricCard: React.FC<Props> = ({ data, loading, onApplyAuth }) => {
+const MetricCard: React.FC<Props> = ({ data, question, loading, onApplyAuth }) => {
   const { queryMode, queryColumns, queryResults, entityInfo, aggregateInfo } = data;
 
   const { metricInfos } = aggregateInfo || {};
 
   const indicatorColumn = queryColumns?.find(column => column.showType === 'NUMBER');
-  const indicatorColumnName = indicatorColumn?.nameEn || '';
+  const indicatorColumnName = indicatorColumn?.bizName || '';
 
   const { dataFormatType, dataFormat } = indicatorColumn || {};
   const value = queryResults?.[0]?.[indicatorColumnName] || 0;
@@ -39,11 +40,7 @@ const MetricCard: React.FC<Props> = ({ data, loading, onApplyAuth }) => {
   return (
     <div className={matricCardClass}>
       <div className={`${prefixCls}-top-bar`}>
-        {indicatorColumn?.name ? (
-          <div className={`${prefixCls}-indicator-name`}>{indicatorColumn?.name}</div>
-        ) : (
-          <div style={{ height: 10 }} />
-        )}
+        <div className={`${prefixCls}-indicator-name`}>{question}</div>
       </div>
       <Spin spinning={loading}>
         <div className={`${prefixCls}-indicator`}>
@@ -55,10 +52,7 @@ const MetricCard: React.FC<Props> = ({ data, loading, onApplyAuth }) => {
                 {typeof value === 'string' && isNaN(+value)
                   ? value
                   : dataFormatType === 'percent' || dataFormatType === 'decimal'
-                  ? `${formatByDecimalPlaces(
-                      dataFormat?.needMultiply100 ? +value * 100 : value,
-                      dataFormat?.decimalPlaces || 2
-                    )}${dataFormatType === 'percent' ? '%' : ''}`
+                  ? formatByDataFormatType(value, dataFormatType, dataFormat)
                   : isNumber
                   ? formatMetric(value) || '-'
                   : formatNumberWithCN(+value)}

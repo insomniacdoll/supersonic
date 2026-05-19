@@ -1,8 +1,8 @@
 package com.tencent.supersonic.headless.server.rest;
 
 import com.github.pagehelper.PageInfo;
-import com.tencent.supersonic.auth.api.authentication.pojo.User;
 import com.tencent.supersonic.auth.api.authentication.utils.UserHolder;
+import com.tencent.supersonic.common.pojo.User;
 import com.tencent.supersonic.headless.api.pojo.request.ItemValueReq;
 import com.tencent.supersonic.headless.api.pojo.request.TagDeleteReq;
 import com.tencent.supersonic.headless.api.pojo.request.TagFilterPageReq;
@@ -12,12 +12,10 @@ import com.tencent.supersonic.headless.api.pojo.response.TagResp;
 import com.tencent.supersonic.headless.server.persistence.dataobject.TagDO;
 import com.tencent.supersonic.headless.server.pojo.TagFilter;
 import com.tencent.supersonic.headless.server.service.TagMetaService;
-
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-import javax.validation.Valid;
-
 import com.tencent.supersonic.headless.server.service.TagQueryService;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -35,8 +33,7 @@ public class TagController {
     private final TagMetaService tagMetaService;
     private final TagQueryService tagQueryService;
 
-    public TagController(TagMetaService tagMetaService,
-                         TagQueryService tagQueryService) {
+    public TagController(TagMetaService tagMetaService, TagQueryService tagQueryService) {
         this.tagMetaService = tagMetaService;
         this.tagQueryService = tagQueryService;
     }
@@ -51,9 +48,8 @@ public class TagController {
      * @throws Exception
      */
     @PostMapping("/create")
-    public TagResp create(@RequestBody TagReq tagReq,
-                          HttpServletRequest request,
-                          HttpServletResponse response) throws Exception {
+    public TagResp create(@RequestBody TagReq tagReq, HttpServletRequest request,
+            HttpServletResponse response) throws Exception {
         User user = UserHolder.findUser(request, response);
         return tagMetaService.create(tagReq, user);
     }
@@ -69,8 +65,7 @@ public class TagController {
      */
     @PostMapping("/create/batch")
     public Integer createBatch(@RequestBody @Valid List<TagReq> tagReqList,
-                               HttpServletRequest request,
-                               HttpServletResponse response) throws Exception {
+            HttpServletRequest request, HttpServletResponse response) throws Exception {
         User user = UserHolder.findUser(request, response);
         return tagMetaService.createBatch(tagReqList, user);
     }
@@ -86,8 +81,7 @@ public class TagController {
      */
     @PostMapping("/delete/batch")
     public Boolean deleteBatch(@RequestBody @Valid List<TagDeleteReq> tagDeleteReqList,
-                          HttpServletRequest request,
-                          HttpServletResponse response) throws Exception {
+            HttpServletRequest request, HttpServletResponse response) throws Exception {
         User user = UserHolder.findUser(request, response);
         return tagMetaService.deleteBatch(tagDeleteReqList, user);
     }
@@ -102,9 +96,8 @@ public class TagController {
      * @throws Exception
      */
     @DeleteMapping("delete/{id}")
-    public Boolean delete(@PathVariable("id") Long id,
-                          HttpServletRequest request,
-                          HttpServletResponse response) {
+    public Boolean delete(@PathVariable("id") Long id, HttpServletRequest request,
+            HttpServletResponse response) {
         User user = UserHolder.findUser(request, response);
         tagMetaService.delete(id, user);
         return true;
@@ -119,9 +112,8 @@ public class TagController {
      * @return
      */
     @GetMapping("getTag/{id}")
-    public TagResp getTag(@PathVariable("id") Long id,
-                          HttpServletRequest request,
-                          HttpServletResponse response) {
+    public TagResp getTag(@PathVariable("id") Long id, HttpServletRequest request,
+            HttpServletResponse response) {
         User user = UserHolder.findUser(request, response);
         return tagMetaService.getTag(id, user);
     }
@@ -130,19 +122,12 @@ public class TagController {
      * 标签查询
      *
      * @param tagFilter
-     * @param request
-     * @param response
      * @return
-     * @throws Exception
      */
     @PostMapping("/queryTag")
-    public List<TagDO> queryPage(@RequestBody TagFilter tagFilter,
-                                     HttpServletRequest request,
-                                     HttpServletResponse response) throws Exception {
-        User user = UserHolder.findUser(request, response);
-        return tagMetaService.getTagDOList(tagFilter, user);
+    public List<TagDO> queryPage(@RequestBody TagFilter tagFilter) {
+        return tagMetaService.getTagDOList(tagFilter);
     }
-
 
     /**
      * 获取标签值分布信息
@@ -155,8 +140,7 @@ public class TagController {
      */
     @PostMapping("/value/distribution")
     public ItemValueResp queryTagValue(@RequestBody ItemValueReq itemValueReq,
-                                       HttpServletRequest request,
-                                       HttpServletResponse response) throws Exception {
+            HttpServletRequest request, HttpServletResponse response) throws Exception {
         User user = UserHolder.findUser(request, response);
         return tagQueryService.queryTagValue(itemValueReq, user);
     }
@@ -172,10 +156,8 @@ public class TagController {
      */
     @PostMapping("/queryTag/market")
     public PageInfo<TagResp> queryTagMarketPage(@RequestBody TagFilterPageReq tagMarketPageReq,
-                                                HttpServletRequest request,
-                                                HttpServletResponse response) throws Exception {
+            HttpServletRequest request, HttpServletResponse response) throws Exception {
         User user = UserHolder.findUser(request, response);
         return tagMetaService.queryTagMarketPage(tagMarketPageReq, user);
     }
-
 }

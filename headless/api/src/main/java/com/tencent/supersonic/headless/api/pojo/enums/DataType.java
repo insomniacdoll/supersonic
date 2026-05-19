@@ -1,36 +1,43 @@
 package com.tencent.supersonic.headless.api.pojo.enums;
 
-
 import com.tencent.supersonic.common.pojo.Constants;
+
 import java.util.HashSet;
 import java.util.Set;
 
 public enum DataType {
-
     MYSQL("mysql", "mysql", "com.mysql.cj.jdbc.Driver", "`", "`", "'", "'"),
 
-    HIVE2("hive2", "hive", "org.apache.hive.jdbc.HiveDriver", "`", "`", "`", "`"),
+    HIVE2("hive2", "hive", "org.apache.kyuubi.jdbc.KyuubiHiveDriver", "`", "`", "`", "`"),
+
+    KYUUBI("kyuubi", "kyuubi", "org.apache.kyuubi.jdbc.KyuubiHiveDriver", "`", "`", "`", "`"),
 
     ORACLE("oracle", "oracle", "oracle.jdbc.driver.OracleDriver", "\"", "\"", "\"", "\""),
 
-    SQLSERVER("sqlserver", "sqlserver", "com.microsoft.sqlserver.jdbc.SQLServerDriver", "\"", "\"", "\"", "\""),
+    SQLSERVER("sqlserver", "sqlserver", "com.microsoft.sqlserver.jdbc.SQLServerDriver", "\"", "\"",
+            "\"", "\""),
 
-    H2("h2", "h2", "org.h2.Driver", "`", "`", "\"", "\""),
+    H2("H2", "h2", "org.h2.Driver", "`", "`", "\"", "\""),
 
-    PHOENIX("phoenix", "hbase phoenix", "org.apache.phoenix.jdbc.PhoenixDriver", "", "", "\"", "\""),
+    PHOENIX("phoenix", "hbase phoenix", "org.apache.phoenix.jdbc.PhoenixDriver", "", "", "\"",
+            "\""),
 
     MONGODB("mongo", "mongodb", "mongodb.jdbc.MongoDriver", "`", "`", "\"", "\""),
 
-    ELASTICSEARCH("elasticsearch", "elasticsearch", "com.amazon.opendistroforelasticsearch.jdbc.Driver", "", "", "'",
-            "'"),
+    ELASTICSEARCH("elasticsearch", "elasticsearch",
+            "com.amazon.opendistroforelasticsearch.jdbc.Driver", "", "", "'", "'"),
 
     PRESTO("presto", "presto", "com.facebook.presto.jdbc.PrestoDriver", "\"", "\"", "\"", "\""),
 
+    TRINO("trino", "trino", "io.trino.jdbc.TrinoDriver", "\"", "\"", "\"", "\""),
+
     MOONBOX("moonbox", "moonbox", "moonbox.jdbc.MbDriver", "`", "`", "`", "`"),
 
-    CASSANDRA("cassandra", "cassandra", "com.github.adejanovski.cassandra.jdbc.CassandraDriver", "", "", "'", "'"),
+    CASSANDRA("cassandra", "cassandra", "com.github.adejanovski.cassandra.jdbc.CassandraDriver", "",
+            "", "'", "'"),
 
-    CLICKHOUSE("clickhouse", "clickhouse", "ru.yandex.clickhouse.ClickHouseDriver", "", "", "\"", "\""),
+    CLICKHOUSE("clickhouse", "clickhouse", "ru.yandex.clickhouse.ClickHouseDriver", "", "", "\"",
+            "\""),
 
     KYLIN("kylin", "kylin", "org.apache.kylin.jdbc.Driver", "\"", "\"", "\"", "\""),
 
@@ -42,7 +49,9 @@ public enum DataType {
 
     TDENGINE("TAOS", "TAOS", "com.taosdata.jdbc.TSDBDriver", "'", "'", "\"", "\""),
 
-    POSTGRESQL("postgresql", "postgresql", "org.postgresql.Driver", "'", "'", "\"", "\"");
+    POSTGRESQL("postgresql", "postgresql", "org.postgresql.Driver", "'", "'", "\"", "\""),
+
+    DUCKDB("duckdb", "duckdb", "org.duckdb.DuckDBDriver", "'", "'", "\"", "\"");
 
     private String feature;
     private String desc;
@@ -53,7 +62,7 @@ public enum DataType {
     private String aliasSuffix;
 
     DataType(String feature, String desc, String driver, String keywordPrefix, String keywordSuffix,
-             String aliasPrefix, String aliasSuffix) {
+            String aliasPrefix, String aliasSuffix) {
         this.feature = feature;
         this.desc = desc;
         this.driver = driver;
@@ -66,7 +75,8 @@ public enum DataType {
     public static DataType urlOf(String jdbcUrl) throws RuntimeException {
         String url = jdbcUrl.toLowerCase().trim();
         for (DataType dataTypeEnum : values()) {
-            if (url.startsWith(String.format(Constants.JDBC_PREFIX_FORMATTER, dataTypeEnum.feature))) {
+            if (url.startsWith(
+                    String.format(Constants.JDBC_PREFIX_FORMATTER, dataTypeEnum.feature))) {
                 return dataTypeEnum;
             }
         }

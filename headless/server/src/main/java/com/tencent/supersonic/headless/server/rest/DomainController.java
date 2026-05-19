@@ -1,11 +1,13 @@
 package com.tencent.supersonic.headless.server.rest;
 
-import com.tencent.supersonic.auth.api.authentication.pojo.User;
 import com.tencent.supersonic.auth.api.authentication.utils.UserHolder;
+import com.tencent.supersonic.common.pojo.User;
 import com.tencent.supersonic.headless.api.pojo.request.DomainReq;
 import com.tencent.supersonic.headless.api.pojo.request.DomainUpdateReq;
 import com.tencent.supersonic.headless.api.pojo.response.DomainResp;
 import com.tencent.supersonic.headless.server.service.DomainService;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -14,12 +16,9 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
-
 
 @RestController
 @RequestMapping("/api/semantic/domain")
@@ -32,21 +31,17 @@ public class DomainController {
     }
 
     @PostMapping("/createDomain")
-    public Boolean createDomain(@RequestBody DomainReq domainReq,
-                                HttpServletRequest request,
-                                HttpServletResponse response) {
+    public DomainResp createDomain(@RequestBody DomainReq domainReq, HttpServletRequest request,
+            HttpServletResponse response) {
         User user = UserHolder.findUser(request, response);
-        domainService.createDomain(domainReq, user);
-        return true;
+        return domainService.createDomain(domainReq, user);
     }
 
     @PostMapping("/updateDomain")
-    public Boolean updateDomain(@RequestBody DomainUpdateReq domainUpdateReq,
-                                HttpServletRequest request,
-                                HttpServletResponse response) {
+    public DomainResp updateDomain(@RequestBody DomainUpdateReq domainUpdateReq,
+            HttpServletRequest request, HttpServletResponse response) {
         User user = UserHolder.findUser(request, response);
-        domainService.updateDomain(domainUpdateReq, user);
-        return true;
+        return domainService.updateDomain(domainUpdateReq, user);
     }
 
     @DeleteMapping("/deleteDomain/{domainId}")
@@ -57,7 +52,7 @@ public class DomainController {
 
     @GetMapping("/getDomainList")
     public List<DomainResp> getDomainList(HttpServletRequest request,
-                                          HttpServletResponse response) {
+            HttpServletResponse response) {
         User user = UserHolder.findUser(request, response);
         return domainService.getDomainListWithAdminAuth(user);
     }
@@ -72,5 +67,4 @@ public class DomainController {
         return domainService.getDomainList(Arrays.stream(domainIds.split(",")).map(Long::parseLong)
                 .collect(Collectors.toList()));
     }
-
 }

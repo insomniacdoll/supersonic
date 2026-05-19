@@ -1,13 +1,20 @@
 package com.tencent.supersonic.headless.core.utils;
 
-import static com.tencent.supersonic.common.pojo.Constants.AT_SYMBOL;
+import javax.sql.DataSource;
 
 import com.tencent.supersonic.common.pojo.QueryColumn;
 import com.tencent.supersonic.common.util.DateUtils;
 import com.tencent.supersonic.headless.api.pojo.enums.DataType;
+import com.tencent.supersonic.headless.api.pojo.response.DatabaseResp;
 import com.tencent.supersonic.headless.api.pojo.response.SemanticQueryResp;
-import com.tencent.supersonic.headless.core.pojo.Database;
 import com.tencent.supersonic.headless.core.pojo.JdbcDataSource;
+import lombok.Getter;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.stereotype.Component;
+
 import java.rmi.ServerException;
 import java.sql.Connection;
 import java.sql.ResultSet;
@@ -16,36 +23,25 @@ import java.sql.SQLException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import javax.sql.DataSource;
-import lombok.Getter;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.stereotype.Component;
+import java.util.*;
 
-/**
- * tools functions about sql query
- */
+import static com.tencent.supersonic.common.pojo.Constants.AT_SYMBOL;
+
+/** tools functions about sql query */
 @Slf4j
 @Component
 public class SqlUtils {
 
     @Getter
-    private Database database;
+    private DatabaseResp database;
 
     @Autowired
     private JdbcDataSource jdbcDataSource;
 
-    @Value("${source.result-limit:1000000}")
+    @Value("${s2.source.result-limit:1000000}")
     private int resultLimit;
 
-    @Value("${source.enable-query-log:false}")
+    @Value("${s2.source.enable-query-log:false}")
     private boolean isQueryLogEnable;
 
     @Getter
@@ -54,28 +50,20 @@ public class SqlUtils {
     @Getter
     private JdbcDataSourceUtils jdbcDataSourceUtils;
 
-    public SqlUtils() {
+    public SqlUtils() {}
 
-    }
-
-    public SqlUtils(Database database) {
+    public SqlUtils(DatabaseResp database) {
         this.database = database;
         this.dataTypeEnum = DataType.urlOf(database.getUrl());
     }
 
-    public SqlUtils init(Database database) {
-        //todo Password decryption
-        return SqlUtilsBuilder
-                .getBuilder()
+    public SqlUtils init(DatabaseResp database) {
+        return SqlUtilsBuilder.getBuilder()
                 .withName(database.getId() + AT_SYMBOL + database.getName())
-                .withType(database.getType())
-                .withJdbcUrl(database.getUrl())
-                .withUsername(database.getUsername())
-                .withPassword(database.getPassword())
-                .withJdbcDataSource(this.jdbcDataSource)
-                .withResultLimit(this.resultLimit)
-                .withIsQueryLogEnable(this.isQueryLogEnable)
-                .build();
+                .withType(database.getType()).withJdbcUrl(database.getUrl())
+                .withUsername(database.getUsername()).withPassword(database.getPassword())
+                .withJdbcDataSource(this.jdbcDataSource).withResultLimit(this.resultLimit)
+                .withIsQueryLogEnable(this.isQueryLogEnable).build();
     }
 
     public List<Map<String, Object>> execute(String sql) throws ServerException {
@@ -147,10 +135,11 @@ public class SqlUtils {
         return data;
     }
 
-    private Map<String, Object> getLineData(ResultSet rs, List<QueryColumn> queryColumns) throws SQLException {
+    private Map<String, Object> getLineData(ResultSet rs, List<QueryColumn> queryColumns)
+            throws SQLException {
         Map<String, Object> map = new LinkedHashMap<>();
         for (QueryColumn queryColumn : queryColumns) {
-            String colName = queryColumn.getNameEn();
+            String colName = queryColumn.getBizName();
             Object value = rs.getObject(colName);
             map.put(colName, getValue(value));
         }
@@ -160,10 +149,10 @@ public class SqlUtils {
     private Object getValue(Object value) {
         if (value instanceof LocalDate) {
             LocalDate localDate = (LocalDate) value;
-            return localDate.format(DateTimeFormatter.ofPattern(DateUtils.DATE_FORMAT));
+            return localDate.format(DateTimeFormatter.ofPattern(DateUtils.DEFAULT_DATE_FORMAT));
         } else if (value instanceof LocalDateTime) {
             LocalDateTime localDateTime = (LocalDateTime) value;
-            return localDateTime.format(DateTimeFormatter.ofPattern(DateUtils.TIME_FORMAT));
+            return localDateTime.format(DateTimeFormatter.ofPattern(DateUtils.DEFAULT_TIME_FORMAT));
         } else if (value instanceof Date) {
             Date date = (Date) value;
             return DateUtils.format(date);
@@ -184,9 +173,7 @@ public class SqlUtils {
         private String username;
         private String password;
 
-        private SqlUtilsBuilder() {
-
-        }
+        private SqlUtilsBuilder() {}
 
         public static SqlUtilsBuilder getBuilder() {
             return new SqlUtilsBuilder();
@@ -233,13 +220,9 @@ public class SqlUtils {
         }
 
         public SqlUtils build() {
-            Database database = Database.builder()
-                    .name(this.name)
-                    .type(this.type)
-                    .url(this.jdbcUrl)
-                    .username(this.username)
-                    .password(this.password)
-                    .build();
+            DatabaseResp database = DatabaseResp.builder().name(this.name)
+                    .type(this.type.toUpperCase()).url(this.jdbcUrl).username(this.username)
+                    .password(this.password).build();
 
             SqlUtils sqlUtils = new SqlUtils(database);
             sqlUtils.jdbcDataSource = this.jdbcDataSource;

@@ -7,6 +7,7 @@ import com.tencent.supersonic.headless.api.pojo.enums.VariableValueType;
 import com.tencent.supersonic.headless.core.utils.SqlVariableParseUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+
 import java.util.List;
 
 public class SqlVariableParseUtilsTest {
@@ -26,7 +27,21 @@ public class SqlVariableParseUtilsTest {
         String sql = "select * from t_$interval$ where id = $id$ and name = $name$";
         List<SqlVariable> variables = Lists.newArrayList(mockNumSqlVariable(),
                 mockExprSqlVariable(), mockStrSqlVariable());
-        List<Param> params = Lists.newArrayList(mockIdParam(), mockNameParam(), mockIntervalParam());
+        List<Param> params =
+                Lists.newArrayList(mockIdParam(), mockNameParam(), mockIntervalParam());
+        String actualSql = SqlVariableParseUtils.parse(sql, variables, params);
+        String expectedSql = "select * from t_wk where id = 2 and name = 'alice'";
+        Assertions.assertEquals(expectedSql, actualSql);
+    }
+
+    @Test
+    void testParseSql_if() {
+        String sql =
+                "select * from t_$interval$ where id = $id$ $if(name)$and name = $name$$endif$";
+        List<SqlVariable> variables = Lists.newArrayList(mockNumSqlVariable(),
+                mockExprSqlVariable(), mockStrSqlVariable());
+        List<Param> params =
+                Lists.newArrayList(mockIdParam(), mockNameParam(), mockIntervalParam());
         String actualSql = SqlVariableParseUtils.parse(sql, variables, params);
         String expectedSql = "select * from t_wk where id = 2 and name = 'alice'";
         Assertions.assertEquals(expectedSql, actualSql);
@@ -44,7 +59,8 @@ public class SqlVariableParseUtilsTest {
         return mockSqlVariable("interval", VariableValueType.EXPR, "d");
     }
 
-    private SqlVariable mockSqlVariable(String name, VariableValueType variableValueType, Object value) {
+    private SqlVariable mockSqlVariable(String name, VariableValueType variableValueType,
+            Object value) {
         SqlVariable sqlVariable = new SqlVariable();
         sqlVariable.setName(name);
         sqlVariable.setValueType(variableValueType);
@@ -67,5 +83,4 @@ public class SqlVariableParseUtilsTest {
     private Param mockParam(String name, String value) {
         return new Param(name, value);
     }
-
 }

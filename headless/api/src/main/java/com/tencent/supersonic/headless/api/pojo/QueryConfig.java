@@ -2,12 +2,13 @@ package com.tencent.supersonic.headless.api.pojo;
 
 import lombok.Data;
 
+import java.io.Serializable;
+
 @Data
-public class QueryConfig {
+public class QueryConfig implements Serializable {
 
-    private TagTypeDefaultConfig tagTypeDefaultConfig = new TagTypeDefaultConfig();
+    private DetailTypeDefaultConfig detailTypeDefaultConfig = new DetailTypeDefaultConfig();
 
-    private MetricTypeDefaultConfig metricTypeDefaultConfig = new MetricTypeDefaultConfig();
-
-
+    private AggregateTypeDefaultConfig aggregateTypeDefaultConfig =
+            new AggregateTypeDefaultConfig();
 }

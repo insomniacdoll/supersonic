@@ -3,7 +3,7 @@ package com.tencent.supersonic.headless.server.service.impl;
 import com.github.pagehelper.PageHelper;
 import com.github.pagehelper.PageInfo;
 import com.google.common.collect.Lists;
-import com.tencent.supersonic.auth.api.authentication.pojo.User;
+import com.tencent.supersonic.common.pojo.User;
 import com.tencent.supersonic.common.pojo.enums.AuthType;
 import com.tencent.supersonic.common.pojo.enums.TypeEnums;
 import com.tencent.supersonic.headless.api.pojo.SchemaElementType;
@@ -59,9 +59,9 @@ public class TagMetaServiceImpl implements TagMetaService {
     private final DomainService domainService;
 
     public TagMetaServiceImpl(TagRepository tagRepository, ModelService modelService,
-                              CollectService collectService, @Lazy DimensionService dimensionService,
-                              @Lazy MetricService metricService, TagObjectService tagObjectService,
-                              DomainService domainService) {
+            CollectService collectService, @Lazy DimensionService dimensionService,
+            @Lazy MetricService metricService, TagObjectService tagObjectService,
+            DomainService domainService) {
         this.tagRepository = tagRepository;
         this.modelService = modelService;
         this.collectService = collectService;
@@ -133,12 +133,11 @@ public class TagMetaServiceImpl implements TagMetaService {
 
     @Override
     public List<TagResp> getTags(TagFilter tagFilter) {
-        List<TagResp> tagRespList = tagRepository.queryTagRespList(tagFilter);
-        return tagRespList;
+        return tagRepository.queryTagRespList(tagFilter);
     }
 
     @Override
-    public List<TagDO> getTagDOList(TagFilter tagFilter, User user) {
+    public List<TagDO> getTagDOList(TagFilter tagFilter) {
         return tagRepository.getTagDOList(tagFilter);
     }
 
@@ -157,18 +156,24 @@ public class TagMetaServiceImpl implements TagMetaService {
         }
 
         if (Objects.nonNull(tagMarketPageReq.getTagObjectId())) {
-            modelRespList = modelRespList.stream()
-                    .filter(modelResp -> tagMarketPageReq.getTagObjectId().equals(modelResp.getTagObjectId()))
-                    .collect(Collectors.toList());
+            modelRespList =
+                    modelRespList.stream()
+                            .filter(modelResp -> tagMarketPageReq.getTagObjectId()
+                                    .equals(modelResp.getTagObjectId()))
+                            .collect(Collectors.toList());
         }
-        List<Long> modelIds = modelRespList.stream().map(model -> model.getId()).collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(modelRespList)) {
+            return new PageInfo<TagResp>();
+        }
+        List<Long> modelIds =
+                modelRespList.stream().map(model -> model.getId()).collect(Collectors.toList());
 
         TagFilter tagFilter = new TagFilter();
         BeanUtils.copyProperties(tagMarketPageReq, tagFilter);
-        List<CollectDO> collectList = collectService.getCollectList(user.getName());
+        List<CollectDO> collectList = collectService.getCollectionList(user.getName());
         if (tagMarketPageReq.isHasCollect()) {
-            List<Long> collectIds = collectList.stream()
-                    .filter(collectDO -> SchemaElementType.TAG.name().equalsIgnoreCase(collectDO.getType()))
+            List<Long> collectIds = collectList.stream().filter(
+                    collectDO -> SchemaElementType.TAG.name().equalsIgnoreCase(collectDO.getType()))
                     .map(CollectDO::getCollectId).collect(Collectors.toList());
             if (CollectionUtils.isEmpty(collectIds)) {
                 tagFilter.setIds(Lists.newArrayList(-1L));
@@ -177,9 +182,9 @@ public class TagMetaServiceImpl implements TagMetaService {
             }
         }
         tagFilter.setModelIds(modelIds);
-        PageInfo<TagResp> tagDOPageInfo = PageHelper.startPage(tagMarketPageReq.getCurrent(),
-                tagMarketPageReq.getPageSize())
-                .doSelectPageInfo(() -> getTags(tagFilter));
+        PageInfo<TagResp> tagDOPageInfo =
+                PageHelper.startPage(tagMarketPageReq.getCurrent(), tagMarketPageReq.getPageSize())
+                        .doSelectPageInfo(() -> getTags(tagFilter));
 
         List<TagResp> tagRespList = tagDOPageInfo.getList();
         if (CollectionUtils.isEmpty(tagRespList)) {
@@ -199,8 +204,8 @@ public class TagMetaServiceImpl implements TagMetaService {
         if (CollectionUtils.isEmpty(tagObjects)) {
             return;
         }
-        Map<Long, TagObjectResp> tagObjectMap = tagObjects.stream()
-                .collect(Collectors.toMap(TagObjectResp::getId, tagObject -> tagObject, (v1, v2) -> v2));
+        Map<Long, TagObjectResp> tagObjectMap = tagObjects.stream().collect(
+                Collectors.toMap(TagObjectResp::getId, tagObject -> tagObject, (v1, v2) -> v2));
         if (CollectionUtils.isNotEmpty(tagRespList)) {
             tagRespList.stream().forEach(tagResp -> {
                 if (tagObjectMap.containsKey(tagResp.getTagObjectId())) {
@@ -280,28 +285,29 @@ public class TagMetaServiceImpl implements TagMetaService {
                 }
             }
             modelRespList.add(modelResp);
-
         }
         return modelRespList;
     }
 
     private void fillModelInfo(List<TagResp> tagRespList) {
-        List<Long> modelIds = tagRespList.stream().map(TagResp::getModelId)
-                .collect(Collectors.toList());
+        List<Long> modelIds =
+                tagRespList.stream().map(TagResp::getModelId).collect(Collectors.toList());
         ModelFilter modelFilter = new ModelFilter(false, modelIds);
         Map<Long, ModelResp> modelIdAndRespMap = modelService.getModelMap(modelFilter);
         tagRespList.stream().forEach(tagResp -> {
-            if (Objects.nonNull(modelIdAndRespMap) && modelIdAndRespMap.containsKey(tagResp.getModelId())) {
+            if (Objects.nonNull(modelIdAndRespMap)
+                    && modelIdAndRespMap.containsKey(tagResp.getModelId())) {
                 tagResp.setModelName(modelIdAndRespMap.get(tagResp.getModelId()).getName());
                 tagResp.setDomainId(modelIdAndRespMap.get(tagResp.getModelId()).getDomainId());
-                tagResp.setTagObjectId(modelIdAndRespMap.get(tagResp.getModelId()).getTagObjectId());
+                tagResp.setTagObjectId(
+                        modelIdAndRespMap.get(tagResp.getModelId()).getTagObjectId());
             }
         });
     }
 
     private TagResp fillCollectAndAdminInfo(TagResp tagResp, User user) {
-        List<Long> collectIds = collectService.getCollectList(user.getName())
-                .stream().filter(collectDO -> TypeEnums.TAG.name().equalsIgnoreCase(collectDO.getType()))
+        List<Long> collectIds = collectService.getCollectionList(user.getName()).stream()
+                .filter(collectDO -> TypeEnums.TAG.name().equalsIgnoreCase(collectDO.getType()))
                 .map(CollectDO::getCollectId).collect(Collectors.toList());
         if (CollectionUtils.isNotEmpty(collectIds) && collectIds.contains(tagResp.getId())) {
             tagResp.setIsCollect(true);
@@ -314,8 +320,8 @@ public class TagMetaServiceImpl implements TagMetaService {
     }
 
     private TagResp fillCollectAndAdminInfo(List<TagResp> tagRespList, User user) {
-        List<Long> collectIds = collectService.getCollectList(user.getName())
-                .stream().filter(collectDO -> TypeEnums.TAG.name().equalsIgnoreCase(collectDO.getType()))
+        List<Long> collectIds = collectService.getCollectionList(user.getName()).stream()
+                .filter(collectDO -> TypeEnums.TAG.name().equalsIgnoreCase(collectDO.getType()))
                 .map(CollectDO::getCollectId).collect(Collectors.toList());
 
         tagRespList.stream().forEach(tagResp -> {
@@ -331,13 +337,16 @@ public class TagMetaServiceImpl implements TagMetaService {
     }
 
     private void fillAdminRes(List<TagResp> tagRespList, User user) {
-        List<ModelResp> modelRespList = modelService.getModelListWithAuth(user, null, AuthType.ADMIN);
+        List<ModelResp> modelRespList =
+                modelService.getModelListWithAuth(user, null, AuthType.ADMIN);
         if (CollectionUtils.isEmpty(modelRespList)) {
             return;
         }
-        Set<Long> modelIdSet = modelRespList.stream().map(ModelResp::getId).collect(Collectors.toSet());
+        Set<Long> modelIdSet =
+                modelRespList.stream().map(ModelResp::getId).collect(Collectors.toSet());
         for (TagResp tagResp : tagRespList) {
-            if (modelIdSet.contains(tagResp.getModelId()) || tagResp.getCreatedBy().equalsIgnoreCase(user.getName())) {
+            if (modelIdSet.contains(tagResp.getModelId())
+                    || tagResp.getCreatedBy().equalsIgnoreCase(user.getName())) {
                 tagResp.setHasAdminRes(true);
             } else {
                 tagResp.setHasAdminRes(false);
@@ -354,7 +363,8 @@ public class TagMetaServiceImpl implements TagMetaService {
 
         List<TagDO> tagRespList = tagRepository.getTagDOList(tagFilter);
         if (!CollectionUtils.isEmpty(tagRespList)) {
-            throw new RuntimeException(String.format("the tag is exit, itemId:%s", tagReq.getItemId()));
+            throw new RuntimeException(
+                    String.format("the tag is exit, itemId:%s", tagReq.getItemId()));
         }
     }
 
@@ -363,16 +373,18 @@ public class TagMetaServiceImpl implements TagMetaService {
             DimensionResp dimension = dimensionService.getDimension(tagReq.getItemId());
             ModelResp model = modelService.getModel(dimension.getModelId());
             if (Objects.isNull(model.getTagObjectId())) {
-                throw new RuntimeException(String.format("this dimension:%s is not supported to create tag,"
-                        + " no related tag object", tagReq.getItemId()));
+                throw new RuntimeException(
+                        String.format("this dimension:%s is not supported to create tag,"
+                                + " no related tag object", tagReq.getItemId()));
             }
         }
         if (TagDefineType.METRIC.equals(tagReq.getTagDefineType())) {
             MetricResp metric = metricService.getMetric(tagReq.getItemId());
             ModelResp model = modelService.getModel(metric.getModelId());
             if (Objects.isNull(model.getTagObjectId())) {
-                throw new RuntimeException(String.format("this metric:%s is not supported to create tag,"
-                        + " no related tag object", tagReq.getItemId()));
+                throw new RuntimeException(String.format(
+                        "this metric:%s is not supported to create tag," + " no related tag object",
+                        tagReq.getItemId()));
             }
         }
     }
@@ -385,18 +397,17 @@ public class TagMetaServiceImpl implements TagMetaService {
     }
 
     @Override
-    public List<TagItem> getTagItems(User user, List<Long> itemIds, TagDefineType tagDefineType) {
+    public List<TagItem> getTagItems(List<Long> itemIds, TagDefineType tagDefineType) {
         TagFilter tagFilter = new TagFilter();
         tagFilter.setTagDefineType(tagDefineType);
         tagFilter.setItemIds(itemIds);
-        Set<Long> dimensionItemSet = getTagDOList(tagFilter, user).stream().map(TagDO::getItemId)
-                .collect(Collectors.toSet());
+        Set<Long> dimensionItemSet =
+                getTagDOList(tagFilter).stream().map(TagDO::getItemId).collect(Collectors.toSet());
         return itemIds.stream().map(entry -> {
-                    TagItem tagItem = new TagItem();
-                    tagItem.setIsTag(Boolean.compare(dimensionItemSet.contains(entry), false));
-                    tagItem.setItemId(entry);
-                    return tagItem;
-                }
-        ).collect(Collectors.toList());
+            TagItem tagItem = new TagItem();
+            tagItem.setIsTag(Boolean.compare(dimensionItemSet.contains(entry), false));
+            tagItem.setItemId(entry);
+            return tagItem;
+        }).collect(Collectors.toList());
     }
 }

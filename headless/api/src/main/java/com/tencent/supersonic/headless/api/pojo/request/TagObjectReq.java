@@ -2,9 +2,9 @@ package com.tencent.supersonic.headless.api.pojo.request;
 
 import com.alibaba.fastjson.JSONObject;
 import com.tencent.supersonic.headless.api.pojo.SchemaItem;
+import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
-import javax.validation.constraints.NotNull;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;

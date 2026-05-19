@@ -27,19 +27,18 @@ public class DataUtils {
     }
 
     public static MetricSchemaResp mockMetric(Long id, String bizName, String name,
-                                        List<DrillDownDimension> drillDownDimensions) {
+            List<DrillDownDimension> drillDownDimensions) {
         MetricSchemaResp metricSchemaResp = new MetricSchemaResp();
         metricSchemaResp.setId(id);
         metricSchemaResp.setName(name);
         metricSchemaResp.setBizName(bizName);
-        metricSchemaResp.setRelateDimension(RelateDimension.builder()
-                .drillDownDimensions(drillDownDimensions).build());
+        metricSchemaResp.setRelateDimension(
+                RelateDimension.builder().drillDownDimensions(drillDownDimensions).build());
         return metricSchemaResp;
     }
 
     public static MetricSchemaResp mockMetric(Long id, String bizName,
-                                              List<DrillDownDimension> drillDownDimensions) {
+            List<DrillDownDimension> drillDownDimensions) {
         return mockMetric(id, bizName, null, drillDownDimensions);
     }
-
 }

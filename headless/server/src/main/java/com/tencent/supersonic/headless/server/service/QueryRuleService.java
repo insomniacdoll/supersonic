@@ -1,6 +1,6 @@
 package com.tencent.supersonic.headless.server.service;
 
-import com.tencent.supersonic.auth.api.authentication.pojo.User;
+import com.tencent.supersonic.common.pojo.User;
 import com.tencent.supersonic.headless.api.pojo.request.QueryRuleFilter;
 import com.tencent.supersonic.headless.api.pojo.request.QueryRuleReq;
 import com.tencent.supersonic.headless.api.pojo.response.QueryRuleResp;
@@ -18,5 +18,4 @@ public interface QueryRuleService {
     QueryRuleResp getQueryRuleById(Long id, User user);
 
     List<QueryRuleResp> getQueryRuleList(QueryRuleFilter queryRuleFilter, User user);
-
 }

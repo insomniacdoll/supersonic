@@ -8,37 +8,28 @@ import org.springframework.context.annotation.Configuration;
 @Data
 public class EmbeddingConfig {
 
-    @Value("${embedding.url:}")
-    private String url;
+    @Value("${s2.embedding.memory.collection.prefix:memory_}")
+    private String memoryCollectionPrefix;
 
-    @Value("${embedding.recognize.path:/preset_query_retrival}")
-    private String recognizePath;
-
-    @Value("${embedding.preset.collection:preset_query_collection}")
+    @Value("${s2.embedding.preset.collection:preset_query_collection}")
     private String presetCollection;
 
-    @Value("${embedding.meta.collection:meta_collection}")
+    @Value("${s2.embedding.meta.collection:meta_collection}")
     private String metaCollectionName;
 
-    @Value("${embedding.nResult:1}")
+    @Value("${s2.embedding.nResult:1}")
     private int nResult;
 
-    @Value("${embedding.solved.query.collection:solved_query_collection}")
-    private String solvedQueryCollection;
-
-    @Value("${embedding.solved.query.nResult:5}")
-    private int solvedQueryResultNum;
-
-    @Value("${embedding.metric.analyzeQuery.collection:solved_query_collection}")
+    @Value("${s2.embedding.metric.analyzeQuery.collection:solved_query_collection}")
     private String metricAnalyzeQueryCollection;
 
     @Value("${text2sql.collection.name:text2dsl_agent_collection}")
     private String text2sqlCollectionName;
 
-    @Value("${embedding.metric.analyzeQuery.nResult:5}")
+    @Value("${s2.embedding.metric.analyzeQuery.nResult:5}")
     private int metricAnalyzeQueryResultNum;
 
-    @Value("${inMemoryEmbeddingStore.persistent.path:/tmp}")
-    private String embeddingStorePersistentPath;
-
+    public String getMemoryCollectionName(Integer agentId) {
+        return memoryCollectionPrefix + agentId;
+    }
 }

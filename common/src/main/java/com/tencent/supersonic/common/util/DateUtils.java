@@ -1,7 +1,11 @@
 package com.tencent.supersonic.common.util;
 
-import com.tencent.supersonic.common.pojo.Constants;
+import com.google.common.collect.Lists;
+import com.tencent.supersonic.common.pojo.enums.DatePeriodEnum;
+import lombok.extern.slf4j.Slf4j;
+
 import java.text.DateFormat;
+import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -16,22 +20,18 @@ import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
 import java.util.Objects;
-import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 public class DateUtils {
 
-    public static final String DATE_FORMAT = "yyyy-MM-dd";
-    public static final String TIME_FORMAT = "yyyy-MM-dd HH:mm:ss";
-    public static final String FORMAT = "yyyyMMddHHmmss";
-
-    public static Integer currentYear() {
-        Date date = new Date();
-        SimpleDateFormat dateFormat = new SimpleDateFormat(DATE_FORMAT);
-        String time = dateFormat.format(date).replaceAll("-", "");
-        int year = Integer.parseInt(time.substring(0, 4));
-        return year;
-    }
+    public static final String DEFAULT_DATE_FORMAT = "yyyy-MM-dd";
+    public static final String DEFAULT_TIME_FORMAT = "yyyy-MM-dd HH:mm:ss";
+    private static final DateTimeFormatter DEFAULT_DATE_FORMATTER2 =
+            DateTimeFormatter.ofPattern(DEFAULT_DATE_FORMAT);
+    private static final SimpleDateFormat DEFAULT_DATE_FORMATTER =
+            new SimpleDateFormat(DEFAULT_DATE_FORMAT);
+    private static final SimpleDateFormat DEFAULT_TIME_FORMATTER =
+            new SimpleDateFormat(DEFAULT_DATE_FORMAT);
 
     public static DateTimeFormatter getDateFormatter(String date, String[] formats) {
         for (int i = 0; i < formats.length; i++) {
@@ -40,8 +40,8 @@ public class DateUtils {
             try {
                 dateFormat.parse(date);
                 return DateTimeFormatter.ofPattern(format);
-            } catch (Exception e) {
-                log.info("date parse has a exception:{}", e.toString());
+            } catch (ParseException e) {
+                log.warn("date parse has a exception:{}", e.toString());
             }
         }
         return DateTimeFormatter.ofPattern(formats[0]);
@@ -54,52 +54,66 @@ public class DateUtils {
                 DateTimeFormatter dateTimeFormatter = DateTimeFormatter.ofPattern(format);
                 LocalDateTime.parse(date, dateTimeFormatter);
                 return dateTimeFormatter;
-            } catch (Exception e) {
-                log.info("date parse has a exception:{}", e.toString());
+            } catch (DateTimeParseException e) {
+                log.warn("date parse has a exception:{}", e.toString());
             }
         }
         return DateTimeFormatter.ofPattern(formats[0]);
     }
 
     public static String getBeforeDate(int intervalDay) {
-        Calendar calendar = Calendar.getInstance();
-        calendar.setTime(new Date());
-        calendar.add(Calendar.DAY_OF_MONTH, -intervalDay);
-        SimpleDateFormat dateFormat = new SimpleDateFormat(DATE_FORMAT);
-        return dateFormat.format(calendar.getTime());
+        return getBeforeDate(intervalDay, DatePeriodEnum.DAY);
     }
 
     public static String getBeforeDate(int intervalDay, DatePeriodEnum datePeriodEnum) {
         if (Objects.isNull(datePeriodEnum)) {
-            return getBeforeDate(intervalDay);
+            datePeriodEnum = DatePeriodEnum.DAY;
         }
-        SimpleDateFormat dateFormat = new SimpleDateFormat(DATE_FORMAT);
+        SimpleDateFormat dateFormat = new SimpleDateFormat(DEFAULT_DATE_FORMAT);
         String currentDate = dateFormat.format(new Date());
         return getBeforeDate(currentDate, intervalDay, datePeriodEnum);
     }
 
-    public static String getBeforeDate(String date, int intervalDay, DatePeriodEnum datePeriodEnum) {
-        DateTimeFormatter dateTimeFormatter = DateTimeFormatter.ofPattern(DATE_FORMAT);
-        LocalDate currentDate = LocalDate.parse(date, dateTimeFormatter);
+    public static String getBeforeDate(String currentDate, DatePeriodEnum datePeriodEnum) {
+        LocalDate specifiedDate = parseDate(currentDate);
+        LocalDate startDate;
+        switch (datePeriodEnum) {
+            case MONTH:
+                startDate = specifiedDate.withDayOfMonth(1);
+                break;
+            case YEAR:
+                startDate = specifiedDate.withDayOfYear(1);
+                break;
+            default:
+                startDate = specifiedDate;
+        }
+
+        return startDate.format(DEFAULT_DATE_FORMATTER2);
+    }
+
+    public static String getBeforeDate(String currentDate, int intervalDay,
+            DatePeriodEnum datePeriodEnum) {
+        LocalDate specifiedDate = parseDate(currentDate);
         LocalDate result = null;
         switch (datePeriodEnum) {
             case DAY:
-                result = currentDate.minusDays(intervalDay);
+                result = specifiedDate.minusDays(intervalDay);
                 break;
             case WEEK:
-                result = currentDate.minusWeeks(intervalDay);
+                result = specifiedDate.minusWeeks(intervalDay);
                 if (intervalDay == 0) {
-                    result = result.with(TemporalAdjusters.previousOrSame(java.time.DayOfWeek.MONDAY));
+                    result = result
+                            .with(TemporalAdjusters.previousOrSame(java.time.DayOfWeek.MONDAY));
                 }
                 break;
             case MONTH:
-                result = currentDate.minusMonths(intervalDay);
+                result = specifiedDate.minusMonths(intervalDay);
                 if (intervalDay == 0) {
                     result = result.with(TemporalAdjusters.firstDayOfMonth());
                 }
                 break;
             case QUARTER:
-                result = currentDate.minusMonths(intervalDay * 3L);
+                result = specifiedDate.minusMonths(intervalDay * 3L);
                 if (intervalDay == 0) {
                     TemporalAdjuster firstDayOfQuarter = temporal -> {
                         LocalDate tempDate = LocalDate.from(temporal);
@@ -112,7 +126,7 @@ public class DateUtils {
                 }
                 break;
             case YEAR:
-                result = currentDate.minusYears(intervalDay);
+                result = specifiedDate.minusYears(intervalDay);
                 if (intervalDay == 0) {
                     result = result.with(TemporalAdjusters.firstDayOfYear());
                 }
@@ -120,17 +134,18 @@ public class DateUtils {
             default:
         }
         if (Objects.nonNull(result)) {
-            return result.format(DateTimeFormatter.ofPattern(DATE_FORMAT));
+            return result.format(DEFAULT_DATE_FORMATTER2);
         }
+
         return null;
     }
 
     public static String format(Date date) {
         DateFormat dateFormat;
         if (containsTime(date)) {
-            dateFormat = new SimpleDateFormat(DateUtils.TIME_FORMAT);
+            dateFormat = DEFAULT_TIME_FORMATTER;
         } else {
-            dateFormat = new SimpleDateFormat(DateUtils.DATE_FORMAT);
+            dateFormat = DEFAULT_DATE_FORMATTER;
         }
         return dateFormat.format(date);
     }
@@ -146,30 +161,49 @@ public class DateUtils {
         return !timeString.equals("00:00:00");
     }
 
-    public static List<String> getDateList(String startDateStr, String endDateStr, String period) {
-        LocalDate startDate = LocalDate.parse(startDateStr);
-        LocalDate endDate = LocalDate.parse(endDateStr);
-
-        List<String> datesInRange = new ArrayList<>();
-        LocalDate currentDate = startDate;
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM");
-        while (!currentDate.isAfter(endDate)) {
-            if (Constants.MONTH.equals(period)) {
-                datesInRange.add(currentDate.format(formatter));
-                currentDate = currentDate.plusMonths(1);
-            } else if (Constants.WEEK.equals(period)) {
-                datesInRange.add(currentDate.format(DateTimeFormatter.ISO_DATE));
-                currentDate = currentDate.plusWeeks(1);
-            } else {
-                datesInRange.add(currentDate.format(DateTimeFormatter.ISO_DATE));
-                currentDate = currentDate.plusDays(1);
+    public static LocalDate parseDate(String timeString) {
+        DateTimeFormatter[] dateFormatters =
+                {DateTimeFormatter.ofPattern("yyyyMMdd"), DateTimeFormatter.ofPattern("yyyy-MM-dd"),
+                                DateTimeFormatter.ofPattern("yyyy/MM/dd"),
+                                DateTimeFormatter.ofPattern("yyyy-MM")};
+        for (DateTimeFormatter formatter : dateFormatters) {
+            try {
+                return LocalDate.parse(timeString, formatter);
+            } catch (DateTimeParseException ignored) {
             }
         }
-        return datesInRange;
+        return null;
+    }
+
+    public static List<String> getDateList(String startDateStr, String endDateStr,
+            DatePeriodEnum period) {
+        try {
+            LocalDate startDate = parseDate(startDateStr);
+            LocalDate endDate = parseDate(endDateStr);
+            List<String> datesInRange = new ArrayList<>();
+            LocalDate currentDate = startDate;
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM");
+            while (!currentDate.isAfter(endDate)) {
+                if (DatePeriodEnum.MONTH.equals(period)) {
+                    datesInRange.add(currentDate.format(formatter));
+                    currentDate = currentDate.plusMonths(1);
+                } else if (DatePeriodEnum.WEEK.equals((period))) {
+                    datesInRange.add(currentDate.format(DateTimeFormatter.ISO_DATE));
+                    currentDate = currentDate.plusWeeks(1);
+                } else {
+                    datesInRange.add(currentDate.format(DateTimeFormatter.ISO_DATE));
+                    currentDate = currentDate.plusDays(1);
+                }
+            }
+            return datesInRange;
+        } catch (Exception e) {
+            log.info("parse date failed, startDate:{}, endDate:{}", startDateStr, endDateStr, e);
+        }
+        return Lists.newArrayList();
     }
 
     public static boolean isAnyDateString(String value) {
-        List<String> formats = Arrays.asList("yyyy-MM-dd", "yyyy-MM", "yyyy/MM/dd");
+        List<String> formats = Arrays.asList("yyyy-MM-dd", "yyyy-MM", "yyyy/MM/dd", "yyyyMMdd");
         return isAnyDateString(value, formats);
     }
 
@@ -180,6 +214,13 @@ public class DateUtils {
             }
         }
         return false;
+    }
+
+    public static Long calculateDiffMs(Date createAt) {
+        Calendar calendar = Calendar.getInstance();
+        Date now = calendar.getTime();
+        long milliseconds = now.getTime() - createAt.getTime();
+        return milliseconds;
     }
 
     public static boolean isDateString(String value, String format) {

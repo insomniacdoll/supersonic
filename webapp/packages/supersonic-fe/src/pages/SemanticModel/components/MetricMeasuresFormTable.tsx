@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Input, Space, Tag } from 'antd';
+import { Input, Space, Tag, Divider } from 'antd';
 import { ProTable } from '@ant-design/pro-components';
-import ProCard from '@ant-design/pro-card';
+import { ProCard } from '@ant-design/pro-components';
 import SqlEditor from '@/components/SqlEditor';
 
 import FormLabelRequire from './FormLabelRequire';
@@ -43,19 +43,49 @@ const MetricMeasuresFormTable: React.FC<Props> = ({
   });
 
   const [selectedKeysMap, setSelectedKeysMap] = useState<Record<string, boolean>>(() => {
+    if (!Array.isArray(measuresParams?.measures)) {
+      return {};
+    }
     return measuresParams.measures.reduce((keyMap: any, item: ISemantic.IMeasure) => {
       keyMap[item.bizName] = true;
       return keyMap;
     }, {});
   });
 
-  useEffect(() => {
+  const getTableData = () => {
     const datasource =
       datasourceId && Array.isArray(measuresList)
         ? measuresList.filter((item) => item.datasourceId === datasourceId)
         : measuresList;
-    setTableData(datasource);
-  }, [measuresList]);
+    const { measures } = measuresParams;
+    if (!Array.isArray(measures)) {
+      return datasource;
+    }
+    const tableData = datasource.map((item) => {
+      const { bizName } = item;
+      const target = measures.find((measureItem) => measureItem.bizName === bizName);
+      if (target) {
+        return {
+          ...item,
+          constraint: target.constraint,
+        };
+      }
+      return item;
+    });
+    return tableData;
+  };
+
+  useEffect(() => {
+    if (measuresParams?.measures) {
+      setSelectedKeys(measuresParams.measures.map((item: ISemantic.IMeasure) => item.bizName));
+    }
+    typeParams?.expr && setExprString(typeParams.expr);
+  }, [measuresParams, typeParams?.expr]);
+
+
+  useEffect(() => {
+    setTableData(getTableData());
+  }, [measuresList, measuresParams]);
 
   useEffect(() => {
     setMeasuresParams({ ...typeParams });
@@ -72,28 +102,34 @@ const MetricMeasuresFormTable: React.FC<Props> = ({
     {
       dataIndex: 'constraint',
       title: '限定条件',
-      width: 250,
+      width: 350,
       tooltip:
         '该限定条件用于在计算指标时限定口径，作用于度量，所用于过滤的维度必须在创建模型的时候被标记为日期或者维度，不需要加where关键字。比如：维度A="值1" and 维度B="值2"',
       render: (_: any, record: any) => {
-        const { constraint, name } = record;
-        const { measures } = measuresParams;
+        const { constraint, bizName } = record;
         return (
           <TextArea
             placeholder="请输入限定条件"
             value={constraint}
+            style={{ height: 42 }}
+            disabled={!selectedKeysMap[bizName]}
             onChange={(event) => {
               const { value } = event.target;
-              const list = measures.map((item: any) => {
-                if (item.name === name) {
-                  return {
-                    ...item,
-                    constraint: value,
-                  };
+
+              const measures = tableData.reduce((list: any[], item) => {
+                if (selectedKeysMap[item.bizName] === true) {
+                  if (item.bizName === bizName) {
+                    list.push({
+                      ...item,
+                      constraint: value,
+                    });
+                  } else {
+                    list.push(item);
+                  }
                 }
-                return item;
-              });
-              onFieldChange?.(list);
+                return list;
+              }, []);
+              onFieldChange?.(measures);
             }}
           />
         );
@@ -102,33 +138,21 @@ const MetricMeasuresFormTable: React.FC<Props> = ({
     {
       dataIndex: 'agg',
       title: '聚合函数',
-      width: 80,
+      width: 150,
     },
   ];
 
   const handleUpdateKeys = (updateKeys: Record<string, boolean>) => {
-    const datasource =
-      datasourceId && Array.isArray(measuresList)
-        ? measuresList.filter((item) => item.datasourceId === datasourceId)
-        : measuresList;
+    const datasource = getTableData();
     setSelectedKeysMap(updateKeys);
     const selectedKeys: string[] = [];
-    const measures = datasource.reduce(
-      (list: any[], { bizName, name, expr, datasourceId, agg }) => {
-        if (updateKeys[bizName] === true) {
-          selectedKeys.push(bizName);
-          list.push({
-            bizName,
-            name,
-            expr,
-            agg,
-            datasourceId,
-          });
-        }
-        return list;
-      },
-      [],
-    );
+    const measures = datasource.reduce((list: any[], item) => {
+      if (updateKeys[item.bizName] === true) {
+        selectedKeys.push(item.bizName);
+        list.push(item);
+      }
+      return list;
+    }, []);
     setSelectedKeys(selectedKeys);
     onFieldChange(measures);
   };
@@ -169,16 +193,13 @@ const MetricMeasuresFormTable: React.FC<Props> = ({
             search: {
               placeholder: '请输入度量名称',
               onSearch: (value: string) => {
-                const datasource =
-                  datasourceId && Array.isArray(measuresList)
-                    ? measuresList.filter((item) => item.datasourceId === datasourceId)
-                    : measuresList;
+                const tableData = getTableData();
                 if (!value) {
-                  setTableData(datasource);
+                  setTableData(tableData);
                   return;
                 }
                 setTableData(
-                  [...datasource].reduce((data: ISemantic.IMeasure[], item: ISemantic.IMeasure) => {
+                  [...tableData].reduce((data: ISemantic.IMeasure[], item: ISemantic.IMeasure) => {
                     if (item.bizName.includes(value)) {
                       data.push(item);
                     }
@@ -189,16 +210,17 @@ const MetricMeasuresFormTable: React.FC<Props> = ({
             },
           }}
           pagination={{ defaultPageSize: 10 }}
-          size="small"
+          // size="small"
           options={false}
           tableAlertRender={false}
-          scroll={{ y: 500 }}
+          scroll={{ y: 700 }}
           rowSelection={rowSelection}
         />
+        <Divider style={{ marginBottom: 0 }} />
         <ProCard
           title={<FormLabelRequire title="表达式" />}
-          // tooltip="由于度量已自带聚合函数，因此通过度量创建指标时，表达式中无需再写聚合函数，如
-          // 通过度量a和度量b来创建指标，由于建模的时候度量a和度量b被指定了聚合函数SUM，因此创建指标时表达式只需要写成 a+b, 而不需要带聚合函数"
+        // tooltip="由于度量已自带聚合函数，因此通过度量创建指标时，表达式中无需再写聚合函数，如
+        // 通过度量a和度量b来创建指标，由于建模的时候度量a和度量b被指定了聚合函数SUM，因此创建指标时表达式只需要写成 a+b, 而不需要带聚合函数"
         >
           <p
             className={styles.desc}

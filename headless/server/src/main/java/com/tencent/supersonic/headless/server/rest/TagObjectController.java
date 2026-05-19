@@ -1,11 +1,13 @@
 package com.tencent.supersonic.headless.server.rest;
 
-import com.tencent.supersonic.auth.api.authentication.pojo.User;
 import com.tencent.supersonic.auth.api.authentication.utils.UserHolder;
+import com.tencent.supersonic.common.pojo.User;
 import com.tencent.supersonic.headless.api.pojo.request.TagObjectReq;
 import com.tencent.supersonic.headless.api.pojo.response.TagObjectResp;
 import com.tencent.supersonic.headless.server.pojo.TagObjectFilter;
 import com.tencent.supersonic.headless.server.service.TagObjectService;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -13,8 +15,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
 import java.util.List;
 
 @RestController
@@ -37,9 +37,8 @@ public class TagObjectController {
      * @throws Exception
      */
     @PostMapping("/create")
-    public TagObjectResp create(@RequestBody TagObjectReq tagObjectReq,
-                                HttpServletRequest request,
-                                HttpServletResponse response) throws Exception {
+    public TagObjectResp create(@RequestBody TagObjectReq tagObjectReq, HttpServletRequest request,
+            HttpServletResponse response) throws Exception {
         User user = UserHolder.findUser(request, response);
         return tagObjectService.create(tagObjectReq, user);
     }
@@ -53,9 +52,8 @@ public class TagObjectController {
      * @return
      */
     @PostMapping("/update")
-    public TagObjectResp update(@RequestBody TagObjectReq tagObjectReq,
-                                HttpServletRequest request,
-                                HttpServletResponse response) {
+    public TagObjectResp update(@RequestBody TagObjectReq tagObjectReq, HttpServletRequest request,
+            HttpServletResponse response) {
         User user = UserHolder.findUser(request, response);
         return tagObjectService.update(tagObjectReq, user);
     }
@@ -70,16 +68,16 @@ public class TagObjectController {
      * @throws Exception
      */
     @DeleteMapping("delete/{id}")
-    public Boolean delete(@PathVariable("id") Long id,
-                          HttpServletRequest request,
-                          HttpServletResponse response) throws Exception {
+    public Boolean delete(@PathVariable("id") Long id, HttpServletRequest request,
+            HttpServletResponse response) throws Exception {
         User user = UserHolder.findUser(request, response);
-        tagObjectService.delete(id, user);
+        tagObjectService.delete(id, user, true);
         return true;
     }
 
     /**
      * 标签对象-查询
+     *
      * @param filter
      * @param request
      * @param response
@@ -88,8 +86,7 @@ public class TagObjectController {
      */
     @PostMapping("/query")
     public List<TagObjectResp> queryTagObject(@RequestBody TagObjectFilter filter,
-                                         HttpServletRequest request,
-                                         HttpServletResponse response) throws Exception {
+            HttpServletRequest request, HttpServletResponse response) throws Exception {
         User user = UserHolder.findUser(request, response);
         return tagObjectService.getTagObjects(filter, user);
     }

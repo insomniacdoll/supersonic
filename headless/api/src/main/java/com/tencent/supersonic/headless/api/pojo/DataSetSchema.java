@@ -1,27 +1,38 @@
 package com.tencent.supersonic.headless.api.pojo;
 
+import lombok.Data;
+import org.apache.commons.lang3.StringUtils;
+
+import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import lombok.Data;
+import java.util.stream.Collectors;
 
 @Data
-public class DataSetSchema {
+public class DataSetSchema implements Serializable {
+
+    private String databaseType;
+    private String databaseVersion;
     private SchemaElement dataSet;
     private Set<SchemaElement> metrics = new HashSet<>();
     private Set<SchemaElement> dimensions = new HashSet<>();
     private Set<SchemaElement> tags = new HashSet<>();
     private Set<SchemaElement> dimensionValues = new HashSet<>();
-    private SchemaElement entity = new SchemaElement();
+    private Set<SchemaElement> terms = new HashSet<>();
     private QueryConfig queryConfig;
+
+    public Long getDataSetId() {
+        return dataSet.getDataSetId();
+    }
 
     public SchemaElement getElement(SchemaElementType elementType, long elementID) {
         Optional<SchemaElement> element = Optional.empty();
 
         switch (elementType) {
-            case ENTITY:
-                element = Optional.ofNullable(entity);
-                break;
             case DATASET:
                 element = Optional.of(dataSet);
                 break;
@@ -37,41 +48,67 @@ public class DataSetSchema {
             case TAG:
                 element = tags.stream().filter(e -> e.getId() == elementID).findFirst();
                 break;
+            case TERM:
+                element = terms.stream().filter(e -> e.getId() == elementID).findFirst();
+                break;
             default:
         }
 
-        if (element.isPresent()) {
-            return element.get();
-        } else {
-            return null;
-        }
+        return element.orElse(null);
     }
 
-    public TimeDefaultConfig getTagTypeTimeDefaultConfig() {
+    public Map<String, String> getBizNameToName() {
+        List<SchemaElement> allElements = new ArrayList<>();
+        allElements.addAll(getDimensions());
+        allElements.addAll(getMetrics());
+        return allElements.stream().collect(Collectors.toMap(SchemaElement::getBizName,
+                SchemaElement::getName, (k1, k2) -> k1));
+    }
+
+    public TimeDefaultConfig getDetailTypeTimeDefaultConfig() {
         if (queryConfig == null) {
             return null;
         }
-        if (queryConfig.getTagTypeDefaultConfig() == null) {
+        if (queryConfig.getDetailTypeDefaultConfig() == null) {
             return null;
         }
-        return queryConfig.getTagTypeDefaultConfig().getTimeDefaultConfig();
+        return queryConfig.getDetailTypeDefaultConfig().getTimeDefaultConfig();
     }
 
     public TimeDefaultConfig getMetricTypeTimeDefaultConfig() {
         if (queryConfig == null) {
             return null;
         }
-        if (queryConfig.getMetricTypeDefaultConfig() == null) {
+        if (queryConfig.getAggregateTypeDefaultConfig() == null) {
             return null;
         }
-        return queryConfig.getMetricTypeDefaultConfig().getTimeDefaultConfig();
+        return queryConfig.getAggregateTypeDefaultConfig().getTimeDefaultConfig();
     }
 
-    public TagTypeDefaultConfig getTagTypeDefaultConfig() {
-        if (queryConfig == null) {
-            return null;
+    public boolean containsPartitionDimensions() {
+        return dimensions.stream().anyMatch(SchemaElement::isPartitionTime);
+    }
+
+    public SchemaElement getPartitionDimension() {
+        return dimensions.stream().filter(SchemaElement::isPartitionTime).findFirst().orElse(null);
+    }
+
+    public SchemaElement getPrimaryKey() {
+        for (SchemaElement dimension : dimensions) {
+            if (dimension.isPrimaryKey()) {
+                return dimension;
+            }
         }
-        return queryConfig.getTagTypeDefaultConfig();
+        return null;
     }
 
+    public String getPartitionTimeFormat() {
+        for (SchemaElement dimension : dimensions) {
+            String partitionTimeFormat = dimension.getPartitionTimeFormat();
+            if (StringUtils.isNotBlank(partitionTimeFormat)) {
+                return partitionTimeFormat;
+            }
+        }
+        return null;
+    }
 }

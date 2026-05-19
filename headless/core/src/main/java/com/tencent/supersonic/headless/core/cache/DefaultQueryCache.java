@@ -1,14 +1,15 @@
 package com.tencent.supersonic.headless.core.cache;
 
-
 import com.tencent.supersonic.common.util.ContextUtils;
 import com.tencent.supersonic.headless.api.pojo.request.SemanticQueryReq;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
+import org.springframework.stereotype.Component;
+
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Component;
 
 @Component
 @Slf4j
@@ -18,7 +19,10 @@ public class DefaultQueryCache implements QueryCache {
         CacheManager cacheManager = ContextUtils.getBean(CacheManager.class);
         if (isCache(semanticQueryReq)) {
             Object result = cacheManager.get(cacheKey);
-            log.info("query from cache, key:{}", cacheKey);
+            if (Objects.nonNull(result)) {
+                log.debug("query from cache, key:{},result:{}", cacheKey,
+                        StringUtils.normalizeSpace(result.toString()));
+            }
             return result;
         }
         return null;
@@ -33,7 +37,7 @@ public class DefaultQueryCache implements QueryCache {
                         log.warn("exception:", exception);
                         return null;
                     });
-            log.info("put to cache, key:{}", cacheKey);
+            log.debug("put to cache, key: {}", cacheKey);
             return true;
         }
         return false;
@@ -47,7 +51,8 @@ public class DefaultQueryCache implements QueryCache {
     }
 
     private String getKeyByModelIds(List<Long> modelIds) {
-        return String.join(",", modelIds.stream().map(Object::toString).collect(Collectors.toList()));
+        return String.join(",",
+                modelIds.stream().map(Object::toString).collect(Collectors.toList()));
     }
 
     private boolean isCache(SemanticQueryReq semanticQueryReq) {
@@ -60,5 +65,4 @@ public class DefaultQueryCache implements QueryCache {
         }
         return false;
     }
-
 }

@@ -12,12 +12,14 @@ import type { RegisterFormDetail } from './components/types';
 import { postUserLogin, userRegister } from './services';
 import { AUTH_TOKEN_KEY } from '@/common/constants';
 import { queryCurrentUser } from '@/services/user';
-import { history, useModel } from 'umi';
+import { history, useModel } from '@umijs/max';
+import CryptoJS from 'crypto-js';
+import { encryptPassword } from '@/utils/utils';
 
 const { Item } = Form;
 const LoginPage: React.FC = () => {
   const [createModalVisible, setCreateModalVisible] = useState<boolean>(false);
-  // const [forgetModalVisible, setForgetModalVisible] = useState<boolean>(false);
+  const encryptKey = CryptoJS.enc.Utf8.parse('supersonic@2024');
   const [form] = useForm();
   const { initialState = {}, setInitialState } = useModel('@@initialState');
   // 通过用户信息进行登录
@@ -39,25 +41,29 @@ const LoginPage: React.FC = () => {
       }
       history.push('/');
       return;
+    } else {
+      message.error(msg);
     }
-    message.success(msg);
   };
 
   // 处理登录按钮响应
   const handleLogin = async () => {
     const { validateFields } = form;
     const content = await validateFields();
-    await loginDone(content);
+    await loginDone({ ...content, password: encryptPassword(content.password, encryptKey) });
   };
 
   // 处理注册弹窗确定按钮
   const handleRegister = async (values: RegisterFormDetail) => {
-    const { code } = await userRegister({ ...values });
+    const enCodeValues = { ...values, password: encryptPassword(values.password, encryptKey) };
+    const { code, msg } = await userRegister(enCodeValues);
     if (code === 200) {
       message.success('注册成功');
       setCreateModalVisible(false);
       // 注册完自动帮用户登录
-      await loginDone(values);
+      await loginDone(enCodeValues);
+    } else {
+      message.error(msg);
     }
   };
 
@@ -103,7 +109,7 @@ const LoginPage: React.FC = () => {
                   <Input
                     size="large"
                     type="password"
-                    placeholder="密码: admin"
+                    placeholder="密码: 123456"
                     onPressEnter={handleLogin}
                     prefix={<LockOutlined />}
                   />

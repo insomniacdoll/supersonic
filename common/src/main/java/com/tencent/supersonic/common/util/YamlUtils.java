@@ -9,11 +9,13 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.fasterxml.jackson.dataformat.yaml.YAMLGenerator;
 import com.fasterxml.jackson.dataformat.yaml.YAMLMapper;
+import lombok.extern.slf4j.Slf4j;
+
 import java.io.IOException;
 import java.util.LinkedHashMap;
 import java.util.List;
 
-
+@Slf4j
 public class YamlUtils {
 
     /**
@@ -30,7 +32,7 @@ public class YamlUtils {
         try {
             return mapper.readValue(yamlStr, clazz);
         } catch (JsonProcessingException e) {
-            e.printStackTrace();
+            log.error("", e);
         }
         return null;
     }
@@ -45,15 +47,14 @@ public class YamlUtils {
         YAMLMapper mapper = new YAMLMapper();
         mapper.findAndRegisterModules();
         mapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
-        mapper.enable(YAMLGenerator.Feature.MINIMIZE_QUOTES).disable(YAMLGenerator.Feature.LITERAL_BLOCK_STYLE);
+        mapper.enable(YAMLGenerator.Feature.MINIMIZE_QUOTES)
+                .disable(YAMLGenerator.Feature.LITERAL_BLOCK_STYLE);
         try {
             String yaml = mapper.writeValueAsString(object);
-            return yaml.replaceAll("\"True\"", "true")
-                    .replaceAll("\"true\"", "true")
-                    .replaceAll("\"false\"", "false")
-                    .replaceAll("\"False\"", "false");
+            return yaml.replaceAll("\"True\"", "true").replaceAll("\"true\"", "true")
+                    .replaceAll("\"false\"", "false").replaceAll("\"False\"", "false");
         } catch (IOException e) {
-            e.printStackTrace();
+            log.error("", e);
         }
         return null;
     }
@@ -63,15 +64,13 @@ public class YamlUtils {
         if (object instanceof List) {
             return toYaml(JSONObject.parseObject(jsonStr, List.class, Feature.OrderedField));
         } else {
-            return toYaml(JSONObject.parseObject(jsonStr, LinkedHashMap.class, Feature.OrderedField));
+            return toYaml(
+                    JSONObject.parseObject(jsonStr, LinkedHashMap.class, Feature.OrderedField));
         }
-
-
     }
 
     /**
-     * （此方法非必要）
-     * json 2 yaml
+     * （此方法非必要） json 2 yaml
      *
      * @param jsonStr json
      * @return yaml
@@ -81,5 +80,4 @@ public class YamlUtils {
         JsonNode jsonNode = new ObjectMapper().readTree(jsonStr);
         return new YAMLMapper().writeValueAsString(jsonNode);
     }
-
 }

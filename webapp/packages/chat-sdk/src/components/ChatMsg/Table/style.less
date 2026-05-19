@@ -26,6 +26,22 @@
     color: var(--text-color-third);
   }
 
+  &-top-bar {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    column-gap: 8px;
+    row-gap: 12px;
+    font-style: italic;
+    margin-bottom: 15px;
+  }
+  &-indicator-name {
+    font-size: 14px;
+    color: var(--text-color);
+    font-weight: 500;
+    margin-top: 2px;
+  }
+
   &-filter-item {
     display: flex;
     align-items: center;
@@ -66,7 +82,11 @@
     background-color: #fafafa !important;
   }
 
-  .ant-table-cell {
+  .ant-table-cell { // 更新修改，解决表格内容太长导致显示的问题
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 250px;
     text-align: center !important;
   }
 

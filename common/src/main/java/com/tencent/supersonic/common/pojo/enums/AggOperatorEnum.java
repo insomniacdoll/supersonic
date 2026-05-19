@@ -1,6 +1,7 @@
 package com.tencent.supersonic.common.pojo.enums;
 
 public enum AggOperatorEnum {
+    NONE(""),
 
     MAX("MAX"),
 
@@ -11,7 +12,9 @@ public enum AggOperatorEnum {
     SUM("SUM"),
 
     COUNT("COUNT"),
+
     COUNT_DISTINCT("COUNT_DISTINCT"),
+
     DISTINCT("DISTINCT"),
 
     TOPN("TOPN"),
@@ -19,6 +22,7 @@ public enum AggOperatorEnum {
     PERCENTILE("PERCENTILE"),
 
     RATIO_ROLL("RATIO_ROLL"),
+
     RATIO_OVER("RATIO_OVER"),
 
     UNKNOWN("UNKNOWN");
@@ -43,14 +47,14 @@ public enum AggOperatorEnum {
     }
 
     /**
-     * Determine if aggType is count_Distinct type
-     * 1.outer SQL parses the count_distinct(field) operator as count(DISTINCT field).
-     * 2.tableSQL generates aggregation that ignores the count_distinct operator.
+     * Determine if aggType is count_Distinct type 1.outer SQL parses the count_distinct(field)
+     * operator as count(DISTINCT field). 2.tableSQL generates aggregation that ignores the
+     * count_distinct operator.
+     *
      * @param aggType aggType
      * @return is count_Distinct type or not
      */
     public static boolean isCountDistinct(String aggType) {
         return null != aggType && aggType.toUpperCase().equals(COUNT_DISTINCT.getOperator());
     }
-
 }

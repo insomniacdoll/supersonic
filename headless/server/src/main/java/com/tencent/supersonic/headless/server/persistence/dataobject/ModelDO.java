@@ -16,6 +16,7 @@ public class ModelDO {
 
     private Long domainId;
 
+    @Deprecated
     private Long tagObjectId;
 
     private String name;
@@ -58,4 +59,5 @@ public class ModelDO {
 
     private String sourceType;
 
+    private String ext;
 }

@@ -7,12 +7,13 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
 public class SemanticSchema implements Serializable {
 
-    private List<DataSetSchema> dataSetSchemaList;
+    private final List<DataSetSchema> dataSetSchemaList;
 
     public SemanticSchema(List<DataSetSchema> dataSetSchemaList) {
         this.dataSetSchemaList = dataSetSchemaList;
@@ -26,9 +27,6 @@ public class SemanticSchema implements Serializable {
         Optional<SchemaElement> element = Optional.empty();
 
         switch (elementType) {
-            case ENTITY:
-                element = getElementsById(elementID, getEntities());
-                break;
             case DATASET:
                 element = getElementsById(elementID, getDataSets());
                 break;
@@ -44,30 +42,29 @@ public class SemanticSchema implements Serializable {
             case TAG:
                 element = getElementsById(elementID, getTags());
                 break;
+            case TERM:
+                element = getElementsById(elementID, getTerms());
+                break;
             default:
         }
 
-        if (element.isPresent()) {
-            return element.get();
-        } else {
-            return null;
-        }
+        return element.orElse(null);
     }
 
     public Map<Long, String> getDataSetIdToName() {
-        return dataSetSchemaList.stream()
-                .collect(Collectors.toMap(a -> a.getDataSet().getId(), a -> a.getDataSet().getName(), (k1, k2) -> k1));
+        return dataSetSchemaList.stream().collect(Collectors.toMap(a -> a.getDataSet().getId(),
+                a -> a.getDataSet().getName(), (k1, k2) -> k1));
     }
 
     public List<SchemaElement> getDimensionValues() {
         List<SchemaElement> dimensionValues = new ArrayList<>();
-        dataSetSchemaList.stream().forEach(d -> dimensionValues.addAll(d.getDimensionValues()));
+        dataSetSchemaList.forEach(d -> dimensionValues.addAll(d.getDimensionValues()));
         return dimensionValues;
     }
 
     public List<SchemaElement> getDimensions() {
         List<SchemaElement> dimensions = new ArrayList<>();
-        dataSetSchemaList.stream().forEach(d -> dimensions.addAll(d.getDimensions()));
+        dataSetSchemaList.forEach(d -> dimensions.addAll(d.getDimensions()));
         return dimensions;
     }
 
@@ -84,7 +81,7 @@ public class SemanticSchema implements Serializable {
 
     public List<SchemaElement> getMetrics() {
         List<SchemaElement> metrics = new ArrayList<>();
-        dataSetSchemaList.stream().forEach(d -> metrics.addAll(d.getMetrics()));
+        dataSetSchemaList.forEach(d -> metrics.addAll(d.getMetrics()));
         return metrics;
     }
 
@@ -93,40 +90,27 @@ public class SemanticSchema implements Serializable {
         return getElementsByDataSetId(dataSetId, metrics);
     }
 
-    public List<SchemaElement> getEntities() {
-        List<SchemaElement> entities = new ArrayList<>();
-        dataSetSchemaList.stream().forEach(d -> entities.add(d.getEntity()));
-        return entities;
-    }
-
-    public List<SchemaElement> getEntities(Long dataSetId) {
-        List<SchemaElement> entities = getEntities();
-        return getElementsByDataSetId(dataSetId, entities);
-    }
-
     public List<SchemaElement> getTags() {
         List<SchemaElement> tags = new ArrayList<>();
-        dataSetSchemaList.stream().forEach(d -> tags.addAll(d.getTags()));
+        dataSetSchemaList.forEach(d -> tags.addAll(d.getTags()));
         return tags;
     }
 
-    public List<SchemaElement> getTags(Long dataSetId) {
-        List<SchemaElement> tags = new ArrayList<>();
-        dataSetSchemaList.stream().filter(schemaElement ->
-                        dataSetId.equals(schemaElement.getDataSet().getDataSet()))
-                .forEach(d -> tags.addAll(d.getTags()));
-        return tags;
+    public List<SchemaElement> getTerms() {
+        List<SchemaElement> terms = new ArrayList<>();
+        dataSetSchemaList.forEach(d -> terms.addAll(d.getTerms()));
+        return terms;
     }
 
-    private List<SchemaElement> getElementsByDataSetId(Long dataSetId, List<SchemaElement> elements) {
+    private List<SchemaElement> getElementsByDataSetId(Long dataSetId,
+            List<SchemaElement> elements) {
         return elements.stream()
-                .filter(schemaElement -> dataSetId.equals(schemaElement.getDataSet()))
+                .filter(schemaElement -> dataSetId.equals(schemaElement.getDataSetId()))
                 .collect(Collectors.toList());
     }
 
     private Optional<SchemaElement> getElementsById(Long id, List<SchemaElement> elements) {
-        return elements.stream()
-                .filter(schemaElement -> id.equals(schemaElement.getId()))
+        return elements.stream().filter(schemaElement -> id.equals(schemaElement.getId()))
                 .findFirst();
     }
 
@@ -137,23 +121,30 @@ public class SemanticSchema implements Serializable {
 
     public List<SchemaElement> getDataSets() {
         List<SchemaElement> dataSets = new ArrayList<>();
-        dataSetSchemaList.stream().forEach(d -> dataSets.add(d.getDataSet()));
+        dataSetSchemaList.forEach(d -> dataSets.add(d.getDataSet()));
         return dataSets;
     }
 
-    public Map<String, String> getBizNameToName(Long dataSetId) {
-        List<SchemaElement> allElements = new ArrayList<>();
-        allElements.addAll(getDimensions(dataSetId));
-        allElements.addAll(getMetrics(dataSetId));
-        return allElements.stream()
-                .collect(Collectors.toMap(SchemaElement::getBizName, SchemaElement::getName, (k1, k2) -> k1));
+    public DataSetSchema getDataSetSchema(Long dataSetId) {
+        return dataSetSchemaList.stream()
+                .filter(dataSetSchema -> dataSetId.equals(dataSetSchema.getDataSetId())).findFirst()
+                .orElse(null);
+    }
+
+    public QueryConfig getQueryConfig(Long dataSetId) {
+        DataSetSchema dataSetSchema = getDataSetSchema(dataSetId);
+        if (Objects.nonNull(dataSetSchema)) {
+            return dataSetSchema.getQueryConfig();
+        }
+        return null;
     }
 
     public Map<Long, DataSetSchema> getDataSetSchemaMap() {
         if (CollectionUtils.isEmpty(dataSetSchemaList)) {
             return new HashMap<>();
         }
-        return dataSetSchemaList.stream().collect(Collectors.toMap(dataSetSchema
-                -> dataSetSchema.getDataSet().getDataSet(), dataSetSchema -> dataSetSchema));
+        return dataSetSchemaList.stream().collect(
+                Collectors.toMap(dataSetSchema -> dataSetSchema.getDataSet().getDataSetId(),
+                        dataSetSchema -> dataSetSchema));
     }
 }

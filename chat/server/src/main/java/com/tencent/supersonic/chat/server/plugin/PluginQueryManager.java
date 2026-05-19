@@ -7,7 +7,7 @@ import java.util.Map;
 
 public class PluginQueryManager {
 
-    private static Map<String, PluginSemanticQuery> pluginQueries = new HashMap<>();
+    private static final Map<String, PluginSemanticQuery> pluginQueries = new HashMap<>();
 
     public static void register(String queryMode, PluginSemanticQuery pluginSemanticQuery) {
         pluginQueries.put(queryMode, pluginSemanticQuery);
@@ -20,5 +20,4 @@ public class PluginQueryManager {
     public static PluginSemanticQuery getPluginQuery(String queryMode) {
         return pluginQueries.get(queryMode);
     }
-
 }

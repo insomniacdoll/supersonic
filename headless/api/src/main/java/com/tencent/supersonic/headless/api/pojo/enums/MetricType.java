@@ -1,15 +1,13 @@
 package com.tencent.supersonic.headless.api.pojo.enums;
 
-
-import com.tencent.supersonic.headless.api.pojo.MeasureParam;
+import com.tencent.supersonic.headless.api.pojo.Measure;
 import com.tencent.supersonic.headless.api.pojo.MetricDefineByMeasureParams;
+
 import java.util.List;
 import java.util.Objects;
 
 public enum MetricType {
-
-    ATOMIC,
-    DERIVED;
+    ATOMIC, DERIVED;
 
     public static MetricType of(String src) {
         for (MetricType metricType : MetricType.values()) {
@@ -20,12 +18,8 @@ public enum MetricType {
         return null;
     }
 
-    public static Boolean isDerived(String src) {
-        MetricType metricType = of(src);
-        return Objects.nonNull(metricType) && metricType.equals(DERIVED);
-    }
-
-    public static Boolean isDerived(MetricDefineType metricDefineType, MetricDefineByMeasureParams typeParams) {
+    public static Boolean isDerived(MetricDefineType metricDefineType,
+            MetricDefineByMeasureParams typeParams) {
         if (MetricDefineType.METRIC.equals(metricDefineType)) {
             return true;
         }
@@ -33,12 +27,12 @@ public enum MetricType {
             return true;
         }
         if (MetricDefineType.MEASURE.equals(metricDefineType)) {
-            List<MeasureParam> measures = typeParams.getMeasures();
+            List<Measure> measures = typeParams.getMeasures();
             if (measures.size() > 1) {
                 return true;
             }
-            if (measures.size() == 1 && measures.get(0).getBizName()
-                    .equalsIgnoreCase(typeParams.getExpr())) {
+            if (measures.size() == 1
+                    && measures.get(0).getBizName().equalsIgnoreCase(typeParams.getExpr())) {
                 return false;
             }
         }

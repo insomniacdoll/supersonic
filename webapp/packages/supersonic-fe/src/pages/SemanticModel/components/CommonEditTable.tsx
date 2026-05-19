@@ -10,10 +10,12 @@ type Props = {
   tableDataSource: any[];
   columnList: any[];
   rowKey?: string;
+  hideCtrlBtn?: string[];
   editableProTableProps?: any;
   onDataSourceChange?: (dataSource: any) => void;
   extenderCtrlColumn?: (text, record, _, action) => ReactNode[];
   editableActionRender?: (row, config, defaultDom, actionRef) => ReactNode[];
+  onRecordSave?: (record: any) => void;
   ref?: any;
 };
 
@@ -29,6 +31,8 @@ const CommonEditTable: React.FC<Props> = forwardRef(
       rowKey,
       tableDataSource,
       editableProTableProps = {},
+      hideCtrlBtn,
+      onRecordSave,
       onDataSourceChange,
       extenderCtrlColumn,
       editableActionRender,
@@ -36,7 +40,7 @@ const CommonEditTable: React.FC<Props> = forwardRef(
     ref: Ref<any>,
   ) => {
     const defaultRowKey = rowKey || 'editRowId';
-    const [dataSource, setDataSource] = useState<any[]>(tableDataSource);
+    const [dataSource, setDataSource] = useState<Record<string, any>[]>(tableDataSource);
     const actionRef = useRef<ActionType>();
 
     useImperativeHandle(ref, () => ({
@@ -72,26 +76,31 @@ const CommonEditTable: React.FC<Props> = forwardRef(
         render: (text, record, _, action) => {
           return (
             <Space>
-              <a
-                key="editable"
-                onClick={() => {
-                  action?.startEditable?.(record.editRowId);
-                }}
-              >
-                编辑
-              </a>
-              <a
-                key="deleteBtn"
-                onClick={() => {
-                  const data = [...dataSource].filter(
-                    (item) => item[defaultRowKey] !== record[defaultRowKey],
-                  );
-                  setDataSource(data);
-                  handleDataSourceChange(data);
-                }}
-              >
-                删除
-              </a>
+              {!hideCtrlBtn?.includes('editable') && (
+                <a
+                  key="editable"
+                  onClick={() => {
+                    action?.startEditable?.(record.editRowId);
+                  }}
+                >
+                  编辑
+                </a>
+              )}
+              {!hideCtrlBtn?.includes('deleteBtn') && (
+                <a
+                  key="deleteBtn"
+                  onClick={() => {
+                    const data = [...dataSource].filter(
+                      (item) => item[defaultRowKey] !== record[defaultRowKey],
+                    );
+                    setDataSource(data);
+                    handleDataSourceChange(data);
+                  }}
+                >
+                  删除
+                </a>
+              )}
+
               {extenderCtrlColumn?.(text, record, _, action)}
             </Space>
           );
@@ -120,7 +129,7 @@ const CommonEditTable: React.FC<Props> = forwardRef(
           tableAlertRender={() => {
             return false;
           }}
-          onChange={(data) => {
+          onChange={(data: any) => {
             let tableData = data;
             if (rowKey) {
               // 如果rowKey存在，将rowId复写为rowKey值
@@ -144,6 +153,7 @@ const CommonEditTable: React.FC<Props> = forwardRef(
                 message.error('存在重复值');
                 return Promise.reject();
               }
+              onRecordSave?.(row);
               return true;
             },
             actionRender: actionRender,

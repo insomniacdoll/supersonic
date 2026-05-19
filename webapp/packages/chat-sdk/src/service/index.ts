@@ -1,7 +1,6 @@
 import axios from './axiosInstance';
 import {
   ChatContextType,
-  EntityInfoType,
   HistoryMsgItemType,
   HistoryType,
   MsgDataType,
@@ -41,18 +40,33 @@ export function chatQuery(queryText: string, chatId?: number, modelId?: number, 
   });
 }
 
-export function chatParse(
-  queryText: string,
-  chatId?: number,
-  modelId?: number,
-  agentId?: number,
-  filters?: any[]
-) {
+export function chatParse({
+  queryText,
+  chatId,
+  modelId,
+  agentId,
+  parseId,
+  queryId,
+  filters,
+  parseInfo,
+}: {
+  queryText: string;
+  chatId?: number;
+  modelId?: number;
+  agentId?: number;
+  queryId?: number;
+  parseId?: number;
+  filters?: any[];
+  parseInfo?: ChatContextType;
+}) {
   return axios.post<ParseDataType>(`${prefix}/chat/query/parse`, {
     queryText,
     chatId: chatId || DEFAULT_CHAT_ID,
     dataSetId: modelId,
     agentId,
+    parseId,
+    queryId,
+    selectedParse: parseInfo,
     queryFilters: filters
       ? {
           filters,
@@ -61,12 +75,28 @@ export function chatParse(
   });
 }
 
-export function chatExecute(queryText: string, chatId: number, parseInfo: ChatContextType) {
+export function chatExecute(
+  queryText: string,
+  chatId: number,
+  parseInfo: ChatContextType,
+  agentId?: number,
+  streamingResult?:boolean
+) {
   return axios.post<MsgDataType>(`${prefix}/chat/query/execute`, {
     queryText,
+    agentId,
     chatId: chatId || DEFAULT_CHAT_ID,
     queryId: parseInfo.queryId,
     parseId: parseInfo.id,
+    streamingResult:streamingResult
+  });
+}
+
+export function getExecuteSummary(
+    queryId: number
+) {
+  return axios.post<MsgDataType>(`${prefix}/chat/query/getExecuteSummary`, {
+    queryId: queryId,
   });
 }
 
@@ -97,6 +127,10 @@ export function querySimilarQuestions(queryId: number) {
   return axios.get<HistoryMsgItemType>(`${prefix}/chat/manage/getChatQuery/${queryId}`);
 }
 
+export function deleteQuery(queryId: number) {
+  return axios.delete<any>(`${prefix}/chat/manage/${queryId}`);
+}
+
 export function queryEntities(entityId: string | number, modelId: number) {
   return axios.post<any>(`${prefix}/chat/query/choice`, {
     entityId,
@@ -124,10 +158,4 @@ export function queryDimensionValues(
     elementID,
     value,
   });
-}
-
-export function queryEntityInfo(queryId: number, parseId: number) {
-  return axios.get<EntityInfoType>(
-    `${prefix}/chat/query/getEntityInfo?queryId=${queryId}&parseId=${parseId}`
-  );
 }

@@ -2,10 +2,12 @@ package com.tencent.supersonic.chat.server.service.impl;
 
 import com.alibaba.fastjson.JSONObject;
 import com.github.pagehelper.PageInfo;
-import com.tencent.supersonic.auth.api.authentication.pojo.User;
-import com.tencent.supersonic.chat.api.pojo.request.ChatExecuteReq;
-import com.tencent.supersonic.chat.api.pojo.request.ChatParseReq;
-import com.tencent.supersonic.chat.api.pojo.request.PageQueryInfoReq;
+import com.tencent.supersonic.chat.api.pojo.enums.MemoryReviewResult;
+import com.tencent.supersonic.chat.api.pojo.enums.MemoryStatus;
+import com.tencent.supersonic.chat.api.pojo.request.*;
+import com.tencent.supersonic.chat.api.pojo.response.ChatParseResp;
+import com.tencent.supersonic.chat.api.pojo.response.QueryResp;
+import com.tencent.supersonic.chat.api.pojo.response.QueryResult;
 import com.tencent.supersonic.chat.api.pojo.response.ShowCaseResp;
 import com.tencent.supersonic.chat.server.persistence.dataobject.ChatDO;
 import com.tencent.supersonic.chat.server.persistence.dataobject.ChatParseDO;
@@ -13,25 +15,21 @@ import com.tencent.supersonic.chat.server.persistence.dataobject.ChatQueryDO;
 import com.tencent.supersonic.chat.server.persistence.dataobject.QueryDO;
 import com.tencent.supersonic.chat.server.persistence.repository.ChatQueryRepository;
 import com.tencent.supersonic.chat.server.persistence.repository.ChatRepository;
+import com.tencent.supersonic.chat.server.pojo.ChatMemory;
 import com.tencent.supersonic.chat.server.service.ChatManageService;
+import com.tencent.supersonic.chat.server.service.MemoryService;
+import com.tencent.supersonic.common.pojo.User;
 import com.tencent.supersonic.common.util.JsonUtil;
 import com.tencent.supersonic.headless.api.pojo.SemanticParseInfo;
-import com.tencent.supersonic.headless.api.pojo.response.ParseResp;
-import com.tencent.supersonic.chat.api.pojo.response.QueryResp;
-import com.tencent.supersonic.headless.api.pojo.response.QueryResult;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
+
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-
 
 @Slf4j
 @Service
@@ -41,9 +39,11 @@ public class ChatManageServiceImpl implements ChatManageService {
     private ChatRepository chatRepository;
     @Autowired
     private ChatQueryRepository chatQueryRepository;
+    @Autowired
+    private MemoryService memoryService;
 
     @Override
-    public Boolean addChat(User user, String chatName, Integer agentId) {
+    public Long addChat(User user, String chatName, Integer agentId) {
         ChatDO chatDO = new ChatDO();
         chatDO.setChatName(chatName);
         chatDO.setCreator(user.getName());
@@ -67,11 +67,28 @@ public class ChatManageServiceImpl implements ChatManageService {
     }
 
     @Override
-    public boolean updateFeedback(Integer id, Integer score, String feedback) {
+    public boolean updateFeedback(Long id, Integer score, String feedback) {
         QueryDO intelligentQueryDO = new QueryDO();
         intelligentQueryDO.setId(id);
+        intelligentQueryDO.setQuestionId(id);
         intelligentQueryDO.setScore(score);
         intelligentQueryDO.setFeedback(feedback);
+
+        // enable or disable memory based on user feedback
+        if (score >= 5 || score <= 1) {
+            ChatMemoryFilter memoryFilter = ChatMemoryFilter.builder().queryId(id).build();
+            List<ChatMemory> memories = memoryService.getMemories(memoryFilter);
+            memories.forEach(m -> {
+                MemoryStatus status = score >= 5 ? MemoryStatus.ENABLED : MemoryStatus.DISABLED;
+                MemoryReviewResult reviewResult =
+                        score >= 5 ? MemoryReviewResult.POSITIVE : MemoryReviewResult.NEGATIVE;
+                ChatMemoryUpdateReq memoryUpdateReq = ChatMemoryUpdateReq.builder().id(m.getId())
+                        .status(status).humanReviewRet(reviewResult)
+                        .humanReviewCmt("Reviewed as per user feedback").build();
+                memoryService.updateMemory(memoryUpdateReq, User.getDefaultUser());
+            });
+        }
+
         return chatRepository.updateFeedback(intelligentQueryDO);
     }
 
@@ -87,7 +104,8 @@ public class ChatManageServiceImpl implements ChatManageService {
 
     @Override
     public PageInfo<QueryResp> queryInfo(PageQueryInfoReq pageQueryInfoReq, long chatId) {
-        PageInfo<QueryResp> queryRespPageInfo = chatQueryRepository.getChatQuery(pageQueryInfoReq, chatId);
+        PageInfo<QueryResp> queryRespPageInfo =
+                chatQueryRepository.getChatQuery(pageQueryInfoReq, chatId);
         if (CollectionUtils.isEmpty(queryRespPageInfo.getList())) {
             return queryRespPageInfo;
         }
@@ -96,14 +114,25 @@ public class ChatManageServiceImpl implements ChatManageService {
     }
 
     @Override
-    public void createChatQuery(ChatParseReq chatParseReq, ParseResp parseResp) {
-        Long queryId = chatQueryRepository.createChatQuery(chatParseReq);
-        parseResp.setQueryId(queryId);
+    public Long createChatQuery(ChatParseReq chatParseReq) {
+        return chatQueryRepository.createChatQuery(chatParseReq);
     }
 
     @Override
     public QueryResp getChatQuery(Long queryId) {
         return chatQueryRepository.getChatQuery(queryId);
+    }
+
+    @Override
+    public ChatQueryDO getChatQueryDO(Long queryId) {
+        return chatQueryRepository.getChatQueryDO(queryId);
+    }
+
+    @Override
+    public List<QueryResp> getChatQueries(Integer chatId) {
+        List<QueryResp> queries = chatQueryRepository.getChatQueries(chatId);
+        fillParseInfo(queries);
+        return queries;
     }
 
     @Override
@@ -130,30 +159,32 @@ public class ChatManageServiceImpl implements ChatManageService {
         });
         queryResps = new ArrayList<>(queryResps.stream()
                 .collect(Collectors.toMap(QueryResp::getQueryText, Function.identity(),
-                        (existing, replacement) -> existing, LinkedHashMap::new)).values());
+                        (existing, replacement) -> existing, LinkedHashMap::new))
+                .values());
         fillParseInfo(queryResps);
-        Map<Long, List<QueryResp>> showCaseMap = queryResps.stream()
-                .collect(Collectors.groupingBy(QueryResp::getChatId));
+        Map<Long, List<QueryResp>> showCaseMap =
+                queryResps.stream().collect(Collectors.groupingBy(QueryResp::getChatId));
         showCaseResp.setShowCaseMap(showCaseMap);
         return showCaseResp;
     }
 
     private void fillParseInfo(List<QueryResp> queryResps) {
-        List<Long> queryIds = queryResps.stream()
-                .map(QueryResp::getQuestionId).collect(Collectors.toList());
+        List<Long> queryIds =
+                queryResps.stream().map(QueryResp::getQuestionId).collect(Collectors.toList());
         List<ChatParseDO> chatParseDOs = chatQueryRepository.getParseInfoList(queryIds);
         if (CollectionUtils.isEmpty(chatParseDOs)) {
             return;
         }
-        Map<Long, List<ChatParseDO>> chatParseMap = chatParseDOs.stream()
-                .collect(Collectors.groupingBy(ChatParseDO::getQuestionId));
+        Map<Long, List<ChatParseDO>> chatParseMap =
+                chatParseDOs.stream().collect(Collectors.groupingBy(ChatParseDO::getQuestionId));
         for (QueryResp queryResp : queryResps) {
             List<ChatParseDO> chatParseDOList = chatParseMap.get(queryResp.getQuestionId());
             if (CollectionUtils.isEmpty(chatParseDOList)) {
                 continue;
             }
-            List<SemanticParseInfo> parseInfos = chatParseDOList.stream().map(chatParseDO ->
-                            JsonUtil.toObject(chatParseDO.getParseInfo(), SemanticParseInfo.class))
+            List<SemanticParseInfo> parseInfos = chatParseDOList.stream()
+                    .map(chatParseDO -> JsonUtil.toObject(chatParseDO.getParseInfo(),
+                            SemanticParseInfo.class))
                     .sorted(Comparator.comparingDouble(SemanticParseInfo::getScore).reversed())
                     .collect(Collectors.toList());
             queryResp.setParseInfos(parseInfos);
@@ -178,9 +209,25 @@ public class ChatManageServiceImpl implements ChatManageService {
     }
 
     @Override
-    public List<ChatParseDO> batchAddParse(ChatParseReq chatParseReq, ParseResp parseResult) {
-        List<SemanticParseInfo> candidateParses = parseResult.getSelectedParses();
-        return chatQueryRepository.batchSaveParseInfo(chatParseReq, parseResult, candidateParses);
+    public void deleteQuery(Long queryId) {
+        ChatQueryDO chatQuery = chatQueryRepository.getChatQueryDO(queryId);
+        if (Objects.nonNull(chatQuery)) {
+            chatQuery.setQueryState(0);
+            chatQueryRepository.updateChatQuery(chatQuery);
+        }
+    }
+
+    @Override
+    public void updateParseCostTime(ChatParseResp chatParseResp) {
+        ChatQueryDO chatQueryDO = chatQueryRepository.getChatQueryDO(chatParseResp.getQueryId());
+        chatQueryDO.setParseTimeCost(JsonUtil.toString(chatParseResp.getParseTimeCost()));
+        updateQuery(chatQueryDO);
+    }
+
+    @Override
+    public List<ChatParseDO> batchAddParse(ChatParseReq chatParseReq, ChatParseResp chatParseResp) {
+        List<SemanticParseInfo> candidateParses = chatParseResp.getSelectedParses();
+        return chatQueryRepository.batchSaveParseInfo(chatParseReq, chatParseResp, candidateParses);
     }
 
     private String getCurrentTime() {
@@ -191,7 +238,10 @@ public class ChatManageServiceImpl implements ChatManageService {
     @Override
     public SemanticParseInfo getParseInfo(Long questionId, int parseId) {
         ChatParseDO chatParseDO = chatQueryRepository.getParseInfo(questionId, parseId);
-        return JSONObject.parseObject(chatParseDO.getParseInfo(), SemanticParseInfo.class);
+        if (chatParseDO == null) {
+            return null;
+        } else {
+            return JSONObject.parseObject(chatParseDO.getParseInfo(), SemanticParseInfo.class);
+        }
     }
-
 }

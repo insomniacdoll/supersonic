@@ -1,19 +1,15 @@
 package com.tencent.supersonic.headless.core.utils;
 
-import static com.tencent.supersonic.common.pojo.Constants.AT_SYMBOL;
-import static com.tencent.supersonic.common.pojo.Constants.COLON;
-import static com.tencent.supersonic.common.pojo.Constants.DOUBLE_SLASH;
-import static com.tencent.supersonic.common.pojo.Constants.EMPTY;
-import static com.tencent.supersonic.common.pojo.Constants.JDBC_PREFIX_FORMATTER;
-import static com.tencent.supersonic.common.pojo.Constants.NEW_LINE_CHAR;
-import static com.tencent.supersonic.common.pojo.Constants.PATTERN_JDBC_TYPE;
-import static com.tencent.supersonic.common.pojo.Constants.SPACE;
+import javax.sql.DataSource;
 
 import com.alibaba.druid.util.StringUtils;
 import com.tencent.supersonic.common.util.MD5Util;
 import com.tencent.supersonic.headless.api.pojo.enums.DataType;
-import com.tencent.supersonic.headless.core.pojo.Database;
+import com.tencent.supersonic.headless.api.pojo.response.DatabaseResp;
 import com.tencent.supersonic.headless.core.pojo.JdbcDataSource;
+import lombok.Getter;
+import lombok.extern.slf4j.Slf4j;
+
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
@@ -21,13 +17,10 @@ import java.sql.SQLException;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.regex.Matcher;
-import javax.sql.DataSource;
-import lombok.Getter;
-import lombok.extern.slf4j.Slf4j;
 
-/**
- * tools functions about jdbc
- */
+import static com.tencent.supersonic.common.pojo.Constants.*;
+
+/** tools functions about jdbc */
 @Slf4j
 public class JdbcDataSourceUtils {
 
@@ -39,19 +32,32 @@ public class JdbcDataSourceUtils {
         this.jdbcDataSource = jdbcDataSource;
     }
 
-    public static boolean testDatabase(Database database) {
+    public static boolean testDatabase(DatabaseResp database) {
 
         try {
-            Class.forName(getDriverClassName(database.getConnectInfo().getUrl()));
+            Class.forName(getDriverClassName(database.getUrl()));
         } catch (ClassNotFoundException e) {
             log.error(e.toString(), e);
             return false;
         }
-        try (Connection con = DriverManager.getConnection(database.getConnectInfo().getUrl(),
-                database.getConnectInfo().getUserName(), database.getConnectInfo().getPassword());) {
-            return con != null;
-        } catch (SQLException e) {
-            log.error(e.toString(), e);
+        // presto/trino ssl=false connection need password
+        if (database.getUrl().startsWith("jdbc:presto")
+                || database.getUrl().startsWith("jdbc:trino")) {
+            if (database.getUrl().toLowerCase().contains("ssl=false")) {
+                try (Connection con = DriverManager.getConnection(database.getUrl(),
+                        database.getUsername(), null)) {
+                    return con != null;
+                } catch (SQLException e) {
+                    log.error(e.toString(), e);
+                }
+            }
+        } else {
+            try (Connection con = DriverManager.getConnection(database.getUrl(),
+                    database.getUsername(), database.passwordDecrypt())) {
+                return con != null;
+            } catch (SQLException e) {
+                log.error(e.toString(), e);
+            }
         }
 
         return false;
@@ -128,8 +134,8 @@ public class JdbcDataSourceUtils {
         throw new RuntimeException("Not supported data type: jdbcUrl=" + jdbcUrl);
     }
 
-    public static String getKey(String name, String jdbcUrl, String username, String password, String version,
-            boolean isExt) {
+    public static String getKey(String name, String jdbcUrl, String username, String password,
+            String version, boolean isExt) {
 
         StringBuilder sb = new StringBuilder();
 
@@ -146,11 +152,11 @@ public class JdbcDataSourceUtils {
         return MD5Util.getMD5(sb.toString(), true, 64);
     }
 
-    public DataSource getDataSource(Database database) throws RuntimeException {
+    public DataSource getDataSource(DatabaseResp database) throws RuntimeException {
         return jdbcDataSource.getDataSource(database);
     }
 
-    public Connection getConnection(Database database) throws RuntimeException {
+    public Connection getConnection(DatabaseResp database) throws RuntimeException {
         Connection conn = getConnectionWithRetry(database);
         if (conn == null) {
             try {
@@ -166,9 +172,9 @@ public class JdbcDataSourceUtils {
         return conn;
     }
 
-    private Connection getConnectionWithRetry(Database database) {
+    private Connection getConnectionWithRetry(DatabaseResp database) {
         int rc = 1;
-        for (; ; ) {
+        for (;;) {
 
             if (rc > 3) {
                 return null;
@@ -193,7 +199,7 @@ public class JdbcDataSourceUtils {
         }
     }
 
-    public void releaseDataSource(Database database) {
+    public void releaseDataSource(DatabaseResp database) {
         jdbcDataSource.removeDatasource(database);
     }
 }

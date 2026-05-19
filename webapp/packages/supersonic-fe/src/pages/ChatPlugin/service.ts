@@ -1,4 +1,4 @@
-import { request } from 'umi';
+import { request } from '@umijs/max';
 import { DimensionType, ModelType, PluginType } from './type';
 
 export function savePlugin(params: Partial<PluginType>) {
@@ -27,13 +27,11 @@ export function getModelList() {
   });
 }
 
-export function getDimensionList(modelId: number) {
-  return request<Result<{ list: DimensionType[] }>>('/api/semantic/dimension/queryDimension', {
-    method: 'POST',
-    data: {
-      modelIds: [modelId],
-      current: 1,
-      pageSize: 2000,
+export function getDataSetSchema(dataSetId: number) {
+  return request<Result<{ list: DimensionType[] }>>(
+    `/api/chat/conf/getDataSetSchema/${dataSetId}`,
+    {
+      method: 'GET',
     },
-  });
+  );
 }

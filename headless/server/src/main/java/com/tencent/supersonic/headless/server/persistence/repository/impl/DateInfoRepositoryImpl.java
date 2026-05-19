@@ -24,7 +24,6 @@ import java.util.concurrent.TimeUnit;
 @Repository
 public class DateInfoRepositoryImpl implements DateInfoRepository {
 
-
     private ObjectMapper mapper = new ObjectMapper();
 
     @Autowired
@@ -42,7 +41,8 @@ public class DateInfoRepositoryImpl implements DateInfoRepository {
             DateInfoDO dateInfoDO = new DateInfoDO();
             BeanUtils.copyProperties(commend, dateInfoDO);
             try {
-                dateInfoDO.setUnavailableDateList(mapper.writeValueAsString(commend.getUnavailableDateList()));
+                dateInfoDO.setUnavailableDateList(
+                        mapper.writeValueAsString(commend.getUnavailableDateList()));
                 dateInfoDO.setCreatedBy(Constants.ADMIN_LOWER);
                 dateInfoDO.setUpdatedBy(Constants.ADMIN_LOWER);
             } catch (JsonProcessingException e) {
@@ -56,7 +56,8 @@ public class DateInfoRepositoryImpl implements DateInfoRepository {
 
     @Override
     public List<DateInfoDO> getDateInfos(ItemDateFilter itemDateFilter) {
-        if (Objects.nonNull(itemDateFilter) && CollectionUtils.isEmpty(itemDateFilter.getItemIds())) {
+        if (Objects.nonNull(itemDateFilter)
+                && CollectionUtils.isEmpty(itemDateFilter.getItemIds())) {
             return new ArrayList<>();
         }
         return dateInfoMapper.getDateInfos(itemDateFilter);
@@ -65,7 +66,7 @@ public class DateInfoRepositoryImpl implements DateInfoRepository {
     private Integer batchUpsert(List<DateInfoDO> dateInfoDOList) {
         Stopwatch stopwatch = Stopwatch.createStarted();
         for (DateInfoDO dateInfoDO : dateInfoDOList) {
-            dateInfoMapper.upsertDateInfo(dateInfoDO);
+            dateInfoMapper.insertOrUpdate(dateInfoDO);
         }
         log.info("before final, elapsed time:{}", stopwatch.elapsed(TimeUnit.MILLISECONDS));
         return 0;

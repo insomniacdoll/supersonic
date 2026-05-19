@@ -3,40 +3,34 @@ import { ProTable } from '@ant-design/pro-components';
 import { message, Button, Space, Popconfirm, Input } from 'antd';
 import React, { useRef, useState, useEffect } from 'react';
 import { StatusEnum } from '../enum';
-import type { Dispatch } from 'umi';
-import { connect, history } from 'umi';
-import type { StateType } from '../model';
-import { deleteModel, updateModel } from '../service';
+import { useModel, history } from '@umijs/max';
+import { deleteModel, batchUpdateModelStatus } from '../service';
 import ClassModelTypeModal from './ClassModelTypeModal';
 import { ColumnsConfig } from './TableColumnRender';
-import TableHeaderFilter from './TableHeaderFilter';
+import TableHeaderFilter from '@/components/TableHeaderFilter';
 import moment from 'moment';
 import styles from './style.less';
 import { ISemantic } from '../data';
+import { toModelList } from '@/pages/SemanticModel/utils';
 
 type Props = {
   disabledEdit?: boolean;
   modelList: ISemantic.IModelItem[];
   onModelChange?: (model?: ISemantic.IModelItem) => void;
-  dispatch: Dispatch;
-  domainManger: StateType;
 };
 
-const ModelTable: React.FC<Props> = ({
-  modelList,
-  disabledEdit = false,
-  onModelChange,
-  dispatch,
-  domainManger,
-}) => {
-  const { selectDomainId, modelTableHistoryParams } = domainManger;
+const ModelTable: React.FC<Props> = ({ modelList, disabledEdit = false, onModelChange }) => {
+  const domainModel = useModel('SemanticModel.domainData');
+  const modelModel = useModel('SemanticModel.modelData');
+  const { selectDomainId } = domainModel;
+  const { modelTableHistoryParams, setModelTableHistoryParams, setSelectModel } = modelModel;
+
   const [modelItem, setModelItem] = useState<ISemantic.IModelItem>();
-  const [saveLoading, setSaveLoading] = useState<boolean>(false);
   const [filterParams, setFilterParams] = useState<Record<string, any>>({});
   const [createDataSourceModalOpen, setCreateDataSourceModalOpen] = useState(false);
   const [currentPageNumber, setCurrentPageNumber] = useState<number>(1);
   const actionRef = useRef<ActionType>();
-
+  const [isEditing, setIsEditing] = useState<boolean>(false);
   const [tableData, setTableData] = useState<ISemantic.IModelItem[]>([]);
   const params = modelTableHistoryParams?.[selectDomainId];
 
@@ -63,12 +57,9 @@ const ModelTable: React.FC<Props> = ({
   }, []);
 
   const dipatchParams = (params: Record<string, any>) => {
-    dispatch({
-      type: 'domainManger/setModelTableHistoryParams',
-      payload: {
-        [selectDomainId]: {
-          ...params,
-        },
+    setModelTableHistoryParams({
+      [selectDomainId]: {
+        ...params,
       },
     });
   };
@@ -81,17 +72,20 @@ const ModelTable: React.FC<Props> = ({
     }
   };
 
-  const updateModelStatus = async (modelData: ISemantic.IModelItem) => {
-    setSaveLoading(true);
-    const { code, msg } = await updateModel({
-      ...modelData,
+  const queryBatchUpdateStatus = async (ids: React.Key[], status: StatusEnum) => {
+    if (Array.isArray(ids) && ids.length === 0) {
+      return;
+    }
+    const { code, msg } = await batchUpdateModelStatus({
+      ids,
+      status,
     });
-    setSaveLoading(false);
     if (code === 200) {
       onModelChange?.();
-    } else {
-      message.error(msg);
+      window.location.reload();
+      return;
     }
+    message.error(msg);
   };
 
   const columnsConfig = ColumnsConfig();
@@ -108,10 +102,12 @@ const ModelTable: React.FC<Props> = ({
       title: '模型名称',
       search: false,
       render: (_, record) => {
+        const { domainId, id } = record;
         return (
           <a
             onClick={() => {
-              onModelChange?.(record);
+              setSelectModel(record);
+              toModelList(domainId, id);
             }}
           >
             {_}
@@ -169,6 +165,7 @@ const ModelTable: React.FC<Props> = ({
               onClick={() => {
                 setModelItem(record);
                 setCreateDataSourceModalOpen(true);
+                setIsEditing(true);
               }}
             >
               编辑
@@ -178,10 +175,7 @@ const ModelTable: React.FC<Props> = ({
                 type="link"
                 key="editStatusOfflineBtn"
                 onClick={() => {
-                  updateModelStatus({
-                    ...record,
-                    status: StatusEnum.OFFLINE,
-                  });
+                  queryBatchUpdateStatus([record.id], StatusEnum.OFFLINE);
                 }}
               >
                 停用
@@ -191,10 +185,7 @@ const ModelTable: React.FC<Props> = ({
                 type="link"
                 key="editStatusOnlineBtn"
                 onClick={() => {
-                  updateModelStatus({
-                    ...record,
-                    status: StatusEnum.ONLINE,
-                  });
+                  queryBatchUpdateStatus([record.id], StatusEnum.ONLINE);
                 }}
               >
                 启用
@@ -208,6 +199,7 @@ const ModelTable: React.FC<Props> = ({
                 const { code, msg } = await deleteModel(record.id);
                 if (code === 200) {
                   onModelChange?.();
+                  window.location.reload();
                 } else {
                   message.error(msg);
                 }
@@ -223,84 +215,89 @@ const ModelTable: React.FC<Props> = ({
 
   return (
     <>
-      <ProTable
-        className={`${styles.classTable} ${styles.classTableSelectColumnAlignLeft}`}
-        actionRef={actionRef}
-        rowKey="id"
-        search={false}
-        columns={columns}
-        dataSource={tableData}
-        tableAlertRender={() => {
-          return false;
-        }}
-        pagination={{
-          current: currentPageNumber,
-          onChange: (pageNumber) => {
-            setCurrentPageNumber(pageNumber);
-            dipatchParams({
-              ...filterParams,
-              pageNumber: `${pageNumber}`,
-            });
-          },
-        }}
-        headerTitle={
-          <TableHeaderFilter
-            components={[
-              {
-                label: '模型搜索',
-                component: (
-                  <Input.Search
-                    style={{ width: 280 }}
-                    placeholder="请输入模型名称"
-                    defaultValue={params?.key}
-                    onSearch={(value) => {
-                      setCurrentPageNumber(1);
-                      dipatchParams({
-                        ...filterParams,
-                        key: value,
-                        pageNumber: `1`,
-                      });
-                      setFilterParams((preState) => {
-                        return {
-                          ...preState,
+      <div style={{ display: isEditing ? 'none' : 'block' }}>
+        <ProTable
+          className={`${styles.classTable} ${styles.classTableSelectColumnAlignLeft}`}
+          actionRef={actionRef}
+          rowKey="id"
+          search={false}
+          columns={columns}
+          dataSource={tableData}
+          tableAlertRender={() => {
+            return false;
+          }}
+          pagination={{
+            current: currentPageNumber,
+            onChange: (pageNumber) => {
+              setCurrentPageNumber(pageNumber);
+              dipatchParams({
+                ...filterParams,
+                pageNumber: `${pageNumber}`,
+              });
+            },
+          }}
+          headerTitle={
+            <TableHeaderFilter
+              components={[
+                {
+                  label: '模型搜索',
+                  component: (
+                    <Input.Search
+                      style={{ width: 280 }}
+                      placeholder="请输入模型名称"
+                      defaultValue={params?.key}
+                      onSearch={(value) => {
+                        setCurrentPageNumber(1);
+                        dipatchParams({
+                          ...filterParams,
                           key: value,
-                        };
-                      });
+                          pageNumber: `1`,
+                        });
+                        setFilterParams((preState) => {
+                          return {
+                            ...preState,
+                            key: value,
+                          };
+                        });
+                      }}
+                    />
+                  ),
+                },
+              ]}
+            />
+          }
+          size="small"
+          options={{ reload: false, density: false, fullScreen: false }}
+          toolBarRender={() =>
+            disabledEdit
+              ? [<></>]
+              : [
+                  <Button
+                    key="create"
+                    type="primary"
+                    onClick={() => {
+                      setModelItem(undefined);
+                      setCreateDataSourceModalOpen(true);
                     }}
-                  />
-                ),
-              },
-            ]}
-          />
-        }
-        size="small"
-        options={{ reload: false, density: false, fullScreen: false }}
-        toolBarRender={() =>
-          disabledEdit
-            ? [<></>]
-            : [
-                <Button
-                  key="create"
-                  type="primary"
-                  onClick={() => {
-                    setModelItem(undefined);
-                    setCreateDataSourceModalOpen(true);
-                  }}
-                >
-                  创建模型
-                </Button>,
-              ]
-        }
-      />
+                  >
+                    创建模型
+                  </Button>,
+                ]
+          }
+        />
+      </div>
       {createDataSourceModalOpen && (
         <ClassModelTypeModal
           open={createDataSourceModalOpen}
           modelItem={modelItem}
           onSubmit={() => {
             onModelChange?.();
+            setIsEditing(false);
             setCreateDataSourceModalOpen(false);
+            window.location.reload();
           }}
           onCancel={() => {
+            setIsEditing(false);
             setCreateDataSourceModalOpen(false);
           }}
         />
@@ -308,6 +305,4 @@ const ModelTable: React.FC<Props> = ({
     </>
   );
 };
-export default connect(({ domainManger }: { domainManger: StateType }) => ({
-  domainManger,
-}))(ModelTable);
+export default ModelTable;

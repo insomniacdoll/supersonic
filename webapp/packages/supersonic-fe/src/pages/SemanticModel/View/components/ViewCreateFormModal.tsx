@@ -1,11 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Form, Button, Modal, Input, Select, Steps, Radio, Space } from 'antd';
+import { Form, Button, Modal, Input, Select, Steps, Spin, Space } from 'antd';
 import styles from '../../components/style.less';
 import { message } from 'antd';
 import { formLayout } from '@/components/FormHelper/utils';
-import { createView, updateView, getDimensionList, queryMetric, getTagList } from '../../service';
+import { createView, updateView, getDimensionList, queryMetric } from '../../service';
 import { ISemantic } from '../../data';
-import { isString } from 'lodash';
 import FormItemTitle from '@/components/FormHelper/FormItemTitle';
 import SelectTMEPerson from '@/components/SelectTMEPerson';
 import ViewModelConfigTransfer from './ViewModelConfigTransfer';
@@ -13,6 +12,7 @@ import ViewModelConfigTransfer from './ViewModelConfigTransfer';
 const FormItem = Form.Item;
 
 export type ModelCreateFormModalProps = {
+  step: number;
   domainId: number;
   viewItem: any;
   modelList: ISemantic.IModelItem[];
@@ -21,13 +21,19 @@ export type ModelCreateFormModalProps = {
 };
 const { Step } = Steps;
 const ViewCreateFormModal: React.FC<ModelCreateFormModalProps> = ({
+  step = 0,
   viewItem,
   domainId,
   onCancel,
   onSubmit,
   modelList,
 }) => {
-  const [currentStep, setCurrentStep] = useState(0);
+  const stepWidth: Record<string, number> = {
+    '0': 800,
+    '1': 1200,
+    '2': 800,
+  };
+  const [currentStep, setCurrentStep] = useState(step);
 
   const [formVals, setFormVals] = useState<ISemantic.IModelItem>({
     ...viewItem,
@@ -37,7 +43,8 @@ const ViewCreateFormModal: React.FC<ModelCreateFormModalProps> = ({
   const [queryType, setQueryType] = useState<string>('METRIC');
 
   const [saveLoading, setSaveLoading] = useState<boolean>(false);
-  const [modalWidth, setModalWidth] = useState<number>(800);
+  const [dimensionLoading, setDimensionLoading] = useState<boolean>(false);
+  const [modalWidth, setModalWidth] = useState<number>(stepWidth[`${currentStep}`]);
   const [selectedModelItem, setSelectedModelItem] = useState<ISemantic.IModelItem | undefined>(
     modelList[0],
   );
@@ -53,7 +60,7 @@ const ViewCreateFormModal: React.FC<ModelCreateFormModalProps> = ({
 
   const [dimensionList, setDimensionList] = useState<ISemantic.IDimensionItem[]>();
   const [metricList, setMetricList] = useState<ISemantic.IMetricItem[]>();
-  const [tagList, setTagList] = useState<ISemantic.ITagItem[]>();
+  // const [tagList, setTagList] = useState<ISemantic.ITagItem[]>();
 
   useEffect(() => {
     if (selectedModelItem?.id) {
@@ -64,7 +71,9 @@ const ViewCreateFormModal: React.FC<ModelCreateFormModalProps> = ({
   }, [selectedModelItem]);
 
   const queryDimensionList = async (modelId: number) => {
+    setDimensionLoading(true);
     const { code, data, msg } = await getDimensionList({ modelId });
+    setDimensionLoading(false);
     if (code === 200 && Array.isArray(data?.list)) {
       setDimensionList(data.list);
     } else {
@@ -80,21 +89,6 @@ const ViewCreateFormModal: React.FC<ModelCreateFormModalProps> = ({
       message.error(msg);
     }
   };
-
-  // const queryTagList = async (modelId: number) => {
-  //   const { code, data, msg } = await getTagList({
-  //     modelIds: [modelId],
-  //     pageSize: 9999,
-  //   });
-
-  //   const { list } = data || {};
-  //   if (code === 200) {
-  //     setTagList(list);
-  //   } else {
-  //     message.error(msg);
-  //     setTagList([]);
-  //   }
-  // };
 
   const handleConfirm = async () => {
     const fieldsValue = await form.validateFields();
@@ -115,15 +109,10 @@ const ViewCreateFormModal: React.FC<ModelCreateFormModalProps> = ({
     setSaveLoading(false);
     if (code === 200) {
       onSubmit?.(queryData);
+      message.success('保存成功');
     } else {
       message.error(msg);
     }
-  };
-
-  const stepWidth: any = {
-    '0': 800,
-    '1': 1200,
-    '2': 800,
   };
 
   const forward = () => {
@@ -147,11 +136,9 @@ const ViewCreateFormModal: React.FC<ModelCreateFormModalProps> = ({
           <Button style={{ float: 'left' }} onClick={backward}>
             上一步
           </Button>
-          {/* <Button type="primary" onClick={handleNext}>
-            下一步
-          </Button> */}
           <Button
             type="primary"
+            loading={saveLoading}
             onClick={() => {
               handleConfirm();
             }}
@@ -169,6 +156,7 @@ const ViewCreateFormModal: React.FC<ModelCreateFormModalProps> = ({
         </Button>
         <Button
           type="primary"
+          loading={saveLoading}
           onClick={() => {
             handleConfirm();
           }}
@@ -178,57 +166,44 @@ const ViewCreateFormModal: React.FC<ModelCreateFormModalProps> = ({
       </>
     );
   };
-
   const renderContent = () => {
     return (
       <>
         <div style={{ display: currentStep === 1 ? 'block' : 'none' }}>
-          {/* <div style={{ marginBottom: 10, paddingLeft: 12 }}>
-            <Radio.Group
-              buttonStyle="solid"
-              value={queryType}
-              onChange={(e) => {
-                setQueryType(e.target.value);
-              }}
-            >
-              <Radio.Button value="METRIC">指标模式</Radio.Button>
-              <Radio.Button value="TAG">标签模式</Radio.Button>
-            </Radio.Group>
-          </div> */}
-
-          <ViewModelConfigTransfer
-            key={queryType}
-            queryType={queryType}
-            toolbarSolt={
-              <Space>
-                <span>切换模型: </span>
-                <Select
-                  style={{
-                    minWidth: 100,
-                  }}
-                  value={selectedModelItem?.id}
-                  placeholder="请选择模型，获取当前模型下指标维度信息"
-                  onChange={(val) => {
-                    setDimensionList(undefined);
-                    setMetricList(undefined);
-                    const modelItem = modelList.find((item) => item.id === val);
-                    setSelectedModelItem(modelItem);
-                  }}
-                  options={modelList.map((item) => {
-                    return { label: item.name, value: item.id };
-                  })}
-                />
-              </Space>
-            }
-            dimensionList={dimensionList}
-            metricList={metricList}
-            tagList={tagList}
-            modelItem={selectedModelItem}
-            viewItem={viewItem}
-            ref={configTableRef}
-          />
+          <Spin spinning={dimensionLoading}>
+            <ViewModelConfigTransfer
+              key={queryType}
+              queryType={queryType}
+              toolbarSolt={
+                <Space>
+                  <span>切换模型: </span>
+                  <Select
+                    style={{
+                      minWidth: 150,
+                      textAlign: 'left',
+                    }}
+                    value={selectedModelItem?.id}
+                    placeholder="请选择模型，获取当前模型下指标维度信息"
+                    onChange={(val) => {
+                      setDimensionList(undefined);
+                      setMetricList(undefined);
+                      const modelItem = modelList.find((item) => item.id === val);
+                      setSelectedModelItem(modelItem);
+                    }}
+                    options={modelList.map((item) => {
+                      return { label: item.name, value: item.id };
+                    })}
+                  />
+                </Space>
+              }
+              dimensionList={dimensionList}
+              metricList={metricList}
+              modelItem={selectedModelItem}
+              viewItem={viewItem}
+              ref={configTableRef}
+            />
+          </Spin>
         </div>
-
         <div style={{ display: currentStep === 0 ? 'block' : 'none' }}>
           <FormItem
             name="name"
@@ -287,7 +262,6 @@ const ViewCreateFormModal: React.FC<ModelCreateFormModalProps> = ({
       <Steps style={{ marginBottom: 28 }} size="small" current={currentStep}>
         <Step title="基本信息" />
         <Step title="关联信息" />
-        {/* <Step title="进阶设置" /> */}
       </Steps>
       <Form
         {...formLayout}

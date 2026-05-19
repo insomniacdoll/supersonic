@@ -1,13 +1,11 @@
 import { Tag, Space, Tooltip, Typography } from 'antd';
 import React from 'react';
-import { connect } from 'umi';
-import type { StateType } from '../model';
 import { isArrayOfValues } from '@/utils/utils';
 import dayjs from 'dayjs';
+import { basePath } from '../../../../config/defaultSettings';
 import {
   ExportOutlined,
   SolutionOutlined,
-  ContainerOutlined,
   PartitionOutlined,
   PlusOutlined,
   AreaChartOutlined,
@@ -22,7 +20,6 @@ const { Text } = Typography;
 
 type Props = {
   metircData: ISemantic.IMetricItem;
-  domainManger: StateType;
   relationDimensionOptions: { value: string; label: string; modelId: number }[];
   onNodeChange: (params?: { eventName?: string }) => void;
   onEditBtnClick?: (metircData: any) => void;
@@ -46,7 +43,7 @@ const MetricInfoSider: React.FC<Props> = ({
               <span
                 className={styles.gotoMetricListIcon}
                 onClick={() => {
-                  window.open(`/webapp/model/${metircData.domainId}/${metircData.modelId}/`);
+                  window.open(`${basePath}model/${metircData.domainId}/${metircData.modelId}/`);
                 }}
               >
                 <Tooltip title="前往所属模型指标列表">
@@ -62,15 +59,6 @@ const MetricInfoSider: React.FC<Props> = ({
       <div className={styles.sectionContainer}>
         <hr className={styles.hr} />
         <div className={styles.section}>
-          {/* <div className={styles.sectionTitleBox}>
-            <span className={styles.sectionTitle}>
-              <Space>
-                <ContainerOutlined />
-                基本信息
-              </Space>
-            </span>
-          </div> */}
-
           <div className={styles.item}>
             <span className={styles.itemLable}>敏感度: </span>
             <span className={styles.itemValue}>
@@ -95,7 +83,7 @@ const MetricInfoSider: React.FC<Props> = ({
                   <span
                     className={styles.gotoMetricListIcon}
                     onClick={() => {
-                      window.open(`/webapp/model/${metircData.domainId}/0/overview`);
+                      window.open(`${basePath}model/${metircData.domainId}/0/overview`);
                     }}
                   >
                     <Tooltip title="前往模型设置页">
@@ -256,6 +244,4 @@ const MetricInfoSider: React.FC<Props> = ({
   );
 };
 
-export default connect(({ domainManger }: { domainManger: StateType }) => ({
-  domainManger,
-}))(MetricInfoSider);
+export default MetricInfoSider;

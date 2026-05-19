@@ -1,5 +1,6 @@
 package com.tencent.supersonic.headless.server.pojo;
 
+import com.tencent.supersonic.headless.api.pojo.MetaFilter;
 import lombok.Data;
 
 import java.util.List;
@@ -13,9 +14,7 @@ public class ModelFilter extends MetaFilter {
 
     private Boolean includesDetail = true;
 
-    public ModelFilter() {
-
-    }
+    public ModelFilter() {}
 
     public ModelFilter(Boolean includesDetail) {
         this.includesDetail = includesDetail;
@@ -25,5 +24,4 @@ public class ModelFilter extends MetaFilter {
         this.includesDetail = includesDetail;
         this.setIds(ids);
     }
-
 }

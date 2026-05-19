@@ -17,6 +17,14 @@ const ROUTES = [
     envEnableList: [ENV_KEY.CHAT],
   },
   {
+    path: '/chat/external',
+    name: 'chat',
+    component: './ChatPage',
+    hideInMenu: true,
+    layout: false,
+    envEnableList: [ENV_KEY.CHAT],
+  },
+  {
     path: '/chat',
     name: 'chat',
     component: './ChatPage',
@@ -41,10 +49,82 @@ const ROUTES = [
     envEnableList: [ENV_KEY.CHAT],
   },
   {
-    path: '/model/:domainId?/:modelId?/:menuKey?',
-    component: './SemanticModel/DomainManager',
+    path: '/model/metric/edit/:metricId',
+    name: 'metricEdit',
+    hideInMenu: true,
+    component: './SemanticModel/Metric/Edit',
+    envEnableList: [ENV_KEY.SEMANTIC],
+  },
+  {
+    path: '/model/',
+    component: './SemanticModel/',
     name: 'semanticModel',
     envEnableList: [ENV_KEY.SEMANTIC],
+    routes: [
+      {
+        path: '/model/',
+        redirect: '/model/domain',
+      },
+      {
+        path: '/model/domain/',
+        component: './SemanticModel/OverviewContainer',
+        routes: [
+          {
+            path: '/model/domain/:domainId',
+            component: './SemanticModel/DomainManager',
+            routes: [
+              {
+                path: '/model/domain/:domainId/:menuKey',
+                component: './SemanticModel/DomainManager',
+              },
+            ],
+          },
+          {
+            path: '/model/domain/manager/:domainId/:modelId',
+            component: './SemanticModel/ModelManager',
+            routes: [
+              {
+                path: '/model/domain/manager/:domainId/:modelId/:menuKey',
+                component: './SemanticModel/ModelManager',
+              },
+            ],
+          },
+        ],
+      },
+      {
+        path: '/model/dataset/:domainId/:datasetId',
+        component: './SemanticModel/View/components/Detail',
+        envEnableList: [ENV_KEY.SEMANTIC],
+        routes: [
+          {
+            path: '/model/dataset/:domainId/:datasetId/:menuKey',
+            component: './SemanticModel/View/components/Detail',
+          },
+        ],
+      },
+      {
+        path: '/model/metric/:domainId/:modelId/:metricId',
+        component: './SemanticModel/Metric/Edit',
+        envEnableList: [ENV_KEY.SEMANTIC],
+        // routes: [
+        //   {
+        //     path: '/model/manager/:domainId/:modelId/:menuKey',
+        //     component: './SemanticModel/ModelManager',
+        //   },
+        // ],
+      },
+      {
+        path: '/model/dimension/:domainId/:modelId/:dimensionId',
+        component: './SemanticModel/Dimension/Detail',
+        envEnableList: [ENV_KEY.SEMANTIC],
+        // routes: [
+        //   {
+        //     path: '/model/manager/:domainId/:modelId/:menuKey',
+        //     component: './SemanticModel/ModelManager',
+        //   },
+        // ],
+      },
+    ],
   },
 
   {
@@ -70,14 +150,21 @@ const ROUTES = [
         component: './SemanticModel/Metric/Detail',
         envEnableList: [ENV_KEY.SEMANTIC],
       },
+      {
+        path: '/metric/detail/edit/:metricId',
+        name: 'metricDetail',
+        hideInMenu: true,
+        component: './SemanticModel/Metric/Edit',
+        envEnableList: [ENV_KEY.SEMANTIC],
+      },
     ],
   },
-
   {
     path: '/tag',
     name: 'tag',
     component: './SemanticModel/Insights',
     envEnableList: [ENV_KEY.SEMANTIC],
+    hideInMenu: process.env.SHOW_TAG ? false : true,
     routes: [
       {
         path: '/tag',
@@ -109,8 +196,13 @@ const ROUTES = [
   {
     path: '/database',
     name: 'database',
-    // hideInMenu: true,
     component: './SemanticModel/components/Database/DatabaseTable',
+    envEnableList: [ENV_KEY.SEMANTIC],
+  },
+  {
+    path: '/llm',
+    name: 'llm',
+    component: './SemanticModel/components/LLM/LlmTable',
     envEnableList: [ENV_KEY.SEMANTIC],
   },
   {
@@ -121,11 +213,7 @@ const ROUTES = [
   },
   {
     path: '/',
-    redirect: APP_TARGET === 'inner' ? '/model' : '/chat',
-    envRedirect: {
-      [ENV_KEY.CHAT]: '/chat',
-      [ENV_KEY.SEMANTIC]: '/model',
-    },
+    redirect: '/model',
   },
   {
     path: '/401',

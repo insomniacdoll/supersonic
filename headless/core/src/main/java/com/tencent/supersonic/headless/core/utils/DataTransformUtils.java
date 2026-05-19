@@ -1,23 +1,20 @@
 package com.tencent.supersonic.headless.core.utils;
 
 import com.google.common.collect.Lists;
-import com.tencent.supersonic.common.pojo.Constants;
 import com.tencent.supersonic.common.pojo.DateConf;
-import com.tencent.supersonic.common.pojo.enums.TimeDimensionEnum;
 import org.apache.commons.lang3.StringUtils;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-/**
- * transform query results to return the users
- */
+/** transform query results to return the users */
 public class DataTransformUtils {
 
-    public static List<Map<String, Object>> transform(List<Map<String, Object>> originalData, String metric,
-                                                      List<String> groups, DateConf dateConf) {
+    public static List<Map<String, Object>> transform(List<Map<String, Object>> originalData,
+            String metric, List<String> groups, DateConf dateConf) {
         List<String> dateList = dateConf.getDateList();
         List<Map<String, Object>> transposedData = new ArrayList<>();
         for (Map<String, Object> originalRow : originalData) {
@@ -54,7 +51,7 @@ public class DataTransformUtils {
     private static String getRowKey(Map<String, Object> originalRow, List<String> groups) {
         List<Object> values = Lists.newArrayList();
         for (String key : originalRow.keySet()) {
-            if (groups.contains(key) && !TimeDimensionEnum.getNameList().contains(key)) {
+            if (groups.contains(key)) {
                 values.add(originalRow.get(key));
             }
         }
@@ -62,13 +59,6 @@ public class DataTransformUtils {
     }
 
     private static String getTimeDimension(DateConf dateConf) {
-        if (Constants.MONTH.equals(dateConf.getPeriod())) {
-            return TimeDimensionEnum.MONTH.getName();
-        } else if (Constants.WEEK.equals(dateConf.getPeriod())) {
-            return TimeDimensionEnum.WEEK.getName();
-        } else {
-            return TimeDimensionEnum.DAY.getName();
-        }
+        return dateConf.getDateField();
     }
-
 }

@@ -2,10 +2,8 @@ import type { ActionType, ProColumns } from '@ant-design/pro-components';
 import { ProTable } from '@ant-design/pro-components';
 import { message, Button, Space, Popconfirm, Input, Select, Tag } from 'antd';
 import React, { useRef, useState, useEffect } from 'react';
-import type { Dispatch } from 'umi';
-import { StatusEnum } from '../enum';
-import { connect, history } from 'umi';
-import type { StateType } from '../model';
+import { StatusEnum, SemanticNodeType } from '../enum';
+import { useModel } from '@umijs/max';
 import { SENSITIVE_LEVEL_ENUM, SENSITIVE_LEVEL_OPTIONS, TAG_DEFINE_TYPE } from '../constant';
 import {
   queryMetric,
@@ -18,19 +16,25 @@ import {
 } from '../service';
 import MetricInfoCreateForm from './MetricInfoCreateForm';
 import BatchCtrlDropDownButton from '@/components/BatchCtrlDropDownButton';
-import TableHeaderFilter from './TableHeaderFilter';
+import BatchSensitiveLevelModal from '@/components/BatchCtrlDropDownButton/BatchSensitiveLevelModal';
+import TableHeaderFilter from '@/components/TableHeaderFilter';
 import styles from './style.less';
 import { ISemantic } from '../data';
 import { ColumnsConfig } from './TableColumnRender';
+import { toMetricEditPage } from '@/pages/SemanticModel/utils';
 
 type Props = {
   onEmptyMetricData?: () => void;
-  dispatch: Dispatch;
-  domainManger: StateType;
 };
 
-const ClassMetricTable: React.FC<Props> = ({ onEmptyMetricData, domainManger, dispatch }) => {
-  const { selectModelId: modelId, selectDomainId } = domainManger;
+const ClassMetricTable: React.FC<Props> = ({ onEmptyMetricData }) => {
+  const domainModel = useModel('SemanticModel.domainData');
+  const modelModel = useModel('SemanticModel.modelData');
+  const metricModel = useModel('SemanticModel.metricData');
+  const { selectDomainId } = domainModel;
+  const { selectModelId: modelId } = modelModel;
+  const { MrefreshMetricList, setSelectMetric } = metricModel;
+  const [batchSensitiveLevelOpenState, setBatchSensitiveLevelOpenState] = useState<boolean>(false);
   const [createModalVisible, setCreateModalVisible] = useState<boolean>(false);
   const [metricItem, setMetricItem] = useState<ISemantic.IMetricItem>();
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
@@ -60,12 +64,7 @@ const ClassMetricTable: React.FC<Props> = ({ onEmptyMetricData, domainManger, di
     });
     if (code === 200) {
       queryMetricList({ ...filterParams, ...defaultPagination });
-      dispatch({
-        type: 'domainManger/queryMetricList',
-        payload: {
-          modelId,
-        },
-      });
+      MrefreshMetricList({ modelId });
       return;
     }
     message.error(msg);
@@ -87,12 +86,7 @@ const ClassMetricTable: React.FC<Props> = ({ onEmptyMetricData, domainManger, di
     setLoading(false);
     if (code === 200) {
       queryMetricList({ ...filterParams, ...defaultPagination });
-      dispatch({
-        type: 'domainManger/queryMetricList',
-        payload: {
-          modelId,
-        },
-      });
+      MrefreshMetricList({ modelId });
       return;
     }
     message.error(msg);
@@ -108,12 +102,7 @@ const ClassMetricTable: React.FC<Props> = ({ onEmptyMetricData, domainManger, di
     });
     if (code === 200) {
       queryMetricList({ ...filterParams, ...defaultPagination });
-      dispatch({
-        type: 'domainManger/queryMetricList',
-        payload: {
-          modelId,
-        },
-      });
+      MrefreshMetricList({ modelId });
       return;
     }
     message.error(msg);
@@ -121,9 +110,12 @@ const ClassMetricTable: React.FC<Props> = ({ onEmptyMetricData, domainManger, di
 
   useEffect(() => {
     queryMetricList({ ...filterParams, ...defaultPagination });
-  }, [filterParams]);
+  }, [filterParams, modelId]);
 
   const queryMetricList = async (params: any) => {
+    if (!modelId) {
+      return;
+    }
     setLoading(true);
     const { code, data, msg } = await queryMetric({
       ...pagination,
@@ -151,7 +143,14 @@ const ClassMetricTable: React.FC<Props> = ({ onEmptyMetricData, domainManger, di
     }
   };
 
-  const columnsConfig = ColumnsConfig();
+  const columnsConfig = ColumnsConfig({
+    indicatorInfo: {
+      url: '/model/metric/:domainId/:modelId/:indicatorId',
+      onNameClick: (record) => {
+        setSelectMetric(record as ISemantic.IMetricItem);
+      },
+    },
+  });
 
   const columns: ProColumns[] = [
     {
@@ -186,7 +185,7 @@ const ClassMetricTable: React.FC<Props> = ({ onEmptyMetricData, domainManger, di
     {
       dataIndex: 'isTag',
       title: '是否标签',
-      // width: 90,
+      hideInTable: !!!process.env.SHOW_TAG,
       render: (isTag) => {
         switch (isTag) {
           case 0:
@@ -231,6 +230,7 @@ const ClassMetricTable: React.FC<Props> = ({ onEmptyMetricData, domainManger, di
     {
       ...columnsConfig.createInfo,
     },
+
     {
       title: '操作',
       dataIndex: 'x',
@@ -244,8 +244,8 @@ const ClassMetricTable: React.FC<Props> = ({ onEmptyMetricData, domainManger, di
               type="link"
               key="metricEditBtn"
               onClick={() => {
-                setMetricItem(record);
-                setCreateModalVisible(true);
+                const { domainId, modelId, id } = record;
+                toMetricEditPage(domainId, modelId, id);
               }}
             >
               编辑
@@ -324,6 +324,9 @@ const ClassMetricTable: React.FC<Props> = ({ onEmptyMetricData, domainManger, di
       case 'batchUnPublish':
         queryBatchUpdatePublish(selectedRowKeys, false);
         break;
+      case 'batchSensitiveLevel':
+        setBatchSensitiveLevelOpenState(true);
+        break;
       default:
         break;
     }
@@ -356,68 +359,73 @@ const ClassMetricTable: React.FC<Props> = ({ onEmptyMetricData, domainManger, di
         className={`${styles.classTable} ${styles.classTableSelectColumnAlignLeft} ${styles.disabledSearchTable} `}
         actionRef={actionRef}
         headerTitle={
-          <TableHeaderFilter
-            components={[
-              {
-                label: '指标搜索',
-                component: (
-                  <Input.Search
-                    style={{ width: 280 }}
-                    placeholder="请输入ID/指标名称/英文名称/标签"
-                    onSearch={(value) => {
-                      setFilterParams((preState) => {
-                        return {
-                          ...preState,
-                          key: value,
-                        };
-                      });
-                    }}
-                  />
-                ),
-              },
-              {
-                label: '敏感度',
-                component: (
-                  <Select
-                    style={{ width: 140 }}
-                    options={SENSITIVE_LEVEL_OPTIONS}
-                    placeholder="请选择敏感度"
-                    allowClear
-                    onChange={(value) => {
-                      setFilterParams((preState) => {
-                        return {
-                          ...preState,
-                          sensitiveLevel: value,
-                        };
-                      });
-                    }}
-                  />
-                ),
-              },
-              {
-                label: '是否为标签',
-                component: (
-                  <Select
-                    style={{ width: 145 }}
-                    placeholder="请选择标签状态"
-                    allowClear
-                    onChange={(value) => {
-                      setFilterParams((preState) => {
-                        return {
-                          ...preState,
-                          isTag: value,
-                        };
-                      });
-                    }}
-                    options={[
-                      { value: 1, label: '是' },
-                      { value: 0, label: '否' },
-                    ]}
-                  />
-                ),
-              },
-            ]}
-          />
+          <div style={{ marginLeft: 15 }}>
+            <TableHeaderFilter
+              components={
+                [
+                  {
+                    label: '指标搜索',
+                    component: (
+                      <Input.Search
+                        style={{ width: 280 }}
+                        placeholder="请输入ID/指标名称/英文名称"
+                        onSearch={(value) => {
+                          setFilterParams((preState) => {
+                            return {
+                              ...preState,
+                              key: value,
+                            };
+                          });
+                        }}
+                      />
+                    ),
+                  },
+                  {
+                    label: '敏感度',
+                    component: (
+                      <Select
+                        style={{ width: 140 }}
+                        options={SENSITIVE_LEVEL_OPTIONS}
+                        placeholder="请选择敏感度"
+                        allowClear
+                        onChange={(value) => {
+                          setFilterParams((preState) => {
+                            return {
+                              ...preState,
+                              sensitiveLevel: value,
+                            };
+                          });
+                        }}
+                      />
+                    ),
+                  },
+                  {
+                    label: '是否为标签',
+                    hidden: !!!process.env.SHOW_TAG,
+                    component: (
+                      <Select
+                        style={{ width: 145 }}
+                        placeholder="请选择标签状态"
+                        allowClear
+                        onChange={(value) => {
+                          setFilterParams((preState) => {
+                            return {
+                              ...preState,
+                              isTag: value,
+                            };
+                          });
+                        }}
+                        options={[
+                          { value: 1, label: '是' },
+                          { value: 0, label: '否' },
+                        ]}
+                      />
+                    ),
+                  },
+                ].filter((item) => !!!item.hidden) as any
+              }
+            />
+          </div>
         }
         rowKey="id"
         loading={loading}
@@ -452,8 +460,9 @@ const ClassMetricTable: React.FC<Props> = ({ onEmptyMetricData, domainManger, di
             key="create"
             type="primary"
             onClick={() => {
-              setMetricItem(undefined);
-              setCreateModalVisible(true);
+              toMetricEditPage(selectDomainId, modelId!, 0);
+              // setMetricItem(undefined);
+              // setCreateModalVisible(true);
             }}
           >
             创建指标
@@ -461,7 +470,12 @@ const ClassMetricTable: React.FC<Props> = ({ onEmptyMetricData, domainManger, di
           <BatchCtrlDropDownButton
             key="ctrlBtnList"
             downloadLoading={downloadLoading}
-            extenderList={['batchPublish', 'batchUnPublish', 'exportTagButton']}
+            extenderList={[
+              'batchSensitiveLevel',
+              'batchPublish',
+              'batchUnPublish',
+              'exportTagButton',
+            ]}
             onDeleteConfirm={() => {
               queryBatchUpdateStatus(selectedRowKeys, StatusEnum.DELETED);
             }}
@@ -481,21 +495,28 @@ const ClassMetricTable: React.FC<Props> = ({ onEmptyMetricData, domainManger, di
           onSubmit={() => {
             setCreateModalVisible(false);
             queryMetricList({ ...filterParams, ...defaultPagination });
-            dispatch({
-              type: 'domainManger/queryMetricList',
-              payload: {
-                modelId,
-              },
-            });
+            MrefreshMetricList({ modelId });
           }}
           onCancel={() => {
             setCreateModalVisible(false);
           }}
         />
       )}
+      {batchSensitiveLevelOpenState && (
+        <BatchSensitiveLevelModal
+          ids={selectedRowKeys as number[]}
+          open={batchSensitiveLevelOpenState}
+          type={SemanticNodeType.METRIC}
+          onCancel={() => {
+            setBatchSensitiveLevelOpenState(false);
+          }}
+          onSubmit={() => {
+            queryMetricList({ ...filterParams, ...pagination });
+            setBatchSensitiveLevelOpenState(false);
+          }}
+        />
+      )}
     </>
   );
 };
-export default connect(({ domainManger }: { domainManger: StateType }) => ({
-  domainManger,
-}))(ClassMetricTable);
+export default ClassMetricTable;

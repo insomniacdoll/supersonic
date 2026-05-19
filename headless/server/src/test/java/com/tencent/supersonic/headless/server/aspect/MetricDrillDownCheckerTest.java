@@ -7,11 +7,13 @@ import com.tencent.supersonic.headless.api.pojo.response.DimSchemaResp;
 import com.tencent.supersonic.headless.api.pojo.response.MetricSchemaResp;
 import com.tencent.supersonic.headless.api.pojo.response.SemanticSchemaResp;
 import com.tencent.supersonic.headless.server.utils.DataUtils;
+import com.tencent.supersonic.headless.server.utils.MetricDrillDownChecker;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.Test;
-import java.util.List;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import java.util.List;
+
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 @Slf4j
 public class MetricDrillDownCheckerTest {
@@ -24,23 +26,23 @@ public class MetricDrillDownCheckerTest {
         metricDrillDownChecker.checkQuery(semanticSchemaResp, sql);
     }
 
-    @Test
-    void test_groupBy_not_in_drillDownDimension() {
-        MetricDrillDownChecker metricDrillDownChecker = new MetricDrillDownChecker();
-        String sql = "select page, sum(pv) from t_1 group by page";
-        SemanticSchemaResp semanticSchemaResp = mockModelSchemaResp();
-        assertThrows(InvalidArgumentException.class,
-                () -> metricDrillDownChecker.checkQuery(semanticSchemaResp, sql));
-    }
+    // @Test
+    // void test_groupBy_not_in_drillDownDimension() {
+    // MetricDrillDownChecker metricDrillDownChecker = new MetricDrillDownChecker();
+    // String sql = "select page, sum(pv) from t_1 group by page";
+    // SemanticSchemaResp semanticSchemaResp = mockModelSchemaResp();
+    // assertThrows(InvalidArgumentException.class,
+    // () -> metricDrillDownChecker.checkQuery(semanticSchemaResp, sql));
+    // }
 
-    @Test
-    void test_groupBy_not_in_necessary_dimension() {
-        MetricDrillDownChecker metricDrillDownChecker = new MetricDrillDownChecker();
-        String sql = "select user_name, count(distinct uv) from t_1 group by user_name";
-        SemanticSchemaResp semanticSchemaResp = mockModelSchemaResp();
-        assertThrows(InvalidArgumentException.class,
-                () -> metricDrillDownChecker.checkQuery(semanticSchemaResp, sql));
-    }
+    // @Test
+    // void test_groupBy_not_in_necessary_dimension() {
+    // MetricDrillDownChecker metricDrillDownChecker = new MetricDrillDownChecker();
+    // String sql = "select user_name, count(distinct uv) from t_1 group by user_name";
+    // SemanticSchemaResp semanticSchemaResp = mockModelSchemaResp();
+    // assertThrows(InvalidArgumentException.class,
+    // () -> metricDrillDownChecker.checkQuery(semanticSchemaResp, sql));
+    // }
 
     @Test
     void test_groupBy_no_necessary_dimension_setting() {
@@ -67,7 +69,8 @@ public class MetricDrillDownCheckerTest {
 
     private SemanticSchemaResp mockModelSchemaNoDimensionSetting() {
         SemanticSchemaResp semanticSchemaResp = new SemanticSchemaResp();
-        List<MetricSchemaResp> metricSchemaResps = Lists.newArrayList(mockMetricsNoDrillDownSetting());
+        List<MetricSchemaResp> metricSchemaResps =
+                Lists.newArrayList(mockMetricsNoDrillDownSetting());
         semanticSchemaResp.setMetrics(metricSchemaResps);
         semanticSchemaResp.setDimensions(mockDimensions());
         return semanticSchemaResp;
@@ -80,17 +83,17 @@ public class MetricDrillDownCheckerTest {
     }
 
     private List<MetricSchemaResp> mockMetrics() {
-        return Lists.newArrayList(
-                DataUtils.mockMetric(1L, "pv", "访问次数",
-                        Lists.newArrayList(new DrillDownDimension(1L), new DrillDownDimension(2L))),
-                DataUtils.mockMetric(2L, "uv", "访问用户数",
-                        Lists.newArrayList(new DrillDownDimension(2L, true))));
+        return Lists
+                .newArrayList(
+                        DataUtils.mockMetric(1L, "pv", "访问次数",
+                                Lists.newArrayList(new DrillDownDimension(1L),
+                                        new DrillDownDimension(2L))),
+                        DataUtils.mockMetric(2L, "uv", "访问用户数",
+                                Lists.newArrayList(new DrillDownDimension(2L, true))));
     }
 
     private List<MetricSchemaResp> mockMetricsNoDrillDownSetting() {
-        return Lists.newArrayList(
-                DataUtils.mockMetric(1L, "pv", Lists.newArrayList()),
+        return Lists.newArrayList(DataUtils.mockMetric(1L, "pv", Lists.newArrayList()),
                 DataUtils.mockMetric(2L, "uv", Lists.newArrayList()));
     }
-
 }

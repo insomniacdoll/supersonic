@@ -1,44 +1,33 @@
 package com.tencent.supersonic.headless.server.utils;
 
 import com.google.common.collect.Lists;
-import com.tencent.supersonic.headless.api.pojo.DataSetSchema;
-import com.tencent.supersonic.headless.api.pojo.DimValueMap;
-import com.tencent.supersonic.headless.api.pojo.RelateDimension;
-import com.tencent.supersonic.headless.api.pojo.RelatedSchemaElement;
-import com.tencent.supersonic.headless.api.pojo.SchemaElement;
-import com.tencent.supersonic.headless.api.pojo.SchemaElementType;
-import com.tencent.supersonic.headless.api.pojo.SchemaItem;
-import com.tencent.supersonic.headless.api.pojo.SchemaValueMap;
+import com.google.common.collect.Maps;
+import com.tencent.supersonic.common.pojo.DimensionConstants;
+import com.tencent.supersonic.headless.api.pojo.*;
 import com.tencent.supersonic.headless.api.pojo.response.DataSetSchemaResp;
 import com.tencent.supersonic.headless.api.pojo.response.DimSchemaResp;
 import com.tencent.supersonic.headless.api.pojo.response.MetricSchemaResp;
-
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Objects;
-import java.util.Set;
-import java.util.stream.Collectors;
-
-import org.apache.logging.log4j.util.Strings;
+import com.tencent.supersonic.headless.api.pojo.response.ModelResp;
+import com.tencent.supersonic.headless.api.pojo.response.TermResp;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.util.CollectionUtils;
+
+import java.util.*;
+import java.util.stream.Collectors;
 
 public class DataSetSchemaBuilder {
 
     public static DataSetSchema build(DataSetSchemaResp resp) {
         DataSetSchema dataSetSchema = new DataSetSchema();
         dataSetSchema.setQueryConfig(resp.getQueryConfig());
-        SchemaElement dataSet = SchemaElement.builder()
-                .dataSet(resp.getId())
-                .dataSetName(resp.getName())
-                .id(resp.getId())
-                .name(resp.getName())
-                .bizName(resp.getBizName())
-                .type(SchemaElementType.DATASET)
-                .build();
+        SchemaElement dataSet =
+                SchemaElement.builder().dataSetId(resp.getId()).dataSetName(resp.getName())
+                        .id(resp.getId()).name(resp.getName()).description(resp.getDescription())
+                        .bizName(resp.getBizName()).type(SchemaElementType.DATASET).build();
         dataSetSchema.setDataSet(dataSet);
+        dataSetSchema.setDatabaseType(resp.getDatabaseType());
+        dataSetSchema.setDatabaseVersion(resp.getDatabaseVersion());
 
         Set<SchemaElement> metrics = getMetrics(resp);
         dataSetSchema.getMetrics().addAll(metrics);
@@ -55,10 +44,9 @@ public class DataSetSchemaBuilder {
         Set<SchemaElement> dimensionValues = getDimensionValues(resp);
         dataSetSchema.getDimensionValues().addAll(dimensionValues);
 
-        SchemaElement entity = getEntity(resp);
-        if (Objects.nonNull(entity)) {
-            dataSetSchema.setEntity(entity);
-        }
+        Set<SchemaElement> terms = getTerms(resp);
+        dataSetSchema.getTerms().addAll(terms);
+
         return dataSetSchema;
     }
 
@@ -67,17 +55,12 @@ public class DataSetSchemaBuilder {
         for (MetricSchemaResp metric : resp.getMetrics()) {
             List<String> alias = SchemaItem.getAliasList(metric.getAlias());
             if (metric.getIsTag() == 1) {
-                SchemaElement tagToAdd = SchemaElement.builder()
-                        .dataSet(resp.getId())
-                        .dataSetName(resp.getName())
-                        .model(metric.getModelId())
-                        .id(metric.getId())
-                        .name(metric.getName())
-                        .bizName(metric.getBizName())
-                        .type(SchemaElementType.TAG)
-                        .useCnt(metric.getUseCnt())
-                        .alias(alias)
-                        .build();
+                SchemaElement tagToAdd = SchemaElement.builder().dataSetId(resp.getId())
+                        .dataSetName(resp.getName()).model(metric.getModelId()).id(metric.getId())
+                        .name(metric.getName()).bizName(metric.getBizName())
+                        .type(SchemaElementType.TAG).useCnt(metric.getUseCnt()).alias(alias)
+                        .defaultAgg(metric.getDefaultAgg()).isTag(metric.getIsTag())
+                        .description(metric.getDescription()).build();
                 tags.add(tagToAdd);
             }
         }
@@ -98,43 +81,26 @@ public class DataSetSchemaBuilder {
                 }
             }
             if (dim.getIsTag() == 1) {
-                SchemaElement tagToAdd = SchemaElement.builder()
-                        .dataSet(resp.getId())
-                        .dataSetName(resp.getName())
-                        .model(dim.getModelId())
-                        .id(dim.getId())
-                        .name(dim.getName())
-                        .bizName(dim.getBizName())
-                        .type(SchemaElementType.TAG)
-                        .useCnt(dim.getUseCnt())
-                        .alias(alias)
-                        .schemaValueMaps(schemaValueMaps)
-                        .build();
+                SchemaElement tagToAdd = SchemaElement.builder().dataSetId(resp.getId())
+                        .dataSetName(resp.getName()).model(dim.getModelId()).id(dim.getId())
+                        .name(dim.getName()).bizName(dim.getBizName()).type(SchemaElementType.TAG)
+                        .useCnt(dim.getUseCnt()).alias(alias).schemaValueMaps(schemaValueMaps)
+                        .isTag(dim.getIsTag()).description(dim.getDescription()).build();
                 tags.add(tagToAdd);
             }
         }
         return tags;
     }
 
-    private static SchemaElement getEntity(DataSetSchemaResp resp) {
-        DimSchemaResp dim = resp.getPrimaryKey();
-        if (Objects.isNull(dim)) {
-            return null;
-        }
-        return SchemaElement.builder()
-                .dataSet(resp.getId())
-                .model(dim.getModelId())
-                .id(dim.getId())
-                .name(dim.getName())
-                .bizName(dim.getBizName())
-                .type(SchemaElementType.ENTITY)
-                .useCnt(dim.getUseCnt())
-                .alias(dim.getEntityAlias())
-                .build();
-    }
-
     private static Set<SchemaElement> getDimensions(DataSetSchemaResp resp) {
         Set<SchemaElement> dimensions = new HashSet<>();
+        Map<Long, Map<String, String>> dataTypeMap = Maps.newHashMap();
+        for (ModelResp modelResp : resp.getModelResps()) {
+            dataTypeMap.put(modelResp.getId(),
+                    modelResp.getModelDetail().getFields().stream().collect(Collectors
+                            .toMap(Field::getFieldName, Field::getDataType, (k1, k2) -> k2)));
+        }
+
         for (DimSchemaResp dim : resp.getDimensions()) {
             List<String> alias = SchemaItem.getAliasList(dim.getAlias());
             List<DimValueMap> dimValueMaps = dim.getDimValueMaps();
@@ -146,18 +112,25 @@ public class DataSetSchemaBuilder {
                     schemaValueMaps.add(schemaValueMap);
                 }
             }
-            SchemaElement dimToAdd = SchemaElement.builder()
-                    .dataSet(resp.getId())
-                    .dataSetName(resp.getName())
-                    .model(dim.getModelId())
-                    .id(dim.getId())
-                    .name(dim.getName())
-                    .bizName(dim.getBizName())
-                    .type(SchemaElementType.DIMENSION)
-                    .useCnt(dim.getUseCnt())
-                    .alias(alias)
-                    .schemaValueMaps(schemaValueMaps)
-                    .build();
+            SchemaElement dimToAdd = SchemaElement.builder().dataSetId(resp.getId())
+                    .dataSetName(resp.getName()).model(dim.getModelId()).id(dim.getId())
+                    .name(dim.getName()).bizName(dim.getBizName()).useCnt(dim.getUseCnt())
+                    .alias(alias).schemaValueMaps(schemaValueMaps).isTag(dim.getIsTag())
+                    .description(dim.getDescription()).type(SchemaElementType.DIMENSION).build();
+            dimToAdd.getExtInfo().put(DimensionConstants.DIMENSION_TYPE, dim.getType());
+            // data type
+            if (dim.getDataType() != null) {
+                dimToAdd.getExtInfo().put(DimensionConstants.DIMENSION_DATA_TYPE,
+                        dim.getDataType());
+            } else {
+                dimToAdd.getExtInfo().put(DimensionConstants.DIMENSION_DATA_TYPE,
+                        dataTypeMap.get(dim.getModelId()).get(dim.getBizName()));
+            }
+            if (dim.isTimeDimension()) {
+                String timeFormat =
+                        String.valueOf(dim.getExt().get(DimensionConstants.DIMENSION_TIME_FORMAT));
+                setDefaultTimeFormat(dimToAdd, timeFormat);
+            }
             dimensions.add(dimToAdd);
         }
         return dimensions;
@@ -168,9 +141,15 @@ public class DataSetSchemaBuilder {
         for (DimSchemaResp dim : resp.getDimensions()) {
             Set<String> dimValueAlias = new HashSet<>();
             List<DimValueMap> dimValueMaps = dim.getDimValueMaps();
+            List<SchemaValueMap> schemaValueMaps = new ArrayList<>();
             if (!CollectionUtils.isEmpty(dimValueMaps)) {
                 for (DimValueMap dimValueMap : dimValueMaps) {
-                    if (Strings.isNotEmpty(dimValueMap.getBizName())) {
+                    SchemaValueMap schemaValueMap = new SchemaValueMap();
+                    BeanUtils.copyProperties(dimValueMap, schemaValueMap);
+                    schemaValueMaps.add(schemaValueMap);
+                }
+                for (DimValueMap dimValueMap : dimValueMaps) {
+                    if (StringUtils.isNotEmpty(dimValueMap.getBizName())) {
                         dimValueAlias.add(dimValueMap.getBizName());
                     }
                     if (!CollectionUtils.isEmpty(dimValueMap.getAlias())) {
@@ -178,17 +157,12 @@ public class DataSetSchemaBuilder {
                     }
                 }
             }
-            SchemaElement dimValueToAdd = SchemaElement.builder()
-                    .dataSet(resp.getId())
-                    .dataSetName(resp.getName())
-                    .model(dim.getModelId())
-                    .id(dim.getId())
-                    .name(dim.getName())
-                    .bizName(dim.getBizName())
-                    .type(SchemaElementType.VALUE)
-                    .useCnt(dim.getUseCnt())
+            SchemaElement dimValueToAdd = SchemaElement.builder().dataSetId(resp.getId())
+                    .dataSetName(resp.getName()).model(dim.getModelId()).id(dim.getId())
+                    .name(dim.getName()).bizName(dim.getBizName()).type(SchemaElementType.VALUE)
+                    .schemaValueMaps(schemaValueMaps).useCnt(dim.getUseCnt())
                     .alias(new ArrayList<>(Arrays.asList(dimValueAlias.toArray(new String[0]))))
-                    .build();
+                    .isTag(dim.getIsTag()).description(dim.getDescription()).build();
             dimensionValues.add(dimValueToAdd);
         }
         return dimensionValues;
@@ -200,29 +174,37 @@ public class DataSetSchemaBuilder {
 
             List<String> alias = SchemaItem.getAliasList(metric.getAlias());
 
-            SchemaElement metricToAdd = SchemaElement.builder()
-                    .dataSet(resp.getId())
-                    .dataSetName(resp.getName())
-                    .model(metric.getModelId())
-                    .id(metric.getId())
-                    .name(metric.getName())
-                    .bizName(metric.getBizName())
-                    .type(SchemaElementType.METRIC)
-                    .useCnt(metric.getUseCnt())
-                    .alias(alias)
+            SchemaElement metricToAdd = SchemaElement.builder().dataSetId(resp.getId())
+                    .dataSetName(resp.getName()).model(metric.getModelId()).id(metric.getId())
+                    .name(metric.getName()).bizName(metric.getBizName())
+                    .type(SchemaElementType.METRIC).useCnt(metric.getUseCnt()).alias(alias)
                     .relatedSchemaElements(getRelateSchemaElement(metric))
-                    .defaultAgg(metric.getDefaultAgg())
-                    .dataFormatType(metric.getDataFormatType())
-                    .build();
+                    .defaultAgg(metric.getDefaultAgg()).dataFormatType(metric.getDataFormatType())
+                    .isTag(metric.getIsTag()).description(metric.getDescription()).build();
             metrics.add(metricToAdd);
-
         }
         return metrics;
     }
 
-    private static List<RelatedSchemaElement> getRelateSchemaElement(MetricSchemaResp metricSchemaResp) {
+    private static Set<SchemaElement> getTerms(DataSetSchemaResp resp) {
+        Set<SchemaElement> terms = new HashSet<>();
+        for (TermResp termResp : resp.getTermResps()) {
+            List<String> alias = termResp.getAlias();
+            SchemaElement metricToAdd =
+                    SchemaElement.builder().dataSetId(resp.getId()).dataSetName(resp.getName())
+                            .model(-1L).id(termResp.getId()).name(termResp.getName())
+                            .bizName(termResp.getName()).type(SchemaElementType.TERM).useCnt(0L)
+                            .alias(alias).description(termResp.getDescription()).build();
+            terms.add(metricToAdd);
+        }
+        return terms;
+    }
+
+    private static List<RelatedSchemaElement> getRelateSchemaElement(
+            MetricSchemaResp metricSchemaResp) {
         RelateDimension relateDimension = metricSchemaResp.getRelateDimension();
-        if (relateDimension == null || CollectionUtils.isEmpty(relateDimension.getDrillDownDimensions())) {
+        if (relateDimension == null
+                || CollectionUtils.isEmpty(relateDimension.getDrillDownDimensions())) {
             return Lists.newArrayList();
         }
         return relateDimension.getDrillDownDimensions().stream().map(dimension -> {
@@ -232,4 +214,7 @@ public class DataSetSchemaBuilder {
         }).collect(Collectors.toList());
     }
 
+    private static void setDefaultTimeFormat(SchemaElement dimToAdd, String timeFormat) {
+        dimToAdd.getExtInfo().put(DimensionConstants.DIMENSION_TIME_FORMAT, timeFormat);
+    }
 }

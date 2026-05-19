@@ -75,3 +75,27 @@ export enum KnowledgeConfigStatusEnum {
   UNAVAILABLE = 'UNAVAILABLE',
   UNKNOWN = 'UNKNOWN',
 }
+
+export const DetailTypeDefaultConfig = {
+  [ChatConfigType.TAG]: 'detailTypeDefaultConfig',
+  [ChatConfigType.METRIC]: 'aggregateTypeDefaultConfig',
+};
+
+export enum TimeModeEnum {
+  LAST = 'LAST',
+  RECENT = 'RECENT',
+  CURRENT = 'CURRENT',
+}
+
+export enum DatePeriod {
+  DAY = 'DAY',
+  WEEK = 'WEEK',
+  MONTH = 'MONTH',
+  YEAR = 'YEAR',
+}
+
+export enum DimensionValueListType {
+  BLACK_LIST = 'blackList',
+  WHITE_LIST = 'whiteList',
+  RULE_LIST = 'ruleList',
+}

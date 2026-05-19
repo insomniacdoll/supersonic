@@ -1,20 +1,16 @@
 package com.tencent.supersonic.auth.authentication.rest;
 
-
 import com.tencent.supersonic.auth.api.authentication.pojo.Organization;
-import com.tencent.supersonic.auth.api.authentication.pojo.User;
+import com.tencent.supersonic.auth.api.authentication.pojo.UserToken;
 import com.tencent.supersonic.auth.api.authentication.request.UserReq;
+import com.tencent.supersonic.auth.api.authentication.request.UserTokenReq;
 import com.tencent.supersonic.auth.api.authentication.service.UserService;
+import com.tencent.supersonic.common.pojo.User;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
 import java.util.List;
 import java.util.Set;
 
@@ -30,7 +26,8 @@ public class UserController {
     }
 
     @GetMapping("/getCurrentUser")
-    public User getCurrentUser(HttpServletRequest httpServletRequest, HttpServletResponse httpServletResponse) {
+    public User getCurrentUser(HttpServletRequest httpServletRequest,
+            HttpServletResponse httpServletResponse) {
         return userService.getCurrentUser(httpServletRequest, httpServletResponse);
     }
 
@@ -64,9 +61,49 @@ public class UserController {
         userService.register(userCmd);
     }
 
-    @PostMapping("/login")
-    public String login(@RequestBody UserReq userCmd) {
-        return userService.login(userCmd);
+    @DeleteMapping("/delete/{userId}")
+    public void delete(@PathVariable("userId") long userId, HttpServletRequest httpServletRequest,
+            HttpServletResponse httpServletResponse) throws IllegalAccessException {
+        User user = userService.getCurrentUser(httpServletRequest, httpServletResponse);
+        if (user.getIsAdmin() != 1) {
+            throw new IllegalAccessException("only admin can delete user");
+        }
+        userService.deleteUser(userId);
     }
 
+    @PostMapping("/login")
+    public String login(@RequestBody UserReq userCmd, HttpServletRequest request) {
+        return userService.login(userCmd, request);
+    }
+
+    @PostMapping("/resetPassword")
+    public void resetPassword(@RequestBody UserReq userCmd, HttpServletRequest request,
+            HttpServletResponse response) {
+        User user = userService.getCurrentUser(request, response);
+        userService.resetPassword(user.getName(), userCmd.getPassword(), userCmd.getNewPassword());
+    }
+
+    @PostMapping("/generateToken")
+    public UserToken generateToken(@RequestBody UserTokenReq userTokenReq,
+            HttpServletRequest request, HttpServletResponse response) {
+        User user = userService.getCurrentUser(request, response);
+        return userService.generateToken(userTokenReq.getName(), user.getName(),
+                userTokenReq.getExpireTime());
+    }
+
+    @GetMapping("/getUserTokens")
+    public List<UserToken> getUserTokens(HttpServletRequest request, HttpServletResponse response) {
+        User user = userService.getCurrentUser(request, response);
+        return userService.getUserTokens(user.getName());
+    }
+
+    @GetMapping("/getUserToken")
+    public UserToken getUserToken(@RequestParam(name = "tokenId") Long tokenId) {
+        return userService.getUserToken(tokenId);
+    }
+
+    @PostMapping("/deleteUserToken")
+    public void deleteUserToken(@RequestParam(name = "tokenId") Long tokenId) {
+        userService.deleteUserToken(tokenId);
+    }
 }

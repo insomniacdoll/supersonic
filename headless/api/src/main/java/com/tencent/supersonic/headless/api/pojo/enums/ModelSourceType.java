@@ -1,16 +1,13 @@
 package com.tencent.supersonic.headless.api.pojo.enums;
 
 import java.util.Objects;
+
 /**
- * model source table type:
- * FULL: table without time partition
- * PARTITION: table with partition field
+ * model source table type: FULL: table without time partition PARTITION: table with partition field
  * ZIPPER: table with slowly changing dimension
  */
 public enum ModelSourceType {
-    FULL,
-    PARTITION,
-    ZIPPER;
+    FULL, PARTITION, ZIPPER;
 
     public static ModelSourceType of(String src) {
         for (ModelSourceType modelSourceTypeEnum : ModelSourceType.values()) {

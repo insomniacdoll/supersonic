@@ -11,11 +11,7 @@ public class RuleInfo {
     private List<Object> parameters;
 
     public enum Mode {
-        /**
-         * BEFORE, some days ago
-         * RECENT, the last few days
-         * EXIST,  there was some information
-         */
+        /** BEFORE, some days ago RECENT, the last few days EXIST, there was some information */
         BEFORE, RECENT, EXIST
     }
 }

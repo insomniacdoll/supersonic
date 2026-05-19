@@ -10,12 +10,11 @@ import java.util.List;
 @Configuration
 public class InterceptorFactory implements WebMvcConfigurer {
 
-
     private List<AuthenticationInterceptor> authenticationInterceptors;
 
     public InterceptorFactory() {
-        authenticationInterceptors = SpringFactoriesLoader.loadFactories(AuthenticationInterceptor.class,
-                Thread.currentThread().getContextClassLoader());
+        authenticationInterceptors = SpringFactoriesLoader.loadFactories(
+                AuthenticationInterceptor.class, Thread.currentThread().getContextClassLoader());
     }
 
     @Override
@@ -25,5 +24,4 @@ public class InterceptorFactory implements WebMvcConfigurer {
                     .excludePathPatterns("/", "/webapp/**", "/error");
         }
     }
-
 }

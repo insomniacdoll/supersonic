@@ -1,13 +1,15 @@
 package com.tencent.supersonic.headless.server.rest;
 
 import com.github.pagehelper.PageInfo;
-import com.tencent.supersonic.auth.api.authentication.pojo.User;
 import com.tencent.supersonic.auth.api.authentication.utils.UserHolder;
+import com.tencent.supersonic.common.pojo.User;
 import com.tencent.supersonic.headless.api.pojo.request.AppQueryReq;
 import com.tencent.supersonic.headless.api.pojo.request.AppReq;
 import com.tencent.supersonic.headless.api.pojo.response.AppDetailResp;
 import com.tencent.supersonic.headless.api.pojo.response.AppResp;
 import com.tencent.supersonic.headless.server.service.AppService;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -17,8 +19,6 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
 
 @RestController
 @RequestMapping("/api/semantic/app")
@@ -28,57 +28,56 @@ public class AppController {
     private AppService appService;
 
     @PostMapping
-    public boolean save(@RequestBody AppReq app,
-                     HttpServletRequest request, HttpServletResponse response) {
+    public boolean save(@RequestBody AppReq app, HttpServletRequest request,
+            HttpServletResponse response) {
         User user = UserHolder.findUser(request, response);
         appService.save(app, user);
         return true;
     }
 
     @PutMapping
-    public boolean update(@RequestBody AppReq app,
-                       HttpServletRequest request, HttpServletResponse response) {
+    public boolean update(@RequestBody AppReq app, HttpServletRequest request,
+            HttpServletResponse response) {
         User user = UserHolder.findUser(request, response);
         appService.update(app, user);
         return true;
     }
 
     @PutMapping("/online/{id}")
-    public boolean online(@PathVariable("id") Integer id,
-                       HttpServletRequest request, HttpServletResponse response) {
+    public boolean online(@PathVariable("id") Integer id, HttpServletRequest request,
+            HttpServletResponse response) {
         User user = UserHolder.findUser(request, response);
         appService.online(id, user);
         return true;
     }
 
     @PutMapping("/offline/{id}")
-    public boolean offline(@PathVariable("id") Integer id,
-                        HttpServletRequest request, HttpServletResponse response) {
+    public boolean offline(@PathVariable("id") Integer id, HttpServletRequest request,
+            HttpServletResponse response) {
         User user = UserHolder.findUser(request, response);
         appService.offline(id, user);
         return true;
     }
 
     @DeleteMapping("/{id}")
-    public boolean delete(@PathVariable("id") Integer id,
-                       HttpServletRequest request, HttpServletResponse response) {
+    public boolean delete(@PathVariable("id") Integer id, HttpServletRequest request,
+            HttpServletResponse response) {
         User user = UserHolder.findUser(request, response);
         appService.delete(id, user);
         return true;
     }
 
     @GetMapping("/{id}")
-    public AppDetailResp getApp(@PathVariable("id") Integer id,
-                                HttpServletRequest request, HttpServletResponse response) {
+    public AppDetailResp getApp(@PathVariable("id") Integer id, HttpServletRequest request,
+            HttpServletResponse response) {
         User user = UserHolder.findUser(request, response);
         return appService.getApp(id, user);
     }
 
     @PostMapping("/page")
     public PageInfo<AppResp> pageApp(@RequestBody AppQueryReq appQueryReq,
-                                     HttpServletRequest request, HttpServletResponse response) {
+            HttpServletRequest request, HttpServletResponse response) {
         User user = UserHolder.findUser(request, response);
         return appService.pageApp(appQueryReq, user);
     }
-
 }

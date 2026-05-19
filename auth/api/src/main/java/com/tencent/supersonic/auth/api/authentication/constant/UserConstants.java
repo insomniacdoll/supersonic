@@ -13,16 +13,8 @@ public class UserConstants {
     public static final String TOKEN_USER_EMAIL = "token_user_email";
 
     public static final String TOKEN_IS_ADMIN = "token_is_admin";
-
-    public static final String TOKEN_ALGORITHM = "HS512";
-
     public static final String TOKEN_CREATE_TIME = "token_create_time";
 
     public static final String TOKEN_PREFIX = "Bearer";
-
-    public static final Long TOKEN_TIME_OUT = 25920000000L;
-
     public static final String INTERNAL = "internal";
-
-
 }

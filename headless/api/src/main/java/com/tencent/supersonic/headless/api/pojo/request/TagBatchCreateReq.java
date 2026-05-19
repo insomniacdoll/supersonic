@@ -1,11 +1,10 @@
 package com.tencent.supersonic.headless.api.pojo.request;
 
-
 import com.tencent.supersonic.headless.api.pojo.SchemaElementType;
+import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 import lombok.ToString;
 
-import javax.validation.constraints.NotNull;
 import java.util.List;
 
 @ToString
@@ -15,5 +14,4 @@ public class TagBatchCreateReq {
     private Long modelId;
     private SchemaElementType type;
     private List<Long> itemIds;
-
 }

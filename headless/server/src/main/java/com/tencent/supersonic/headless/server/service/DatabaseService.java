@@ -1,26 +1,32 @@
 package com.tencent.supersonic.headless.server.service;
 
-import com.tencent.supersonic.auth.api.authentication.pojo.User;
+import com.tencent.supersonic.common.pojo.User;
+import com.tencent.supersonic.headless.api.pojo.DBColumn;
+import com.tencent.supersonic.headless.api.pojo.enums.DataType;
 import com.tencent.supersonic.headless.api.pojo.request.DatabaseReq;
+import com.tencent.supersonic.headless.api.pojo.request.ModelBuildReq;
 import com.tencent.supersonic.headless.api.pojo.request.SqlExecuteReq;
 import com.tencent.supersonic.headless.api.pojo.response.DatabaseResp;
 import com.tencent.supersonic.headless.api.pojo.response.SemanticQueryResp;
 import com.tencent.supersonic.headless.server.pojo.DatabaseParameter;
+
+import java.sql.SQLException;
 import java.util.List;
 import java.util.Map;
-
 
 public interface DatabaseService {
 
     SemanticQueryResp executeSql(String sql, DatabaseResp databaseResp);
 
-    SemanticQueryResp executeSql(SqlExecuteReq sqlExecuteReq, Long id, User user);
+    List<DatabaseResp> getDatabaseByType(DataType dataType);
+
+    SemanticQueryResp executeSql(SqlExecuteReq sqlExecuteReq, User user);
 
     DatabaseResp getDatabase(Long id, User user);
 
     DatabaseResp getDatabase(Long id);
 
-    Map<String, List<DatabaseParameter>> getDatabaseParameters();
+    Map<String, List<DatabaseParameter>> getDatabaseParameters(User user);
 
     boolean testConnect(DatabaseReq databaseReq, User user);
 
@@ -28,11 +34,17 @@ public interface DatabaseService {
 
     List<DatabaseResp> getDatabaseList(User user);
 
-    void deleteDatabase(Long databaseId);
+    void deleteDatabase(Long databaseId, User user);
 
-    SemanticQueryResp getDbNames(Long id);
+    List<String> getCatalogs(Long id) throws SQLException;
 
-    SemanticQueryResp getTables(Long id, String db);
+    List<String> getDbNames(Long id, String catalog) throws SQLException;
 
-    SemanticQueryResp getColumns(Long id, String db, String table);
+    List<String> getTables(Long id, String catalog, String db) throws SQLException;
+
+    Map<String, List<DBColumn>> getDbColumns(ModelBuildReq modelBuildReq) throws SQLException;
+
+    List<DBColumn> getColumns(Long id, String catalog, String db, String table) throws SQLException;
+
+    List<DBColumn> getColumns(Long id, String sql) throws SQLException;
 }

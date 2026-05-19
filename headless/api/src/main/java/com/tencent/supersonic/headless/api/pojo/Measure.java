@@ -23,11 +23,24 @@ public class Measure {
 
     private String alias;
 
+    private String unit;
+
+    public Measure(String name, String bizName, String expr, String agg, String unit,
+            Integer isCreateMetric) {
+        this.name = name;
+        this.agg = agg;
+        this.isCreateMetric = isCreateMetric;
+        this.bizName = bizName;
+        this.expr = expr;
+        this.unit = unit;
+    }
+
     public Measure(String name, String bizName, String agg, Integer isCreateMetric) {
         this.name = name;
         this.agg = agg;
         this.isCreateMetric = isCreateMetric;
         this.bizName = bizName;
+        this.expr = bizName;
     }
 
     public Measure(String bizName, String constraint) {

@@ -7,7 +7,7 @@ import { XFlowGraphCommands, XFlowNodeCommands, XFlowEdgeCommands } from '@antv/
 import { CanvasMiniMap, CanvasScaleToolbar, CanvasSnapline } from '@antv/xflow';
 import { MODELS } from '@antv/xflow';
 import GraphToolbar from './GraphToolbar/index';
-import { connect } from 'umi';
+import { connect } from '@umijs/max';
 
 /** 配置画布 */
 import { useGraphConfig } from './config-graph';
@@ -30,17 +30,14 @@ import './index.less';
 /** Mock所有与服务端交互的接口 */
 import { MockApi } from './service';
 
-type Props = {
-  domainManger: StateType;
-  dispatch: Dispatch;
-};
+type Props = {};
 
 /** 鼠标的引用 */
 let cursorTipRef: HTMLDivElement;
 /** 鼠标在画布的位置 */
 let cursorLocation: any;
 
-const DomainManger: React.FC<Props> = (demoProps: Props) => {
+const HeadLessFlows: React.FC<Props> = (demoProps: Props) => {
   /** XFlow应用实例 */
   const app = useXFlowApp();
 
@@ -309,6 +306,4 @@ const DomainManger: React.FC<Props> = (demoProps: Props) => {
   );
 };
 
-export default connect(({ domainManger }: { domainManger: StateType }) => ({
-  domainManger,
-}))(DomainManger);
+export default HeadLessFlows;

@@ -3,19 +3,20 @@ package com.tencent.supersonic.headless.api.pojo.request;
 import com.tencent.supersonic.headless.api.pojo.DataSetDetail;
 import com.tencent.supersonic.headless.api.pojo.QueryConfig;
 import com.tencent.supersonic.headless.api.pojo.SchemaItem;
-import java.util.List;
 import lombok.Data;
+
+import java.util.List;
 
 @Data
 public class DataSetReq extends SchemaItem {
 
     private Long domainId;
 
-    private DataSetDetail dataSetDetail;
+    private DataSetDetail dataSetDetail = new DataSetDetail();
 
     private String alias;
 
-    private QueryConfig queryConfig;
+    private QueryConfig queryConfig = new QueryConfig();
 
     private List<String> admins;
 
@@ -34,5 +35,4 @@ public class DataSetReq extends SchemaItem {
         }
         return String.join(",", adminOrgs);
     }
-
 }

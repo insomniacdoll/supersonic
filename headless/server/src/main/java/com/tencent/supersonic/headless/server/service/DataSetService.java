@@ -1,11 +1,11 @@
 package com.tencent.supersonic.headless.server.service;
 
-import com.tencent.supersonic.auth.api.authentication.pojo.User;
+import com.tencent.supersonic.common.pojo.User;
+import com.tencent.supersonic.headless.api.pojo.MetaFilter;
+import com.tencent.supersonic.headless.api.pojo.request.DataSetReq;
 import com.tencent.supersonic.headless.api.pojo.request.QueryDataSetReq;
 import com.tencent.supersonic.headless.api.pojo.request.SemanticQueryReq;
-import com.tencent.supersonic.headless.api.pojo.request.DataSetReq;
 import com.tencent.supersonic.headless.api.pojo.response.DataSetResp;
-import com.tencent.supersonic.headless.server.pojo.MetaFilter;
 
 import java.util.List;
 import java.util.Map;
@@ -18,7 +18,9 @@ public interface DataSetService {
 
     DataSetResp getDataSet(Long id);
 
-    List<DataSetResp> getDataSetList(MetaFilter metaFilter, User user);
+    List<DataSetResp> getDataSetList(MetaFilter metaFilter);
+
+    List<DataSetResp> getDataSetList(Long domainId, List<Integer> statuCodesList);
 
     void delete(Long id, User user);
 
@@ -26,18 +28,13 @@ public interface DataSetService {
 
     Map<Long, List<Long>> getModelIdToDataSetIds();
 
-    List<DataSetResp> getDataSets(User user);
-
     List<DataSetResp> getDataSets(String dataSetName, User user);
 
     List<DataSetResp> getDataSets(List<String> dataSetNames, User user);
-
-    Map<Long, String> getDataSetIdToNameMap(List<Long> dataSetIds);
 
     List<DataSetResp> getDataSetsInheritAuth(User user, Long domainId);
 
     SemanticQueryReq convert(QueryDataSetReq queryDataSetReq);
 
     Long getDataSetIdFromSql(String sql, User user);
-
 }

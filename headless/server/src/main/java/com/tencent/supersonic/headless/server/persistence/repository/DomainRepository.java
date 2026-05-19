@@ -1,6 +1,5 @@
 package com.tencent.supersonic.headless.server.persistence.repository;
 
-
 import com.tencent.supersonic.headless.server.persistence.dataobject.DomainDO;
 
 import java.util.List;
@@ -17,4 +16,5 @@ public interface DomainRepository {
 
     DomainDO getDomainById(Long id);
 
+    List<DomainDO> getDomainByBizName(String bizName);
 }

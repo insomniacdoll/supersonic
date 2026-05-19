@@ -1,10 +1,11 @@
 package com.tencent.supersonic.headless.server.service;
 
-import com.tencent.supersonic.auth.api.authentication.pojo.User;
+import com.tencent.supersonic.common.pojo.User;
 import com.tencent.supersonic.common.pojo.enums.AuthType;
 import com.tencent.supersonic.headless.api.pojo.request.DomainReq;
 import com.tencent.supersonic.headless.api.pojo.request.DomainUpdateReq;
 import com.tencent.supersonic.headless.api.pojo.response.DomainResp;
+import com.tencent.supersonic.headless.server.persistence.dataobject.DomainDO;
 
 import java.util.List;
 import java.util.Map;
@@ -16,9 +17,9 @@ public interface DomainService {
 
     Map<Long, String> getDomainFullPath();
 
-    void createDomain(DomainReq domainReq, User user);
+    DomainResp createDomain(DomainReq domainReq, User user);
 
-    void updateDomain(DomainUpdateReq domainUpdateReq, User user);
+    DomainResp updateDomain(DomainUpdateReq domainUpdateReq, User user);
 
     void deleteDomain(Long id);
 
@@ -32,6 +33,7 @@ public interface DomainService {
 
     Set<DomainResp> getDomainAuthSet(User user, AuthType authTypeEnum);
 
-    Set<DomainResp> getDomainChildren(List<Long> domainId);
+    List<DomainDO> getDomainByBizName(String bizName);
 
+    Set<DomainResp> getDomainChildren(List<Long> domainId);
 }

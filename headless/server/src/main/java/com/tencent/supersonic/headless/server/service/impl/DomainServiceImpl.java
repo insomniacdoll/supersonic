@@ -1,8 +1,9 @@
 package com.tencent.supersonic.headless.server.service.impl;
 
 import com.google.common.collect.Lists;
-import com.tencent.supersonic.auth.api.authentication.pojo.User;
+import com.google.common.collect.Sets;
 import com.tencent.supersonic.auth.api.authentication.service.UserService;
+import com.tencent.supersonic.common.pojo.User;
 import com.tencent.supersonic.common.pojo.enums.AuthType;
 import com.tencent.supersonic.common.pojo.enums.StatusEnum;
 import com.tencent.supersonic.common.util.BeanMapper;
@@ -10,15 +11,12 @@ import com.tencent.supersonic.headless.api.pojo.request.DomainReq;
 import com.tencent.supersonic.headless.api.pojo.request.DomainUpdateReq;
 import com.tencent.supersonic.headless.api.pojo.response.DomainResp;
 import com.tencent.supersonic.headless.api.pojo.response.ModelResp;
-import com.tencent.supersonic.headless.api.pojo.response.DataSetResp;
 import com.tencent.supersonic.headless.server.persistence.dataobject.DomainDO;
 import com.tencent.supersonic.headless.server.persistence.repository.DomainRepository;
 import com.tencent.supersonic.headless.server.service.DomainService;
 import com.tencent.supersonic.headless.server.service.ModelService;
-import com.tencent.supersonic.headless.server.service.DataSetService;
 import com.tencent.supersonic.headless.server.utils.DomainConvert;
 import lombok.extern.slf4j.Slf4j;
-import org.assertj.core.util.Sets;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
@@ -35,7 +33,6 @@ import java.util.Queue;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-
 @Service
 @Slf4j
 public class DomainServiceImpl implements DomainService {
@@ -43,32 +40,29 @@ public class DomainServiceImpl implements DomainService {
     private final DomainRepository domainRepository;
     private final ModelService modelService;
     private final UserService userService;
-    private final DataSetService dataSetService;
 
-
-    public DomainServiceImpl(DomainRepository domainRepository,
-                             @Lazy ModelService modelService,
-                             UserService userService,
-                             @Lazy DataSetService dataSetService) {
+    public DomainServiceImpl(DomainRepository domainRepository, @Lazy ModelService modelService,
+            UserService userService) {
         this.domainRepository = domainRepository;
         this.modelService = modelService;
         this.userService = userService;
-        this.dataSetService = dataSetService;
     }
 
     @Override
-    public void createDomain(DomainReq domainReq, User user) {
+    public DomainResp createDomain(DomainReq domainReq, User user) {
         DomainDO domainDO = DomainConvert.convert(domainReq, user);
         domainDO.setStatus(StatusEnum.ONLINE.getCode());
         domainRepository.createDomain(domainDO);
+        return DomainConvert.convert(domainDO);
     }
 
     @Override
-    public void updateDomain(DomainUpdateReq domainUpdateReq, User user) {
+    public DomainResp updateDomain(DomainUpdateReq domainUpdateReq, User user) {
         domainUpdateReq.updatedBy(user.getName());
         DomainDO domainDO = getDomainDO(domainUpdateReq.getId());
         BeanMapper.mapper(domainUpdateReq, domainDO);
         domainRepository.updateDomain(domainDO);
+        return DomainConvert.convert(domainDO);
     }
 
     @Override
@@ -93,8 +87,7 @@ public class DomainServiceImpl implements DomainService {
 
     @Override
     public List<DomainResp> getDomainList(List<Long> domainIds) {
-        return getDomainList().stream()
-                .filter(domainDO -> domainIds.contains(domainDO.getId()))
+        return getDomainList().stream().filter(domainDO -> domainIds.contains(domainDO.getId()))
                 .collect(Collectors.toList());
     }
 
@@ -102,18 +95,20 @@ public class DomainServiceImpl implements DomainService {
     public List<DomainResp> getDomainListWithAdminAuth(User user) {
         Set<DomainResp> domainWithAuthAll = getDomainAuthSet(user, AuthType.ADMIN);
         if (!CollectionUtils.isEmpty(domainWithAuthAll)) {
-            List<Long> domainIds = domainWithAuthAll.stream().map(DomainResp::getId).collect(Collectors.toList());
+            List<Long> domainIds =
+                    domainWithAuthAll.stream().map(DomainResp::getId).collect(Collectors.toList());
             domainWithAuthAll.addAll(getParentDomain(domainIds));
         }
         List<ModelResp> modelResps = modelService.getModelAuthList(user, null, AuthType.ADMIN);
+        List<Long> domainIdsFromModel =
+                modelResps.stream().map(ModelResp::getDomainId).collect(Collectors.toList());
         if (!CollectionUtils.isEmpty(modelResps)) {
-            List<Long> domainIds = modelResps.stream().map(ModelResp::getDomainId).collect(Collectors.toList());
-            domainWithAuthAll.addAll(getParentDomain(domainIds));
+            domainWithAuthAll.addAll(getParentDomain(domainIdsFromModel));
         }
-        List<DataSetResp> dataSetResps = dataSetService.getDataSets(user);
-        if (!CollectionUtils.isEmpty(dataSetResps)) {
-            List<Long> domainIds = dataSetResps.stream().map(DataSetResp::getDomainId).collect(Collectors.toList());
-            domainWithAuthAll.addAll(getParentDomain(domainIds));
+        for (DomainResp domainResp : domainWithAuthAll) {
+            if (domainIdsFromModel.contains(domainResp.getId())) {
+                domainResp.setHasModel(true);
+            }
         }
         return new ArrayList<>(domainWithAuthAll).stream()
                 .sorted(Comparator.comparingLong(DomainResp::getId)).collect(Collectors.toList());
@@ -123,23 +118,21 @@ public class DomainServiceImpl implements DomainService {
     public Set<DomainResp> getDomainAuthSet(User user, AuthType authTypeEnum) {
         List<DomainResp> domainResps = getDomainList();
         Set<String> orgIds = userService.getUserAllOrgId(user.getName());
-        List<DomainResp> domainWithAuth = Lists.newArrayList();
+        Set<DomainResp> domainWithAuth = Sets.newHashSet();
         if (authTypeEnum.equals(AuthType.ADMIN)) {
             domainWithAuth = domainResps.stream()
                     .filter(domainResp -> checkAdminPermission(orgIds, user, domainResp))
-                    .collect(Collectors.toList());
+                    .collect(Collectors.toSet());
+            return domainWithAuth.stream().peek(domainResp -> domainResp.setHasEditPermission(true))
+                    .collect(Collectors.toSet());
         }
-        if (authTypeEnum.equals(AuthType.VISIBLE)) {
+        if (authTypeEnum.equals(AuthType.VIEWER)) {
             domainWithAuth = domainResps.stream()
-                    .filter(domainResp -> checkDataSeterPermission(orgIds, user, domainResp))
-                    .collect(Collectors.toList());
+                    .filter(domainResp -> checkViewPermission(orgIds, user, domainResp))
+                    .collect(Collectors.toSet());
         }
-        List<Long> domainIds = domainWithAuth.stream().map(DomainResp::getId)
-                .collect(Collectors.toList());
-        //get all child domain
-        return getDomainChildren(domainIds).stream()
-                .peek(domainResp -> domainResp.setHasEditPermission(true))
-                .collect(Collectors.toSet());
+
+        return domainWithAuth;
     }
 
     private Set<DomainResp> getParentDomain(List<Long> ids) {
@@ -182,7 +175,13 @@ public class DomainServiceImpl implements DomainService {
 
     @Override
     public Map<Long, DomainResp> getDomainMap() {
-        return getDomainList().stream().collect(Collectors.toMap(DomainResp::getId, a -> a, (k1, k2) -> k1));
+        return getDomainList().stream()
+                .collect(Collectors.toMap(DomainResp::getId, a -> a, (k1, k2) -> k1));
+    }
+
+    @Override
+    public List<DomainDO> getDomainByBizName(String bizName) {
+        return domainRepository.getDomainByBizName(bizName);
     }
 
     @Override
@@ -259,26 +258,20 @@ public class DomainServiceImpl implements DomainService {
         return false;
     }
 
-    private boolean checkDataSeterPermission(Set<String> orgIds, User user, DomainResp domainDesc) {
-        List<String> admins = domainDesc.getAdmins();
-        List<String> viewers = domainDesc.getViewers();
-        List<String> adminOrgs = domainDesc.getAdminOrgs();
-        List<String> viewOrgs = domainDesc.getViewOrgs();
-        if (user.isSuperAdmin()) {
+    private boolean checkViewPermission(Set<String> orgIds, User user, DomainResp domainResp) {
+        if (checkAdminPermission(orgIds, user, domainResp)) {
             return true;
         }
-        if (admins.contains(user.getName())
-                || viewers.contains(user.getName())
-                || domainDesc.getCreatedBy().equals(user.getName())) {
+        List<String> viewers = domainResp.getViewers();
+        List<String> viewOrgs = domainResp.getViewOrgs();
+        if (domainResp.openToAll()) {
             return true;
         }
-        if (CollectionUtils.isEmpty(adminOrgs) && CollectionUtils.isEmpty(viewOrgs)) {
+        if (viewers.contains(user.getName())) {
+            return true;
+        }
+        if (CollectionUtils.isEmpty(viewOrgs)) {
             return false;
-        }
-        for (String orgId : orgIds) {
-            if (adminOrgs.contains(orgId)) {
-                return true;
-            }
         }
         for (String orgId : orgIds) {
             if (viewOrgs.contains(orgId)) {

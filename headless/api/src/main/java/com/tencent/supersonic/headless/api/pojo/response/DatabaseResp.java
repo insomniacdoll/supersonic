@@ -2,6 +2,7 @@ package com.tencent.supersonic.headless.api.pojo.response;
 
 import com.google.common.collect.Lists;
 import com.tencent.supersonic.common.pojo.RecordInfo;
+import com.tencent.supersonic.common.util.AESEncryptionUtil;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -10,7 +11,6 @@ import lombok.NoArgsConstructor;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-
 
 @Data
 @AllArgsConstructor
@@ -27,6 +27,8 @@ public class DatabaseResp extends RecordInfo {
     private List<String> admins = Lists.newArrayList();
 
     private List<String> viewers = Lists.newArrayList();
+
+    private Integer isOpen = 0;
 
     private String type;
 
@@ -48,6 +50,10 @@ public class DatabaseResp extends RecordInfo {
 
     private boolean hasEditPermission = false;
 
+    public boolean isPublic() {
+        return isOpen != null && isOpen == 1;
+    }
+
     public String getHost() {
         Pattern p = Pattern.compile("jdbc:(?<db>\\w+):.*((//)|@)(?<host>.+):(?<port>\\d+).*");
         Matcher m = p.matcher(url);
@@ -66,4 +72,7 @@ public class DatabaseResp extends RecordInfo {
         return "";
     }
 
+    public String passwordDecrypt() {
+        return AESEncryptionUtil.aesDecryptECB(password);
+    }
 }

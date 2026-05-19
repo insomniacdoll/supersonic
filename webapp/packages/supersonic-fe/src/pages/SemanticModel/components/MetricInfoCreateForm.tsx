@@ -17,7 +17,6 @@ import {
   Tooltip,
   Tag,
 } from 'antd';
-import { StatusEnum } from '../enum';
 import { InfoCircleOutlined } from '@ant-design/icons';
 import MetricMeasuresFormTable from './MetricMeasuresFormTable';
 import { SENSITIVE_LEVEL_OPTIONS, METRIC_DEFINE_TYPE, TAG_DEFINE_TYPE } from '../constant';
@@ -37,14 +36,14 @@ import DimensionAndMetricRelationModal from './DimensionAndMetricRelationModal';
 import TableTitleTooltips from '../components/TableTitleTooltips';
 import { createMetric, updateMetric, mockMetricAlias, getMetricTags } from '../service';
 import { ISemantic } from '../data';
-import { history } from 'umi';
+import { history } from '@umijs/max';
 
 export type CreateFormProps = {
   datasourceId?: number;
-  domainId: number;
-  modelId: number;
+  domainId?: number;
+  modelId?: number;
   createModalVisible: boolean;
-  metricItem: any;
+  metricItem?: ISemantic.IMetricItem;
   onCancel?: () => void;
   onSubmit?: (values: any) => void;
 };
@@ -368,6 +367,15 @@ const MetricInfoCreateForm: React.FC<CreateFormProps> = ({
       message.error('请输入度量表达式');
       return;
     }
+
+    if (defineType === METRIC_DEFINE_TYPE.MEASURE) {
+      const { bizName, name, metricDefineByMeasureParams } = queryParams;
+      queryParams[queryParamsTypeParamsKey[METRIC_DEFINE_TYPE.MEASURE]].measures =
+        metricDefineByMeasureParams.measures.map((item: ISemantic.IMeasure) => {
+          return item.bizName === bizName && name ? { ...item, name } : item;
+        });
+    }
+
     if (!dataFormatType) {
       delete queryParams.dataFormat;
     }
@@ -514,6 +522,7 @@ const MetricInfoCreateForm: React.FC<CreateFormProps> = ({
                 typeParams={exprTypeParamsState[METRIC_DEFINE_TYPE.MEASURE]}
                 measuresList={classMeasureList}
                 onFieldChange={(measures: ISemantic.IMeasure[]) => {
+                  // setClassMeasureList(measures);
                   setExprTypeParamsState((prevState) => {
                     return {
                       ...prevState,
@@ -713,6 +722,7 @@ const MetricInfoCreateForm: React.FC<CreateFormProps> = ({
         </FormItem>
 
         <Form.Item
+          hidden={!!!process.env.SHOW_TAG}
           label={
             <FormItemTitle
               title={`设为标签`}
@@ -899,7 +909,9 @@ const MetricInfoCreateForm: React.FC<CreateFormProps> = ({
               type="primary"
               key="console"
               onClick={() => {
-                history.replace(`/model/${domainId}/${modelId || metricItem?.modelId}/dataSource`);
+                history.replace(
+                  `/model/domain/manager/${domainId}/${modelId || metricItem?.modelId}/dataSource`,
+                );
                 onCancel?.();
               }}
             >

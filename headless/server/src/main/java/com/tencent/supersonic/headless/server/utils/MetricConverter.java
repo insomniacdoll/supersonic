@@ -7,16 +7,18 @@ import com.tencent.supersonic.common.pojo.enums.PublishEnum;
 import com.tencent.supersonic.common.pojo.enums.StatusEnum;
 import com.tencent.supersonic.common.pojo.enums.TypeEnums;
 import com.tencent.supersonic.common.util.BeanMapper;
-import com.tencent.supersonic.headless.api.pojo.enums.MetricDefineType;
+import com.tencent.supersonic.headless.api.pojo.Dimension;
 import com.tencent.supersonic.headless.api.pojo.MetricDefineByFieldParams;
 import com.tencent.supersonic.headless.api.pojo.MetricDefineByMeasureParams;
 import com.tencent.supersonic.headless.api.pojo.MetricDefineByMetricParams;
 import com.tencent.supersonic.headless.api.pojo.RelateDimension;
+import com.tencent.supersonic.headless.api.pojo.enums.MetricDefineType;
 import com.tencent.supersonic.headless.api.pojo.request.MetricReq;
+import com.tencent.supersonic.headless.api.pojo.response.DataSetResp;
 import com.tencent.supersonic.headless.api.pojo.response.MetricResp;
 import com.tencent.supersonic.headless.api.pojo.response.ModelResp;
-import com.tencent.supersonic.headless.api.pojo.response.DataSetResp;
 import com.tencent.supersonic.headless.server.persistence.dataobject.MetricDO;
+import org.apache.commons.collections.CollectionUtils;
 import org.springframework.beans.BeanUtils;
 
 import java.util.HashMap;
@@ -35,7 +37,7 @@ public class MetricConverter {
         metricDO.setClassifications(metricReq.getClassifications());
         metricDO.setRelateDimensions(JSONObject.toJSONString(metricReq.getRelateDimension()));
         metricDO.setStatus(StatusEnum.ONLINE.getCode());
-        metricDO.setIsPublish(PublishEnum.UN_PUBLISHED.getCode());
+        metricDO.setIsPublish(PublishEnum.PUBLISHED.getCode());
         if (metricReq.getExt() != null) {
             metricDO.setExt(JSONObject.toJSONString(metricReq.getExt()));
         }
@@ -68,31 +70,38 @@ public class MetricConverter {
         return convert2MetricResp(metricDO, new HashMap<>(), Lists.newArrayList());
     }
 
-    public static MetricResp convert2MetricResp(MetricDO metricDO, Map<Long, ModelResp> modelMap, List<Long> collect) {
+    public static MetricResp convert2MetricResp(MetricDO metricDO, Map<Long, ModelResp> modelMap,
+            List<Long> collect) {
         MetricResp metricResp = new MetricResp();
         BeanUtils.copyProperties(metricDO, metricResp);
 
-        metricResp.setDataFormat(JSONObject.parseObject(metricDO.getDataFormat(), DataFormat.class));
+        metricResp
+                .setDataFormat(JSONObject.parseObject(metricDO.getDataFormat(), DataFormat.class));
         ModelResp modelResp = modelMap.get(metricDO.getModelId());
         if (modelResp != null) {
             metricResp.setModelName(modelResp.getName());
             metricResp.setModelBizName(modelResp.getBizName());
             metricResp.setDomainId(modelResp.getDomainId());
+            List<Dimension> timeDims = modelResp.getTimeDimension();
+            if (CollectionUtils.isNotEmpty(timeDims)) {
+                metricResp.setContainsPartitionDimensions(true);
+            }
         }
+
         metricResp.setIsCollect(collect != null && collect.contains(metricDO.getId()));
         metricResp.setClassifications(metricDO.getClassifications());
-        metricResp.setRelateDimension(JSONObject.parseObject(metricDO.getRelateDimensions(),
-                RelateDimension.class));
+        metricResp.setRelateDimension(
+                JSONObject.parseObject(metricDO.getRelateDimensions(), RelateDimension.class));
         if (metricDO.getExt() != null) {
             metricResp.setExt(JSONObject.parseObject(metricDO.getExt(), HashMap.class));
         }
         metricResp.setTypeEnum(TypeEnums.METRIC);
         if (MetricDefineType.MEASURE.name().equalsIgnoreCase(metricDO.getDefineType())) {
-            metricResp.setMetricDefineByMeasureParams(JSONObject.parseObject(metricDO.getTypeParams(),
-                    MetricDefineByMeasureParams.class));
+            metricResp.setMetricDefineByMeasureParams(JSONObject
+                    .parseObject(metricDO.getTypeParams(), MetricDefineByMeasureParams.class));
         } else if (MetricDefineType.METRIC.name().equalsIgnoreCase(metricDO.getDefineType())) {
-            metricResp.setMetricDefineByMetricParams(JSONObject.parseObject(metricDO.getTypeParams(),
-                    MetricDefineByMetricParams.class));
+            metricResp.setMetricDefineByMetricParams(JSONObject
+                    .parseObject(metricDO.getTypeParams(), MetricDefineByMetricParams.class));
         } else if (MetricDefineType.FIELD.name().equalsIgnoreCase(metricDO.getDefineType())) {
             metricResp.setMetricDefineByFieldParams(JSONObject.parseObject(metricDO.getTypeParams(),
                     MetricDefineByFieldParams.class));
@@ -100,14 +109,15 @@ public class MetricConverter {
         if (metricDO.getDefineType() != null) {
             metricResp.setMetricDefineType(MetricDefineType.valueOf(metricDO.getDefineType()));
         }
+        metricResp.setIsTag(metricDO.getIsTag());
         return metricResp;
     }
 
-    public static List<MetricResp> filterByDataSet(List<MetricResp> metricResps, DataSetResp dataSetResp) {
-        return metricResps.stream().filter(metricResp ->
-                        dataSetResp.metricIds().contains(metricResp.getId())
-                                || dataSetResp.getAllIncludeAllModels().contains(metricResp.getModelId()))
+    public static List<MetricResp> filterByDataSet(List<MetricResp> metricResps,
+            DataSetResp dataSetResp) {
+        return metricResps.stream()
+                .filter(metricResp -> dataSetResp.metricIds().contains(metricResp.getId())
+                        || dataSetResp.getAllIncludeAllModels().contains(metricResp.getModelId()))
                 .collect(Collectors.toList());
     }
-
 }

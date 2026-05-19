@@ -18,7 +18,6 @@ import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
 
-
 public class DictTest extends BaseTest {
     @Autowired
     private DictConfMapper confMapper;
@@ -86,9 +85,9 @@ public class DictTest extends BaseTest {
         DictSingleTaskReq dictTask = DictSingleTaskReq.builder().itemId(confDODb.getItemId())
                 .type(TypeEnums.DIMENSION).build();
         taskService.addDictTask(dictTask, null);
-        DictSingleTaskReq taskReq = DictSingleTaskReq.builder().itemId(3L).type(TypeEnums.DIMENSION).build();
+        DictSingleTaskReq taskReq =
+                DictSingleTaskReq.builder().itemId(3L).type(TypeEnums.DIMENSION).build();
         taskService.deleteDictTask(taskReq, null);
         System.out.println();
     }
-
 }

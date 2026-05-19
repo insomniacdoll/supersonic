@@ -1,21 +1,29 @@
-import React from 'react';
-import { connect } from 'umi';
-import type { StateType } from './model';
-import OverviewContainer from './OverviewContainer';
-import type { Dispatch } from 'umi';
+import React, { useState } from 'react';
+import { useParams, useModel } from '@umijs/max';
+import DomainManagerTab from './components/DomainManagerTab';
+import { toDomainList } from '@/pages/SemanticModel/utils';
 
-type Props = {
-  domainManger: StateType;
-  dispatch: Dispatch;
-};
-const DomainManager: React.FC<Props> = () => {
+type Props = {};
+
+const DomainManager: React.FC<Props> = ({}) => {
+  const defaultTabKey = 'overview';
+  const params: any = useParams();
+  const domainModel = useModel('SemanticModel.domainData');
+
+  const { selectDomainId } = domainModel;
+  const menuKey = params.menuKey ? params.menuKey : defaultTabKey;
+
+  const [activeKey, setActiveKey] = useState<string>(menuKey);
+
   return (
-    <>
-      <OverviewContainer mode={'domain'} />
-    </>
+    <DomainManagerTab
+      activeKey={activeKey}
+      onMenuChange={(menuKey) => {
+        setActiveKey(menuKey);
+        toDomainList(selectDomainId, menuKey);
+      }}
+    />
   );
 };
 
-export default connect(({ domainManger }: { domainManger: StateType }) => ({
-  domainManger,
-}))(DomainManager);
+export default DomainManager;

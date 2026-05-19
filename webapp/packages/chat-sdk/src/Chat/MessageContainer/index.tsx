@@ -18,6 +18,8 @@ type Props = {
   chatVisible?: boolean;
   isDeveloper?: boolean;
   integrateSystem?: string;
+  isSimpleMode?: boolean;
+  isDebugMode?: boolean;
   onMsgDataLoaded: (
     data: MsgDataType,
     questionId: string | number,
@@ -37,11 +39,12 @@ const MessageContainer: React.FC<Props> = ({
   chatVisible,
   isDeveloper,
   integrateSystem,
+  isSimpleMode,
+  isDebugMode,
   onMsgDataLoaded,
   onSendMsg,
 }) => {
   const [triggerResize, setTriggerResize] = useState(false);
-
   const onResize = useCallback(() => {
     setTriggerResize(true);
     setTimeout(() => {
@@ -61,13 +64,13 @@ const MessageContainer: React.FC<Props> = ({
   }, [historyVisible, chatVisible]);
 
   const messageContainerClass = classNames(styles.messageContainer, { [styles.mobile]: isMobile });
-
   return (
     <div id={id} className={messageContainerClass}>
       <div className={styles.messageList}>
         {messageList.map((msgItem: MessageItem, index: number) => {
           const {
             id: msgId,
+            questionId,
             modelId,
             agentId,
             type,
@@ -92,6 +95,10 @@ const MessageContainer: React.FC<Props> = ({
                   <Text position="right" data={msg} />
                   {identityMsg && <Text position="left" data={identityMsg} />}
                   <ChatItem
+                    questionId={questionId}
+                    currentAgent={currentAgent}
+                    isSimpleMode={isSimpleMode}
+                    isDebugMode={isDebugMode}
                     msg={msgValue || msg || ''}
                     parseInfos={parseInfos}
                     parseTimeCostValue={parseTimeCost}
@@ -109,6 +116,7 @@ const MessageContainer: React.FC<Props> = ({
                     }}
                     onUpdateMessageScroll={updateMessageContainerScroll}
                     onSendMsg={onSendMsg}
+                    isLastMessage={index === messageList.length - 1}
                   />
                 </>
               )}
@@ -126,7 +134,8 @@ function areEqual(prevProps: Props, nextProps: Props) {
     isEqual(prevProps.messageList, nextProps.messageList) &&
     prevProps.historyVisible === nextProps.historyVisible &&
     prevProps.currentAgent === nextProps.currentAgent &&
-    prevProps.chatVisible === nextProps.chatVisible
+    prevProps.chatVisible === nextProps.chatVisible &&
+    prevProps.isSimpleMode === nextProps.isSimpleMode
   ) {
     return true;
   }

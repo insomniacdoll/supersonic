@@ -13,14 +13,10 @@ public class Identify {
 
     private String name;
 
-    /**
-     * primary, foreign
-     */
+    /** primary, foreign */
     private String type;
 
     private String bizName;
-
-    private List<String> entityNames;
 
     private Integer isCreateDimension = 0;
 
@@ -30,15 +26,7 @@ public class Identify {
         this.bizName = bizName;
     }
 
-    public Identify(String name, String type, String bizName, Integer isCreateDimension) {
-        this.name = name;
-        this.type = type;
-        this.bizName = bizName;
-        this.isCreateDimension = isCreateDimension;
-    }
-
     public String getFieldName() {
         return bizName;
     }
-
 }

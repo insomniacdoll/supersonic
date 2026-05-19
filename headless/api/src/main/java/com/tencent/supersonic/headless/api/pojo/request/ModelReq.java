@@ -1,15 +1,12 @@
 package com.tencent.supersonic.headless.api.pojo.request;
 
-
-import com.google.common.collect.Lists;
-import com.tencent.supersonic.headless.api.pojo.Dim;
 import com.tencent.supersonic.headless.api.pojo.DrillDownDimension;
 import com.tencent.supersonic.headless.api.pojo.ModelDetail;
 import com.tencent.supersonic.headless.api.pojo.SchemaItem;
 import lombok.Data;
 
 import java.util.List;
-
+import java.util.Map;
 
 @Data
 public class ModelReq extends SchemaItem {
@@ -38,14 +35,7 @@ public class ModelReq extends SchemaItem {
 
     private List<String> adminOrgs;
 
-    private Long tagObjectId;
-
-    public List<Dim> getTimeDimension() {
-        if (modelDetail == null) {
-            return Lists.newArrayList();
-        }
-        return modelDetail.filterTimeDims();
-    }
+    private Map<String, Object> ext;
 
     public String getViewer() {
         if (viewers == null) {
@@ -74,5 +64,4 @@ public class ModelReq extends SchemaItem {
         }
         return String.join(",", adminOrgs);
     }
-
 }

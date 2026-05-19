@@ -1,24 +1,20 @@
 package com.tencent.supersonic.headless.api.pojo;
 
-import java.util.ArrayList;
-import java.util.List;
 import lombok.Data;
 
-@Data
-public class SchemaValueMap {
+import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.List;
 
-    /**
-     * dimension value in db
-     */
+@Data
+public class SchemaValueMap implements Serializable {
+
+    /** dimension value in db */
     private String techName;
 
-    /**
-     * dimension value for result show
-     */
+    /** dimension value for result show */
     private String bizName;
 
-    /**
-     * dimension value for user query
-     */
+    /** dimension value for user query */
     private List<String> alias = new ArrayList<>();
 }

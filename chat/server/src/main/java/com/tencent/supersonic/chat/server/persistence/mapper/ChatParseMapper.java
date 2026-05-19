@@ -6,7 +6,6 @@ import org.apache.ibatis.annotations.Param;
 
 import java.util.List;
 
-
 @Mapper
 public interface ChatParseMapper {
 
@@ -18,4 +17,5 @@ public interface ChatParseMapper {
 
     List<ChatParseDO> getParseInfoList(List<Long> questionIds);
 
+    List<ChatParseDO> getContextualParseInfo(Integer chatId);
 }

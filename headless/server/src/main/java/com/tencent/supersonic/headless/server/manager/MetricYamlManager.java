@@ -1,19 +1,10 @@
 package com.tencent.supersonic.headless.server.manager;
 
 import com.google.common.collect.Lists;
+import com.tencent.supersonic.headless.api.pojo.*;
 import com.tencent.supersonic.headless.api.pojo.enums.MetricDefineType;
-import com.tencent.supersonic.headless.api.pojo.FieldParam;
-import com.tencent.supersonic.headless.api.pojo.MeasureParam;
-import com.tencent.supersonic.headless.api.pojo.MetricDefineByFieldParams;
-import com.tencent.supersonic.headless.api.pojo.MetricDefineByMeasureParams;
-import com.tencent.supersonic.headless.api.pojo.MetricDefineByMetricParams;
-import com.tencent.supersonic.headless.api.pojo.MetricParam;
 import com.tencent.supersonic.headless.api.pojo.response.MetricResp;
-import com.tencent.supersonic.headless.server.pojo.yaml.FieldParamYamlTpl;
-import com.tencent.supersonic.headless.server.pojo.yaml.MeasureYamlTpl;
-import com.tencent.supersonic.headless.server.pojo.yaml.MetricParamYamlTpl;
-import com.tencent.supersonic.headless.server.pojo.yaml.MetricTypeParamsYamlTpl;
-import com.tencent.supersonic.headless.server.pojo.yaml.MetricYamlTpl;
+import com.tencent.supersonic.headless.server.pojo.yaml.*;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
@@ -22,9 +13,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
-/**
- * manager to handle the metric
- */
+/** manager to handle the metric */
 @Slf4j
 @Service
 public class MetricYamlManager {
@@ -46,9 +35,10 @@ public class MetricYamlManager {
         metricYamlTpl.setOwners(Lists.newArrayList(metric.getCreatedBy()));
         MetricTypeParamsYamlTpl metricTypeParamsYamlTpl = new MetricTypeParamsYamlTpl();
         if (MetricDefineType.MEASURE.equals(metric.getMetricDefineType())) {
-            MetricDefineByMeasureParams metricDefineParams = metric.getMetricDefineByMeasureParams();
+            MetricDefineByMeasureParams metricDefineParams =
+                    metric.getMetricDefineByMeasureParams();
             metricTypeParamsYamlTpl.setExpr(metricDefineParams.getExpr());
-            List<MeasureParam> measures = metricDefineParams.getMeasures();
+            List<Measure> measures = metricDefineParams.getMeasures();
             metricTypeParamsYamlTpl.setMeasures(
                     measures.stream().map(MetricYamlManager::convert).collect(Collectors.toList()));
         } else if (MetricDefineType.FIELD.equals(metric.getMetricDefineType())) {
@@ -58,7 +48,8 @@ public class MetricYamlManager {
             metricTypeParamsYamlTpl.setFields(
                     fields.stream().map(MetricYamlManager::convert).collect(Collectors.toList()));
         } else if (MetricDefineType.METRIC.equals(metric.getMetricDefineType())) {
-            MetricDefineByMetricParams metricDefineByMetricParams = metric.getMetricDefineByMetricParams();
+            MetricDefineByMetricParams metricDefineByMetricParams =
+                    metric.getMetricDefineByMetricParams();
             metricTypeParamsYamlTpl.setExpr(metricDefineByMetricParams.getExpr());
             List<MetricParam> metrics = metricDefineByMetricParams.getMetrics();
             metricTypeParamsYamlTpl.setMetrics(
@@ -68,7 +59,7 @@ public class MetricYamlManager {
         return metricYamlTpl;
     }
 
-    public static MeasureYamlTpl convert(MeasureParam measure) {
+    public static MeasureYamlTpl convert(Measure measure) {
         MeasureYamlTpl measureYamlTpl = new MeasureYamlTpl();
         measureYamlTpl.setName(measure.getBizName());
         measureYamlTpl.setConstraint(measure.getConstraint());
@@ -88,5 +79,4 @@ public class MetricYamlManager {
         metricParamYamlTpl.setId(metricParam.getId());
         return metricParamYamlTpl;
     }
-
 }

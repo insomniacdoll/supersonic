@@ -1,7 +1,7 @@
 package com.tencent.supersonic.headless.api.pojo.request;
 
 import com.tencent.supersonic.common.pojo.DateConf;
-import javax.validation.constraints.NotNull;
+import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 import lombok.ToString;
 

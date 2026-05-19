@@ -1,10 +1,10 @@
 package com.tencent.supersonic.common.pojo;
 
-
 import com.tencent.supersonic.common.pojo.enums.FilterOperatorEnum;
+import lombok.Data;
+
 import java.util.Arrays;
 import java.util.List;
-import lombok.Data;
 
 @Data
 public class Criterion {
@@ -26,7 +26,8 @@ public class Criterion {
         this.value = value;
         this.dataType = dataType;
 
-        if (FilterOperatorEnum.BETWEEN.name().equals(operator) || FilterOperatorEnum.IN.name().equals(operator)
+        if (FilterOperatorEnum.BETWEEN.name().equals(operator)
+                || FilterOperatorEnum.IN.name().equals(operator)
                 || FilterOperatorEnum.NOT_IN.name().equals(operator)) {
             this.values = (List) value;
         }
@@ -38,7 +39,6 @@ public class Criterion {
                 .isPresent();
     }
 
-
     public enum NumericDataType {
         TINYINT("TINYINT"),
         SMALLINT("SMALLINT"),
@@ -49,8 +49,8 @@ public class Criterion {
         FLOAT("FLOAT"),
         DOUBLE("DOUBLE"),
         DECIMAL("DECIMAL"),
-        NUMERIC("NUMERIC"),
-        ;
+        NUMERIC("NUMERIC"),;
+
         private String type;
 
         NumericDataType(String type) {
@@ -62,11 +62,9 @@ public class Criterion {
         }
     }
 
-
     public enum StringDataType {
-        VARCHAR("VARCHAR"),
-        STRING("STRING"),
-        ;
+        VARCHAR("VARCHAR"), STRING("STRING"),;
+
         private String type;
 
         StringDataType(String type) {
@@ -77,6 +75,4 @@ public class Criterion {
             return type;
         }
     }
-
-
 }

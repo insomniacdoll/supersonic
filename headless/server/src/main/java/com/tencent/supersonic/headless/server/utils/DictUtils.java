@@ -1,109 +1,79 @@
 package com.tencent.supersonic.headless.server.utils;
 
-import com.google.common.base.Strings;
-import com.tencent.supersonic.auth.api.authentication.pojo.User;
-import com.tencent.supersonic.common.pojo.Aggregator;
-import com.tencent.supersonic.common.pojo.Constants;
-import com.tencent.supersonic.common.pojo.DateConf;
-import com.tencent.supersonic.common.pojo.Filter;
-import com.tencent.supersonic.common.pojo.Order;
-import com.tencent.supersonic.common.pojo.enums.AggOperatorEnum;
-import com.tencent.supersonic.common.pojo.enums.FilterOperatorEnum;
-import com.tencent.supersonic.common.pojo.enums.StatusEnum;
-import com.tencent.supersonic.common.pojo.enums.TaskStatusEnum;
-import com.tencent.supersonic.common.pojo.enums.TimeDimensionEnum;
-import com.tencent.supersonic.common.pojo.enums.TypeEnums;
+import com.tencent.supersonic.common.pojo.*;
+import com.tencent.supersonic.common.pojo.enums.*;
+import com.tencent.supersonic.common.util.BeanMapper;
 import com.tencent.supersonic.common.util.JsonUtil;
-import com.tencent.supersonic.headless.api.pojo.Dim;
+import com.tencent.supersonic.headless.api.pojo.Dimension;
 import com.tencent.supersonic.headless.api.pojo.ItemValueConfig;
 import com.tencent.supersonic.headless.api.pojo.request.DictItemReq;
 import com.tencent.supersonic.headless.api.pojo.request.QuerySqlReq;
 import com.tencent.supersonic.headless.api.pojo.request.QueryStructReq;
 import com.tencent.supersonic.headless.api.pojo.request.SemanticQueryReq;
-import com.tencent.supersonic.headless.api.pojo.response.DictItemResp;
-import com.tencent.supersonic.headless.api.pojo.response.DictTaskResp;
-import com.tencent.supersonic.headless.api.pojo.response.DimensionResp;
-import com.tencent.supersonic.headless.api.pojo.response.MetricResp;
-import com.tencent.supersonic.headless.api.pojo.response.ModelResp;
-import com.tencent.supersonic.headless.api.pojo.response.SemanticQueryResp;
-import com.tencent.supersonic.headless.api.pojo.response.TagResp;
+import com.tencent.supersonic.headless.api.pojo.response.*;
+import com.tencent.supersonic.headless.server.facade.service.SemanticLayerService;
 import com.tencent.supersonic.headless.server.persistence.dataobject.DictConfDO;
 import com.tencent.supersonic.headless.server.persistence.dataobject.DictTaskDO;
 import com.tencent.supersonic.headless.server.service.DimensionService;
 import com.tencent.supersonic.headless.server.service.MetricService;
 import com.tencent.supersonic.headless.server.service.ModelService;
-import com.tencent.supersonic.headless.server.service.QueryService;
-import com.tencent.supersonic.headless.server.service.TagMetaService;
+import com.xkzhangsan.time.utils.CollectionUtil;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
-import java.util.StringJoiner;
+import java.util.*;
 
-import static com.tencent.supersonic.common.pojo.Constants.AND_UPPER;
-import static com.tencent.supersonic.common.pojo.Constants.APOSTROPHE;
-import static com.tencent.supersonic.common.pojo.Constants.COMMA;
-import static com.tencent.supersonic.common.pojo.Constants.POUND;
-import static com.tencent.supersonic.common.pojo.Constants.SPACE;
+import static com.tencent.supersonic.common.pojo.Constants.*;
 
 @Slf4j
 @Component
 public class DictUtils {
-
-    private static String dateTimeFormatter = "yyyyMMddHHmmss";
-    @Value("${dimension.multi.value.split:#}")
+    @Value("${s2.dimension.multi.value.split:#}")
     private String dimMultiValueSplit;
 
-    @Value("${item.value.max.count:100000}")
-    private Long itemValueMaxCount;
+    @Value("${s2.item.value.max.count:100000}")
+    private int itemValueMaxCount;
 
-    @Value("${item.value.white.frequency:999999}")
+    @Value("${s2.item.value.white.frequency:999999}")
     private Long itemValueWhiteFrequency;
 
-    @Value("${item.value.date.start:1}")
+    // 前多少天
+    @Value("${s2.item.value.date.start:1}")
     private Integer itemValueDateStart;
-    @Value("${item.value.date.end:1}")
+
+    @Value("${s2.item.value.date.end:1}")
+    // 前多少天
     private Integer itemValueDateEnd;
 
+    @Value("${s2.item.value.date.format:yyyy-MM-dd}")
+    private String itemValueDateFormat;
 
     private final DimensionService dimensionService;
     private final MetricService metricService;
-    private final QueryService queryService;
+    private final SemanticLayerService queryService;
     private final ModelService modelService;
-    private final TagMetaService tagMetaService;
 
-    public DictUtils(DimensionService dimensionService,
-                     MetricService metricService,
-                     QueryService queryService,
-                     ModelService modelService,
-                     @Lazy TagMetaService tagMetaService) {
+    public DictUtils(DimensionService dimensionService, MetricService metricService,
+            SemanticLayerService queryService, ModelService modelService) {
         this.dimensionService = dimensionService;
         this.metricService = metricService;
         this.queryService = queryService;
         this.modelService = modelService;
-        this.tagMetaService = tagMetaService;
     }
 
     public String fetchDictFileName(DictItemResp dictItemResp) {
-        return String.format("dic_value_%d_%s_%s", dictItemResp.getModelId(), dictItemResp.getType().name(),
-                dictItemResp.getItemId());
+        return String.format("dic_value_%d_%s_%s", dictItemResp.getModelId(),
+                dictItemResp.getType().name(), dictItemResp.getItemId());
     }
 
-    public DictTaskDO generateDictTaskDO(DictItemResp dictItemResp, User user, TaskStatusEnum status) {
+    public DictTaskDO generateDictTaskDO(DictItemResp dictItemResp, User user,
+            TaskStatusEnum status) {
         DictTaskDO taskDO = new DictTaskDO();
         Date createAt = new Date();
         String name = dictItemResp.fetchDictFileName();
@@ -113,7 +83,8 @@ public class DictUtils {
         taskDO.setConfig(JsonUtil.toString(dictItemResp.getConfig()));
         taskDO.setStatus(status.getStatus());
         taskDO.setCreatedAt(createAt);
-        String creator = (Objects.isNull(user) || Strings.isNullOrEmpty(user.getName())) ? "" : user.getName();
+        String creator =
+                (Objects.isNull(user) || StringUtils.isEmpty(user.getName())) ? "" : user.getName();
         taskDO.setCreatedBy(creator);
         return taskDO;
     }
@@ -125,7 +96,7 @@ public class DictUtils {
         confDO.setConfig(JsonUtil.toString(itemValueReq.getConfig()));
         Date createAt = new Date();
         confDO.setCreatedAt(createAt);
-        String creator = Strings.isNullOrEmpty(user.getName()) ? "" : user.getName();
+        String creator = StringUtils.isEmpty(user.getName()) ? "" : user.getName();
         confDO.setCreatedBy(creator);
         confDO.setStatus(itemValueReq.getStatus().name());
         return confDO;
@@ -133,7 +104,12 @@ public class DictUtils {
 
     public List<DictItemResp> dictDOList2Req(List<DictConfDO> dictConfDOList) {
         List<DictItemResp> dictItemReqList = new ArrayList<>();
-        dictConfDOList.stream().forEach(conf -> dictItemReqList.add(dictDO2Req(conf)));
+        dictConfDOList.stream().forEach(conf -> {
+            DictItemResp dictItemResp = dictDO2Req(conf);
+            if (Objects.nonNull(dictItemResp)) {
+                dictItemReqList.add(dictDO2Req(conf));
+            }
+        });
         return dictItemReqList;
     }
 
@@ -145,13 +121,12 @@ public class DictUtils {
         dictItemResp.setStatus(StatusEnum.of(dictConfDO.getStatus()));
         if (TypeEnums.DIMENSION.equals(TypeEnums.valueOf(dictConfDO.getType()))) {
             DimensionResp dimension = dimensionService.getDimension(dictConfDO.getItemId());
+            if (Objects.isNull(dimension)) {
+                log.info("dimension is null, dictConfDO:{}", dictConfDO);
+                return null;
+            }
             dictItemResp.setModelId(dimension.getModelId());
             dictItemResp.setBizName(dimension.getBizName());
-        }
-        if (TypeEnums.TAG.equals(TypeEnums.valueOf(dictConfDO.getType()))) {
-            TagResp tagResp = tagMetaService.getTag(dictConfDO.getItemId(), User.getFakeUser());
-            dictItemResp.setModelId(tagResp.getModelId());
-            dictItemResp.setBizName(tagResp.getBizName());
         }
 
         return dictItemResp;
@@ -163,8 +138,10 @@ public class DictUtils {
         semanticQueryReq.setNeedAuth(false);
         String bizName = dictItemResp.getBizName();
         try {
-            SemanticQueryResp semanticQueryResp = queryService.queryByReq(semanticQueryReq, null);
-            if (Objects.isNull(semanticQueryResp) || CollectionUtils.isEmpty(semanticQueryResp.getResultList())) {
+            SemanticQueryResp semanticQueryResp =
+                    queryService.queryByReq(semanticQueryReq, User.getDefaultUser());
+            if (Objects.isNull(semanticQueryResp)
+                    || CollectionUtils.isEmpty(semanticQueryResp.getResultList())) {
                 return lines;
             }
             Map<String, Long> valueAndFrequencyPair = new HashMap<>(2000);
@@ -181,7 +158,7 @@ public class DictUtils {
                         metricObject = line.get(key);
                     }
                 }
-                if (!Strings.isNullOrEmpty(dimValue) && Objects.nonNull(metricObject)) {
+                if (!StringUtils.isEmpty(dimValue) && Objects.nonNull(metricObject)) {
                     Long metric = Math.round(Double.parseDouble(metricObject.toString()));
                     mergeMultivaluedValue(valueAndFrequencyPair, dimValue, metric);
                 }
@@ -190,7 +167,7 @@ public class DictUtils {
             constructDictLines(valueAndFrequencyPair, lines, nature);
             addWhiteValueLines(dictItemResp, lines, nature);
         } catch (Exception e) {
-            e.printStackTrace();
+            log.error("dictItemResp:{},fetchItemValue error:", dictItemResp, e);
         }
         return lines;
     }
@@ -202,28 +179,30 @@ public class DictUtils {
         }
         List<String> whiteList = dictItemResp.getConfig().getWhiteList();
         whiteList.forEach(white -> {
-            if (!Strings.isNullOrEmpty(white)) {
+            if (!StringUtils.isEmpty(white)) {
                 white = white.replace(SPACE, POUND);
             }
             lines.add(String.format("%s %s %s", white, nature, itemValueWhiteFrequency));
         });
     }
 
-    private void constructDictLines(Map<String, Long> valueAndFrequencyPair, List<String> lines, String nature) {
+    private void constructDictLines(Map<String, Long> valueAndFrequencyPair, List<String> lines,
+            String nature) {
         if (CollectionUtils.isEmpty(valueAndFrequencyPair)) {
             return;
         }
 
         valueAndFrequencyPair.forEach((value, frequency) -> {
-            if (!Strings.isNullOrEmpty(value)) {
+            if (!StringUtils.isEmpty(value)) {
                 value = value.replace(SPACE, POUND);
             }
             lines.add(String.format("%s %s %s", value, nature, frequency));
         });
     }
 
-    private void mergeMultivaluedValue(Map<String, Long> valueAndFrequencyPair, String dimValue, Long metric) {
-        if (org.apache.logging.log4j.util.Strings.isEmpty(dimValue)) {
+    private void mergeMultivaluedValue(Map<String, Long> valueAndFrequencyPair, String dimValue,
+            Long metric) {
+        if (StringUtils.isEmpty(dimValue)) {
             return;
         }
         Map<String, Long> tmp = new HashMap<>();
@@ -235,7 +214,9 @@ public class DictUtils {
         }
 
         for (String value : tmp.keySet()) {
-            long metricOld = valueAndFrequencyPair.containsKey(value) ? valueAndFrequencyPair.get(value) : 0L;
+            long metricOld =
+                    valueAndFrequencyPair.containsKey(value) ? valueAndFrequencyPair.get(value)
+                            : 0L;
             valueAndFrequencyPair.put(value, metric + metricOld);
         }
     }
@@ -253,15 +234,17 @@ public class DictUtils {
         String sqlPattern = "select %s, %s from tbl %s group by %s order by %s desc limit %d";
         String bizName = dictItemResp.getBizName();
         String whereStr = generateWhereStr(dictItemResp);
-        String where = Strings.isNullOrEmpty(whereStr) ? "" : "WHERE" + whereStr;
+        String where = StringUtils.isEmpty(whereStr) ? "" : "WHERE" + whereStr;
         ItemValueConfig config = dictItemResp.getConfig();
-        Long limit = (Objects.isNull(config) || Objects.isNull(config.getLimit())) ? itemValueMaxCount :
-                dictItemResp.getConfig().getLimit();
+        int limit =
+                (Objects.isNull(config) || Objects.isNull(config.getLimit())) ? itemValueMaxCount
+                        : dictItemResp.getConfig().getLimit();
 
         // todo 自定义指标
         Set<Long> modelIds = new HashSet<>();
         String metric = "count(1)";
-        if (Objects.nonNull(dictItemResp.getConfig()) && Objects.nonNull(dictItemResp.getConfig().getMetricId())) {
+        if (Objects.nonNull(dictItemResp.getConfig())
+                && Objects.nonNull(dictItemResp.getConfig().getMetricId())) {
             Long metricId = dictItemResp.getConfig().getMetricId();
             MetricResp metricResp = metricService.getMetric(metricId);
             String metricBizName = metricResp.getBizName();
@@ -291,18 +274,30 @@ public class DictUtils {
 
     private QuerySqlReq constructQuerySqlReq(DictItemResp dictItemResp) {
 
-        String sqlPattern = "select %s,count(1) from tbl %s group by %s order by count(1) desc limit %d";
-        String bizName = dictItemResp.getBizName();
+        ModelResp model = modelService.getModel(dictItemResp.getModelId());
+        String tableStr = StringUtils.isNotBlank(model.getModelDetail().getTableQuery())
+                ? model.getModelDetail().getTableQuery()
+                : "(" + model.getModelDetail().getSqlQuery() + ") AS t";
+        String sqlPattern =
+                "select %s,count(1) from %s %s group by %s order by count(1) desc limit %d";
+        String dimBizName = dictItemResp.getBizName();
         String whereStr = generateWhereStr(dictItemResp);
-        String where = Strings.isNullOrEmpty(whereStr) ? "" : "WHERE" + whereStr;
+        String where = StringUtils.isEmpty(whereStr) ? "" : "WHERE" + whereStr;
         ItemValueConfig config = dictItemResp.getConfig();
-        Long limit = (Objects.isNull(config) || Objects.isNull(config.getLimit())) ? itemValueMaxCount :
-                dictItemResp.getConfig().getLimit();
-        String sql = String.format(sqlPattern, bizName, where, bizName, limit);
+        long limit =
+                (Objects.isNull(config) || Objects.isNull(config.getLimit())) ? itemValueMaxCount
+                        : dictItemResp.getConfig().getLimit();
+        if (limit <= 0) {
+            limit = Integer.MAX_VALUE;
+        }
+
+        String sql = String.format(sqlPattern, dimBizName, tableStr, where, dimBizName, limit);
         Set<Long> modelIds = new HashSet<>();
         modelIds.add(dictItemResp.getModelId());
         QuerySqlReq querySqlReq = new QuerySqlReq();
         querySqlReq.setSql(sql);
+        // bypass semantic translation
+        querySqlReq.getSqlInfo().setQuerySQL(sql);
         querySqlReq.setNeedAuth(false);
         querySqlReq.setModelIds(modelIds);
 
@@ -334,17 +329,47 @@ public class DictUtils {
 
         fillStructDateInfo(queryStructReq, dictItemResp);
 
-        Long limit = Objects.isNull(dictItemResp.getConfig().getLimit()) ? itemValueMaxCount :
-                dictItemResp.getConfig().getLimit();
+        int limit = Objects.isNull(dictItemResp.getConfig().getLimit()) ? itemValueMaxCount
+                : dictItemResp.getConfig().getLimit();
         queryStructReq.setLimit(limit);
         queryStructReq.setNeedAuth(false);
         return queryStructReq;
     }
 
     private void fillStructDateInfo(QueryStructReq queryStructReq, DictItemResp dictItemResp) {
+
+        ItemValueConfig config = dictItemResp.getConfig();
+
         ModelResp model = modelService.getModel(dictItemResp.getModelId());
+        // 用户未进行设置
+        if (Objects.isNull(config) || Objects.isNull(config.getDateConf())) {
+            fillStructDateBetween(queryStructReq, model, itemValueDateStart, itemValueDateEnd);
+            return;
+        }
+
+        // 全表扫描
+        if (DateConf.DateMode.ALL.equals(config.getDateConf().getDateMode())) {
+            return;
+        }
+        // 静态日期
+        if (DateConf.DateMode.BETWEEN.equals(config.getDateConf().getDateMode())) {
+            DateConf dateConf = new DateConf();
+            BeanMapper.mapper(config.getDateConf(), dateConf);
+            dateConf.setDateMode(DateConf.DateMode.BETWEEN);
+            queryStructReq.setDateInfo(dateConf);
+            return;
+        }
+        // 动态日期 包括今天日期
+        if (DateConf.DateMode.RECENT.equals(config.getDateConf().getDateMode())) {
+            fillStructDateBetween(queryStructReq, model, config.getDateConf().getUnit() - 1, 0);
+            return;
+        }
+    }
+
+    private void fillStructDateBetween(QueryStructReq queryStructReq, ModelResp model,
+            Integer itemValueDateStart, Integer itemValueDateEnd) {
         if (Objects.nonNull(model)) {
-            List<Dim> timeDims = model.getTimeDimension();
+            List<Dimension> timeDims = model.getTimeDimension();
             if (!CollectionUtils.isEmpty(timeDims)) {
                 DateConf dateConf = new DateConf();
                 dateConf.setDateMode(DateConf.DateMode.BETWEEN);
@@ -366,7 +391,7 @@ public class DictUtils {
             return new ArrayList<>();
         }
         String whereStr = generateWhereStr(dictItemResp);
-        if (Strings.isNullOrEmpty(whereStr)) {
+        if (StringUtils.isEmpty(whereStr)) {
             return new ArrayList<>();
         }
         Filter filter = new Filter("", FilterOperatorEnum.SQL_PART, whereStr);
@@ -382,7 +407,8 @@ public class DictUtils {
         if (Objects.nonNull(config)) {
             if (!CollectionUtils.isEmpty(config.getBlackList())) {
                 StringJoiner joinerBlack = new StringJoiner(COMMA);
-                config.getBlackList().stream().forEach(black -> joinerBlack.add(APOSTROPHE + black + APOSTROPHE));
+                config.getBlackList().stream()
+                        .forEach(black -> joinerBlack.add(APOSTROPHE + black + APOSTROPHE));
                 joiner.add(String.format("(%s not in (%s))", bizName, joinerBlack.toString()));
             }
 
@@ -391,20 +417,96 @@ public class DictUtils {
             }
         }
 
-        ModelResp model = modelService.getModel(dictItemResp.getModelId());
-        if (Objects.nonNull(model)) {
-            List<Dim> timeDims = model.getTimeDimension();
-            if (!CollectionUtils.isEmpty(timeDims)) {
-                String format = timeDims.get(0).getDateFormat();
-                String start = LocalDate.now().minusDays(itemValueDateStart)
-                        .format(DateTimeFormatter.ofPattern(format));
-                String end = LocalDate.now().minusDays(itemValueDateEnd)
-                        .format(DateTimeFormatter.ofPattern(format));
-                joiner.add(String.format("( %s >= '%s' and %s <= '%s' )", TimeDimensionEnum.DAY.getName(), start,
-                        TimeDimensionEnum.DAY.getName(), end));
-            }
+        String dateFilter = generateDictDateFilter(dictItemResp);
+        if (StringUtils.isNotEmpty(dateFilter)) {
+            joiner.add(dateFilter);
         }
         return joiner.toString();
+    }
+
+    private String generateDictDateFilter(DictItemResp dictItemResp) {
+        Dimension partitionTimeDimension = getPartitionTimeDimension(dictItemResp.getModelId());
+        // 如果没有设置数据时间维度，则无法做时间分区过滤
+        if (partitionTimeDimension == null) {
+            return "";
+        }
+
+        ItemValueConfig config = dictItemResp.getConfig();
+        // 默认使用数据时间维度进行时间分区过滤
+        if (Objects.isNull(config) || Objects.isNull(config.getDateConf())) {
+            String startDate = LocalDate.now().minusDays(itemValueDateStart)
+                    .format(DateTimeFormatter.ofPattern(partitionTimeDimension.getDateFormat()));
+            String endDate = LocalDate.now().minusDays(itemValueDateEnd)
+                    .format(DateTimeFormatter.ofPattern(partitionTimeDimension.getDateFormat()));
+            return String.format("( %s >= '%s' and %s <= '%s' )",
+                    partitionTimeDimension.getBizName(), startDate,
+                    partitionTimeDimension.getBizName(), endDate);
+        }
+
+        // 全表扫描
+        if (DateConf.DateMode.ALL.equals(config.getDateConf().getDateMode())) {
+            return "";
+        }
+
+        // 静态日期
+        if (DateConf.DateMode.BETWEEN.equals(config.getDateConf().getDateMode())) {
+            String dateFormat = partitionTimeDimension.getDateFormat();
+            if (StringUtils.isEmpty(dateFormat)) {
+                dateFormat = "yyyy-MM-dd"; // 默认格式
+            }
+
+            // 格式化起止日期
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern(dateFormat);
+            String startDate =
+                    LocalDate.parse(config.getDateConf().getStartDate()).format(formatter);
+            String endDate = LocalDate.parse(config.getDateConf().getEndDate()).format(formatter);
+
+            return String.format("( %s >= '%s' and %s <= '%s' )",
+                    partitionTimeDimension.getBizName(), startDate,
+                    partitionTimeDimension.getBizName(), endDate);
+        }
+
+        // 动态日期
+        if (DateConf.DateMode.RECENT.equals(config.getDateConf().getDateMode())) {
+            dictItemResp.getConfig().getDateConf()
+                    .setDateField(partitionTimeDimension.getBizName());
+            return generateDictDateFilterRecent(dictItemResp);
+        }
+
+        return "";
+    }
+
+    private Dimension getPartitionTimeDimension(Long modelId) {
+        ModelResp model = modelService.getModel(modelId);
+        if (Objects.nonNull(model)) {
+            List<Dimension> timeDims = model.getTimeDimension();
+            if (!CollectionUtils.isEmpty(timeDims)) {
+                return timeDims.get(0);
+            }
+        }
+        return null;
+    }
+
+    private String generateDictDateFilterRecent(DictItemResp dictItemResp) {
+        ModelResp model = modelService.getModel(dictItemResp.getModelId());
+        if (Objects.nonNull(model)) {
+            List<Dimension> timeDims = model.getTimeDimension();
+            if (!CollectionUtils.isEmpty(timeDims)) {
+                String dateFormat = timeDims.get(0).getDateFormat();
+                if (StringUtils.isEmpty(dateFormat)) {
+                    dateFormat = itemValueDateFormat;
+                }
+                String start =
+                        LocalDate.now().minusDays(dictItemResp.getConfig().getDateConf().getUnit())
+                                .format(DateTimeFormatter.ofPattern(dateFormat));
+                String end = LocalDate.now().minusDays(0)
+                        .format(DateTimeFormatter.ofPattern(dateFormat));
+                return String.format("( %s > '%s' and %s <= '%s' )",
+                        dictItemResp.getConfig().getDateConf().getDateField(), start,
+                        dictItemResp.getConfig().getDateConf().getDateField(), end);
+            }
+        }
+        return "";
     }
 
     public DictTaskResp taskDO2Resp(DictTaskDO dictTaskDO) {
@@ -414,5 +516,13 @@ public class DictUtils {
         resp.setType(TypeEnums.valueOf(dictTaskDO.getType()));
         resp.setConfig(JsonUtil.toObject(dictTaskDO.getConfig(), ItemValueConfig.class));
         return resp;
+    }
+
+    public List<DictTaskResp> taskDO2Resp(List<DictTaskDO> dictTaskDOList) {
+        List<DictTaskResp> dictTaskRespList = new ArrayList<>();
+        if (CollectionUtil.isNotEmpty(dictTaskDOList)) {
+            dictTaskDOList.stream().forEach(taskDO -> dictTaskRespList.add(taskDO2Resp(taskDO)));
+        }
+        return dictTaskRespList;
     }
 }

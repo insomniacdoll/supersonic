@@ -5,9 +5,11 @@ import com.tencent.supersonic.common.pojo.enums.FilterOperatorEnum;
 import lombok.Data;
 import lombok.ToString;
 
+import java.io.Serializable;
+
 @Data
 @ToString(callSuper = true)
-public class QueryFilter {
+public class QueryFilter implements Serializable {
 
     private String bizName;
 
@@ -30,14 +32,13 @@ public class QueryFilter {
             return false;
         }
         QueryFilter that = (QueryFilter) o;
-        return Objects.equal(bizName, that.bizName) && Objects.equal(name,
-                that.name) && operator == that.operator && Objects.equal(value, that.value)
-                && Objects.equal(elementID, that.elementID) && Objects.equal(
-                function, that.function);
+        return Objects.equal(bizName, that.bizName) && Objects.equal(name, that.name)
+                && operator == that.operator && Objects.equal(value, that.value)
+                && Objects.equal(function, that.function);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hashCode(bizName, name, operator, value, elementID, function);
+        return Objects.hashCode(bizName, name, operator, value, function);
     }
 }

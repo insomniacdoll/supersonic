@@ -16,12 +16,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-
 class DownloadServiceImplTest {
     @Test
-    void testBatchDownload() throws Exception {
-
-    }
+    void testBatchDownload() throws Exception {}
 
     private ModelSchemaResp mockModelSchemaResp() {
         ModelSchemaResp modelSchemaResp = new ModelSchemaResp();
@@ -38,7 +35,8 @@ class DownloadServiceImplTest {
         return modelSchemaResp;
     }
 
-    private MetricSchemaResp mockMetric(Long id, String bizName, String name, List<Long> drillDownloadDimensions) {
+    private MetricSchemaResp mockMetric(Long id, String bizName, String name,
+            List<Long> drillDownloadDimensions) {
         MetricSchemaResp metricResp = new MetricSchemaResp();
         metricResp.setId(id);
         metricResp.setBizName(bizName);
@@ -93,7 +91,8 @@ class DownloadServiceImplTest {
         return semanticQueryResp;
     }
 
-    private static Map<String, Object> createMap(String sysImpDate, String d1, String d2, String m1) {
+    private static Map<String, Object> createMap(String sysImpDate, String d1, String d2,
+            String m1) {
         Map<String, Object> map = new HashMap<>();
         map.put("sys_imp_date", sysImpDate);
         map.put("user_name", d1);
@@ -101,5 +100,4 @@ class DownloadServiceImplTest {
         map.put("pv", m1);
         return map;
     }
-
 }

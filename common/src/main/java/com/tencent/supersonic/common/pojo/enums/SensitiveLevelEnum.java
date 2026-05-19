@@ -1,11 +1,7 @@
 package com.tencent.supersonic.common.pojo.enums;
 
 public enum SensitiveLevelEnum {
-
-    LOW(0),
-    MID(1),
-    HIGH(2);
-
+    LOW(0), MID(1), HIGH(2);
 
     private Integer code;
 
@@ -16,5 +12,4 @@ public enum SensitiveLevelEnum {
     public Integer getCode() {
         return code;
     }
-
 }

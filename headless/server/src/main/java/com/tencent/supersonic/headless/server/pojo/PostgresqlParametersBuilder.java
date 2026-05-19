@@ -1,22 +1,24 @@
 package com.tencent.supersonic.headless.server.pojo;
 
-
-import java.util.ArrayList;
-import java.util.List;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
+import java.util.List;
+
 @Service
 @Slf4j
-public class PostgresqlParametersBuilder implements DbParametersBuilder {
+public class PostgresqlParametersBuilder extends DefaultParametersBuilder {
 
     @Override
     public List<DatabaseParameter> build() {
         List<DatabaseParameter> databaseParameters = new ArrayList<>();
         DatabaseParameter host = new DatabaseParameter();
-        host.setComment("链接");
+        host.setComment("JDBC连接");
+        host.setValue(
+                "jdbc:postgresql://localhost:5432/postgres?useUnicode=true&characterEncoding=utf-8&useSSL");
         host.setName("url");
-        host.setPlaceholder("请输入链接");
+        host.setPlaceholder("请输入JDBC连接串");
         databaseParameters.add(host);
 
         DatabaseParameter userName = new DatabaseParameter();
@@ -29,14 +31,9 @@ public class PostgresqlParametersBuilder implements DbParametersBuilder {
         password.setComment("密码");
         password.setName("password");
         password.setPlaceholder("请输入密码");
+        password.setRequire(false);
         databaseParameters.add(password);
 
-        DatabaseParameter database = new DatabaseParameter();
-        database.setComment("数据库名称");
-        database.setName("database");
-        database.setPlaceholder("请输入数据库名称");
-        database.setRequire(false);
-        databaseParameters.add(database);
         return databaseParameters;
     }
 }

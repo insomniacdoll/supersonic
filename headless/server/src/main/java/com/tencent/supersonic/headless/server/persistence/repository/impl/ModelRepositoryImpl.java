@@ -12,17 +12,15 @@ import org.springframework.util.CollectionUtils;
 
 import java.util.List;
 
-
 @Component
 public class ModelRepositoryImpl implements ModelRepository {
-
 
     private ModelDOMapper modelDOMapper;
 
     private ModelDOCustomMapper modelDOCustomMapper;
 
     public ModelRepositoryImpl(ModelDOMapper modelDOMapper,
-                               ModelDOCustomMapper modelDOCustomMapper) {
+            ModelDOCustomMapper modelDOCustomMapper) {
         this.modelDOMapper = modelDOMapper;
         this.modelDOCustomMapper = modelDOCustomMapper;
     }
@@ -56,6 +54,12 @@ public class ModelRepositoryImpl implements ModelRepository {
         if (!CollectionUtils.isEmpty(modelFilter.getModelIds())) {
             wrapper.lambda().in(ModelDO::getId, modelFilter.getModelIds());
         }
+        if (!CollectionUtils.isEmpty(modelFilter.getNames())) {
+            wrapper.lambda().in(ModelDO::getName, modelFilter.getNames());
+        }
+        if (!CollectionUtils.isEmpty(modelFilter.getBizNames())) {
+            wrapper.lambda().in(ModelDO::getBizName, modelFilter.getBizNames());
+        }
         if (modelFilter.getIncludesDetail() != null && !modelFilter.getIncludesDetail()) {
             wrapper.select(ModelDO.class, modelDO -> !modelDO.getColumn().equals("model_detail"));
         }
@@ -71,5 +75,4 @@ public class ModelRepositoryImpl implements ModelRepository {
     public void batchUpdate(List<ModelDO> modelDOS) {
         modelDOCustomMapper.batchUpdateStatus(modelDOS);
     }
-
 }

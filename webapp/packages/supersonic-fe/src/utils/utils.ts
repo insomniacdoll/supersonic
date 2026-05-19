@@ -3,6 +3,7 @@ import { message } from 'antd';
 import numeral from 'numeral';
 import copy from 'copy-to-clipboard';
 import { isString } from 'lodash';
+import CryptoJS from 'crypto-js';
 
 /* eslint no-useless-escape:0  */
 const reg =
@@ -267,7 +268,7 @@ export function formatByDecimalPlaces(value: number | string, decimalPlaces: num
     return value;
   }
   let str = (+value).toFixed(decimalPlaces);
-  if (!/^[0-9.]+$/g.test(str)) {
+  if (!/^-?[0-9.]+$/g.test(str)) {
     return '0';
   }
   while (str.includes('.') && (str.endsWith('.') || str.endsWith('0'))) {
@@ -336,17 +337,20 @@ export const getFormattedValueData = (value: number | string, remainZero?: boole
   if (!isFinite(+value)) {
     return value;
   }
+
+  const absNumericValue = Math.abs(+value);
+
   const unit =
-    value >= 100000000
+    absNumericValue >= 100000000
       ? NumericUnit.OneHundredMillion
-      : value >= 10000
+      : absNumericValue >= 10000
       ? NumericUnit.EnTenThousand
       : NumericUnit.None;
 
   let formattedValue = formatByUnit(value, unit);
   formattedValue = formatByDecimalPlaces(
     formattedValue,
-    unit === NumericUnit.OneHundredMillion ? 2 : value < 1 ? 3 : 1,
+    unit === NumericUnit.OneHundredMillion ? 2 : absNumericValue < 1 ? 3 : 1,
   );
   formattedValue = formatByThousandSeperator(formattedValue);
   if ((typeof formattedValue === 'number' && isNaN(formattedValue)) || +formattedValue === 0) {
@@ -470,3 +474,47 @@ export const objToArray = (_obj: ObjToArrayParams, keyType: string = 'string') =
     };
   });
 };
+
+export const encryptKey = CryptoJS.enc.Hex.parse(
+  '9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08',
+);
+
+export const encryptPassword = (password: string, key?: string) => {
+  if (!password) {
+    return password;
+  }
+  const srcs = CryptoJS.enc.Utf8.parse(password);
+  const encrypted = CryptoJS.AES.encrypt(srcs, key || encryptKey, {
+    mode: CryptoJS.mode.ECB,
+    padding: CryptoJS.pad.Pkcs7,
+  });
+  return encrypted.toString();
+};
+
+export function decryptPassword(encryptPassword: string) {
+  if (!encryptPassword) {
+    return encryptPassword;
+  }
+  const decrypt = CryptoJS.AES.decrypt(encryptPassword, encryptKey, {
+    mode: CryptoJS.mode.ECB,
+    padding: CryptoJS.pad.Pkcs7,
+  });
+  return CryptoJS.enc.Utf8.stringify(decrypt).toString();
+}
+
+export function uniqueArray(arr: any[]) {
+  return Array.from(new Set(arr));
+}
+
+// 替换以:开头标记的变量
+export const replaceRouteParams = (template: string, values: Record<string, string>): string => {
+  return template.replace(/:([a-zA-Z0-9_]+)/g, (match, key) => {
+    return values[key] !== undefined ? values[key] : match;
+  });
+};
+
+export function openNewPage(url: string) {
+  const newWindow: any = window.open();
+  newWindow.opener = null;
+  newWindow.location.href = url;
+}

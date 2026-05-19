@@ -22,6 +22,7 @@ const metricChartSelectOptions = [
 
 type Props = {
   data: MsgDataType;
+  question: string;
   chartIndex: number;
   triggerResize?: boolean;
   loading: boolean;
@@ -34,6 +35,7 @@ type Props = {
 
 const MetricTrend: React.FC<Props> = ({
   data,
+  question,
   chartIndex,
   triggerResize,
   loading,
@@ -49,9 +51,9 @@ const MetricTrend: React.FC<Props> = ({
   const dateField: any = queryColumns?.find(
     (column: any) => column.showType === 'DATE' || column.type === 'DATE'
   );
-  const dateColumnName = dateField?.nameEn || '';
+  const dateColumnName = dateField?.bizName || '';
   const categoryColumnName =
-    queryColumns?.find((column: any) => column.showType === 'CATEGORY')?.nameEn || '';
+    queryColumns?.find((column: any) => column.showType === 'CATEGORY')?.bizName || '';
   const metricFields = queryColumns?.filter((column: any) => column.showType === 'NUMBER');
 
   const currentMetricField = queryColumns?.find((column: any) => column.showType === 'NUMBER');
@@ -65,16 +67,11 @@ const MetricTrend: React.FC<Props> = ({
   return (
     <div className={prefixCls}>
       <div className={`${prefixCls}-charts`}>
-        {metricFields?.length === 1 && (
-          <div className={`${prefixCls}-top-bar`}>
-            <div
-              className={`${prefixCls}-metric-fields ${prefixCls}-metric-field-single`}
-              key={activeMetricField?.bizName}
-            >
-              {activeMetricField?.name}
-            </div>
+        <div className={`${prefixCls}-top-bar`}>
+          <div className={`${prefixCls}-metric-fields ${prefixCls}-metric-field-single`}>
+            {question}
           </div>
-        )}
+        </div>
         <Spin spinning={loading}>
           <div className={`${prefixCls}-content`}>
             {!isMobile &&
@@ -103,6 +100,7 @@ const MetricTrend: React.FC<Props> = ({
               <MultiMetricsTrendChart
                 dateColumnName={dateColumnName}
                 metricFields={metricFields}
+                question={question}
                 resultList={queryResults}
                 triggerResize={triggerResize}
                 chartType={chartType}

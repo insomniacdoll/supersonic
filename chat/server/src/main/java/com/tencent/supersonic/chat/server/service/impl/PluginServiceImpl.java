@@ -2,16 +2,16 @@ package com.tencent.supersonic.chat.server.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.google.common.collect.Lists;
-import com.tencent.supersonic.auth.api.authentication.pojo.User;
 import com.tencent.supersonic.chat.api.pojo.request.PluginQueryReq;
-import com.tencent.supersonic.chat.server.plugin.Plugin;
+import com.tencent.supersonic.chat.server.persistence.dataobject.PluginDO;
+import com.tencent.supersonic.chat.server.persistence.repository.PluginRepository;
+import com.tencent.supersonic.chat.server.plugin.ChatPlugin;
 import com.tencent.supersonic.chat.server.plugin.PluginParseConfig;
 import com.tencent.supersonic.chat.server.plugin.event.PluginAddEvent;
 import com.tencent.supersonic.chat.server.plugin.event.PluginDelEvent;
 import com.tencent.supersonic.chat.server.plugin.event.PluginUpdateEvent;
-import com.tencent.supersonic.chat.server.persistence.dataobject.PluginDO;
-import com.tencent.supersonic.chat.server.persistence.repository.PluginRepository;
 import com.tencent.supersonic.chat.server.service.PluginService;
+import com.tencent.supersonic.common.pojo.User;
 import com.tencent.supersonic.common.util.JsonUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -43,19 +43,19 @@ public class PluginServiceImpl implements PluginService {
     }
 
     @Override
-    public synchronized void createPlugin(Plugin plugin, User user) {
+    public synchronized void createPlugin(ChatPlugin plugin, User user) {
         PluginDO pluginDO = convert(plugin, user);
         pluginRepository.createPlugin(pluginDO);
-        //compatible with H2 db
-        List<Plugin> plugins = getPluginList();
+        // compatible with H2 db
+        List<ChatPlugin> plugins = getPluginList();
         publisher.publishEvent(new PluginAddEvent(this, plugins.get(plugins.size() - 1)));
     }
 
     @Override
-    public void updatePlugin(Plugin plugin, User user) {
+    public void updatePlugin(ChatPlugin plugin, User user) {
         Long id = plugin.getId();
         PluginDO pluginDO = pluginRepository.getPlugin(id);
-        Plugin oldPlugin = convert(pluginDO);
+        ChatPlugin oldPlugin = convert(pluginDO);
         convert(plugin, pluginDO, user);
         pluginRepository.updatePlugin(pluginDO);
         publisher.publishEvent(new PluginUpdateEvent(this, oldPlugin, plugin));
@@ -71,8 +71,8 @@ public class PluginServiceImpl implements PluginService {
     }
 
     @Override
-    public List<Plugin> getPluginList() {
-        List<Plugin> plugins = Lists.newArrayList();
+    public List<ChatPlugin> getPluginList() {
+        List<ChatPlugin> plugins = Lists.newArrayList();
         List<PluginDO> pluginDOS = pluginRepository.getPlugins();
         if (CollectionUtils.isEmpty(pluginDOS)) {
             return plugins;
@@ -81,13 +81,13 @@ public class PluginServiceImpl implements PluginService {
     }
 
     @Override
-    public List<Plugin> fetchPluginDOs(String queryText, String type) {
+    public List<ChatPlugin> fetchPluginDOs(String queryText, String type) {
         List<PluginDO> pluginDOS = pluginRepository.fetchPluginDOs(queryText, type);
         return convertList(pluginDOS);
     }
 
     @Override
-    public List<Plugin> query(PluginQueryReq pluginQueryReq) {
+    public List<ChatPlugin> query(PluginQueryReq pluginQueryReq) {
         QueryWrapper<PluginDO> queryWrapper = new QueryWrapper<>();
 
         if (StringUtils.isNotBlank(pluginQueryReq.getType())) {
@@ -108,11 +108,12 @@ public class PluginServiceImpl implements PluginService {
         if (StringUtils.isNotBlank(pluginQueryReq.getCreatedBy())) {
             queryWrapper.lambda().eq(PluginDO::getCreatedBy, pluginQueryReq.getCreatedBy());
         }
+        queryWrapper.orderByAsc("name");
         List<PluginDO> pluginDOS = pluginRepository.query(queryWrapper);
         if (StringUtils.isNotBlank(pluginQueryReq.getPattern())) {
-            pluginDOS = pluginDOS.stream().filter(pluginDO ->
-                            pluginDO.getPattern().contains(pluginQueryReq.getPattern())
-                                    || (pluginDO.getName() != null
+            pluginDOS = pluginDOS.stream()
+                    .filter(pluginDO -> pluginDO.getPattern().contains(pluginQueryReq.getPattern())
+                            || (pluginDO.getName() != null
                                     && pluginDO.getName().contains(pluginQueryReq.getPattern())))
                     .collect(Collectors.toList());
         }
@@ -120,26 +121,25 @@ public class PluginServiceImpl implements PluginService {
     }
 
     @Override
-    public Optional<Plugin> getPluginByName(String name) {
+    public Optional<ChatPlugin> getPluginByName(String name) {
         log.info("name:{}", name);
-        return getPluginList().stream()
-                .filter(plugin -> {
-                    PluginParseConfig functionCallConfig = getPluginParseConfig(plugin);
-                    if (functionCallConfig == null) {
-                        return false;
-                    }
-                    return functionCallConfig.getName().equalsIgnoreCase(name);
-                })
-                .findFirst();
+        return getPluginList().stream().filter(plugin -> {
+            PluginParseConfig functionCallConfig = getPluginParseConfig(plugin);
+            if (functionCallConfig == null) {
+                return false;
+            }
+            return functionCallConfig.getName().equalsIgnoreCase(name);
+        }).findFirst();
     }
 
-    private PluginParseConfig getPluginParseConfig(Plugin plugin) {
+    private PluginParseConfig getPluginParseConfig(ChatPlugin plugin) {
         if (StringUtils.isBlank(plugin.getParseModeConfig())) {
             return null;
         }
-        PluginParseConfig functionCallConfig = JsonUtil.toObject(
-                plugin.getParseModeConfig(), PluginParseConfig.class);
-        if (Objects.isNull(functionCallConfig) || StringUtils.isEmpty(functionCallConfig.getName())) {
+        PluginParseConfig functionCallConfig =
+                JsonUtil.toObject(plugin.getParseModeConfig(), PluginParseConfig.class);
+        if (Objects.isNull(functionCallConfig)
+                || StringUtils.isEmpty(functionCallConfig.getName())) {
             return null;
         }
         if (StringUtils.isBlank(functionCallConfig.getName())) {
@@ -149,36 +149,34 @@ public class PluginServiceImpl implements PluginService {
     }
 
     @Override
-    public List<Plugin> queryWithAuthCheck(PluginQueryReq pluginQueryReq, User user) {
+    public List<ChatPlugin> queryWithAuthCheck(PluginQueryReq pluginQueryReq, User user) {
         return authCheck(query(pluginQueryReq), user);
     }
 
     @Override
-    public Map<String, Plugin> getNameToPlugin() {
-        List<Plugin> pluginList = getPluginList();
+    public Map<String, ChatPlugin> getNameToPlugin() {
+        List<ChatPlugin> pluginList = getPluginList();
 
-        return pluginList.stream()
-                .filter(plugin -> {
-                    PluginParseConfig functionCallConfig = getPluginParseConfig(plugin);
-                    if (functionCallConfig == null) {
-                        return false;
-                    }
-                    return true;
-                })
-                .collect(Collectors.toMap(a -> {
-                    PluginParseConfig functionCallConfig = JsonUtil.toObject(
-                            a.getParseModeConfig(), PluginParseConfig.class);
-                    return functionCallConfig.getName();
-                }, a -> a, (k1, k2) -> k1));
+        return pluginList.stream().filter(plugin -> {
+            PluginParseConfig functionCallConfig = getPluginParseConfig(plugin);
+            if (functionCallConfig == null) {
+                return false;
+            }
+            return true;
+        }).collect(Collectors.toMap(a -> {
+            PluginParseConfig functionCallConfig =
+                    JsonUtil.toObject(a.getParseModeConfig(), PluginParseConfig.class);
+            return functionCallConfig.getName();
+        }, a -> a, (k1, k2) -> k1));
     }
 
-    //todo
-    private List<Plugin> authCheck(List<Plugin> plugins, User user) {
+    // todo
+    private List<ChatPlugin> authCheck(List<ChatPlugin> plugins, User user) {
         return plugins;
     }
 
-    public Plugin convert(PluginDO pluginDO) {
-        Plugin plugin = new Plugin();
+    public ChatPlugin convert(PluginDO pluginDO) {
+        ChatPlugin plugin = new ChatPlugin();
         BeanUtils.copyProperties(pluginDO, plugin);
         if (StringUtils.isNotBlank(pluginDO.getDataSet())) {
             plugin.setDataSetList(Arrays.stream(pluginDO.getDataSet().split(","))
@@ -187,7 +185,7 @@ public class PluginServiceImpl implements PluginService {
         return plugin;
     }
 
-    public PluginDO convert(Plugin plugin, User user) {
+    public PluginDO convert(ChatPlugin plugin, User user) {
         PluginDO pluginDO = new PluginDO();
         BeanUtils.copyProperties(plugin, pluginDO);
         pluginDO.setCreatedAt(new Date());
@@ -198,7 +196,7 @@ public class PluginServiceImpl implements PluginService {
         return pluginDO;
     }
 
-    public PluginDO convert(Plugin plugin, PluginDO pluginDO, User user) {
+    public PluginDO convert(ChatPlugin plugin, PluginDO pluginDO, User user) {
         BeanUtils.copyProperties(plugin, pluginDO);
         pluginDO.setUpdatedAt(new Date());
         pluginDO.setUpdatedBy(user.getName());
@@ -206,11 +204,10 @@ public class PluginServiceImpl implements PluginService {
         return pluginDO;
     }
 
-    public List<Plugin> convertList(List<PluginDO> pluginDOS) {
+    public List<ChatPlugin> convertList(List<PluginDO> pluginDOS) {
         if (!CollectionUtils.isEmpty(pluginDOS)) {
             return pluginDOS.stream().map(this::convert).collect(Collectors.toList());
         }
         return Lists.newArrayList();
     }
-
 }

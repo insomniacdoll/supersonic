@@ -1,9 +1,8 @@
 package com.tencent.supersonic.headless.api.pojo;
 
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import lombok.Data;
-
-import javax.validation.constraints.NotBlank;
-import javax.validation.constraints.NotNull;
 
 @Data
 public class Param {
@@ -14,12 +13,10 @@ public class Param {
     @NotNull(message = "Invalid parameter value")
     private String value;
 
-    public Param() {
-    }
+    public Param() {}
 
     public Param(String name, String value) {
         this.name = name;
         this.value = value;
     }
-
 }

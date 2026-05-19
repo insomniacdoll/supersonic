@@ -8,6 +8,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.CollectionUtils;
 import org.stringtemplate.v4.ST;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -15,14 +16,16 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+
 import static com.tencent.supersonic.common.pojo.Constants.COMMA;
 import static com.tencent.supersonic.common.pojo.Constants.EMPTY;
 
 @Slf4j
 public class SqlVariableParseUtils {
 
-    public static final String REG_SENSITIVE_SQL = "drop\\s|alter\\s|grant\\s|insert\\s|replace\\s|delete\\s|"
-            + "truncate\\s|update\\s|remove\\s";
+    public static final String REG_SENSITIVE_SQL =
+            "drop\\s|alter\\s|grant\\s|insert\\s|replace\\s|delete\\s|"
+                    + "truncate\\s|update\\s|remove\\s";
     public static final Pattern PATTERN_SENSITIVE_SQL = Pattern.compile(REG_SENSITIVE_SQL);
 
     public static final String APOSTROPHE = "'";
@@ -34,13 +37,13 @@ public class SqlVariableParseUtils {
         if (CollectionUtils.isEmpty(sqlVariables)) {
             return sql;
         }
-        //1. handle default variable value
+        // 1. handle default variable value
         sqlVariables.forEach(variable -> {
             variables.put(variable.getName().trim(),
                     getValues(variable.getValueType(), variable.getDefaultValues()));
         });
 
-        //override by variable param
+        // override by variable param
         if (!CollectionUtils.isEmpty(params)) {
             Map<String, List<SqlVariable>> map =
                     sqlVariables.stream().collect(Collectors.groupingBy(SqlVariable::getName));
@@ -80,11 +83,12 @@ public class SqlVariableParseUtils {
             switch (valueType) {
                 case STRING:
                     return values.stream().map(String::valueOf)
-                            .map(s -> s.startsWith(APOSTROPHE) && s.endsWith(APOSTROPHE)
-                                    ? s : String.join(EMPTY, APOSTROPHE, s, APOSTROPHE))
+                            .map(s -> s.startsWith(APOSTROPHE) && s.endsWith(APOSTROPHE) ? s
+                                    : String.join(EMPTY, APOSTROPHE, s, APOSTROPHE))
                             .collect(Collectors.toList());
                 case EXPR:
-                    values.stream().map(String::valueOf).forEach(SqlVariableParseUtils::checkSensitiveSql);
+                    values.stream().map(String::valueOf)
+                            .forEach(SqlVariableParseUtils::checkSensitiveSql);
                     return values.stream().map(String::valueOf).collect(Collectors.toList());
                 case NUMBER:
                     return values.stream().map(String::valueOf).collect(Collectors.toList());
@@ -117,8 +121,8 @@ public class SqlVariableParseUtils {
         if (matcher.find()) {
             String group = matcher.group();
             log.warn("Sensitive SQL operations are not allowed: {}", group.toUpperCase());
-            throw new InvalidArgumentException("Sensitive SQL operations are not allowed: " + group.toUpperCase());
+            throw new InvalidArgumentException(
+                    "Sensitive SQL operations are not allowed: " + group.toUpperCase());
         }
     }
-
 }

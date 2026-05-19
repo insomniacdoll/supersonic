@@ -7,6 +7,7 @@ import {
   DeleteOutlined,
   ExportOutlined,
   RocketOutlined,
+  FormOutlined,
 } from '@ant-design/icons';
 
 export type BatchCtrlDropDownButtonProps = {
@@ -37,6 +38,7 @@ const BatchCtrlDropDownButton: FC<BatchCtrlDropDownButtonProps> = ({
     exportTagButton: {
       key: 'exportTagButton',
       label: '导出为标签',
+      hidden: !!!process.env.SHOW_TAG,
       icon: <ExportOutlined />,
       disabled: disabledList?.includes('exportTagButton'),
     },
@@ -51,6 +53,42 @@ const BatchCtrlDropDownButton: FC<BatchCtrlDropDownButtonProps> = ({
       label: '批量下架',
       icon: <RocketOutlined />,
       disabled: disabledList?.includes('batchUnPublish'),
+    },
+    batchAddClass: {
+      key: 'batchAddClass',
+      label: '批量分类',
+      icon: <FormOutlined />,
+      disabled: disabledList?.includes('batchAddClass'),
+    },
+    batchSensitiveLevel: {
+      key: 'batchSensitiveLevel',
+      label: '批量修改敏感度',
+      icon: <FormOutlined />,
+      disabled: disabledList?.includes('batchSensitiveLevel'),
+    },
+    batchDimensionValueBlackList: {
+      key: 'batchDimensionValueBlackList',
+      label: '批量导入黑名单',
+      icon: <FormOutlined />,
+      disabled: disabledList?.includes('batchDimensionValueBlackList'),
+    },
+    batchDimensionValueWhiteList: {
+      key: 'batchDimensionValueWhiteList',
+      label: '批量导入白名单',
+      icon: <FormOutlined />,
+      disabled: disabledList?.includes('batchDimensionValueWhiteList'),
+    },
+    batchRemoveDimensionValueBlackList: {
+      key: 'batchRemoveDimensionValueBlackList',
+      label: '批量移除黑名单',
+      icon: <DeleteOutlined />,
+      disabled: disabledList?.includes('batchRemoveDimensionValueBlackList'),
+    },
+    batchRemoveDimensionValueWhiteList: {
+      key: 'batchRemoveDimensionValueWhiteList',
+      label: '批量移除白名单',
+      icon: <DeleteOutlined />,
+      disabled: disabledList?.includes('batchRemoveDimensionValueWhiteList'),
     },
   };
 
@@ -105,9 +143,11 @@ const BatchCtrlDropDownButton: FC<BatchCtrlDropDownButtonProps> = ({
       icon: <DeleteOutlined />,
       disabled: disabledList?.includes('batchDelete'),
     },
-  ].filter((item) => {
-    return !hiddenList.includes(item.key);
-  });
+  ]
+    .filter((item) => {
+      return !hiddenList.includes(item.key);
+    })
+    .filter((item) => !!!item.hidden);
 
   const popoverConfig = {
     title: '选择下载区间',

@@ -1,7 +1,7 @@
 package com.tencent.supersonic.headless.server.service;
 
 import com.github.pagehelper.PageInfo;
-import com.tencent.supersonic.auth.api.authentication.pojo.User;
+import com.tencent.supersonic.common.pojo.User;
 import com.tencent.supersonic.headless.api.pojo.enums.TagDefineType;
 import com.tencent.supersonic.headless.api.pojo.request.TagDeleteReq;
 import com.tencent.supersonic.headless.api.pojo.request.TagFilterPageReq;
@@ -27,9 +27,9 @@ public interface TagMetaService {
 
     List<TagResp> getTags(TagFilter tagFilter);
 
-    List<TagDO> getTagDOList(TagFilter tagFilter, User user);
+    List<TagDO> getTagDOList(TagFilter tagFilter);
 
     PageInfo<TagResp> queryTagMarketPage(TagFilterPageReq tagMarketPageReq, User user);
 
-    List<TagItem> getTagItems(User user, List<Long> itemIds, TagDefineType tagDefineType);
+    List<TagItem> getTagItems(List<Long> itemIds, TagDefineType tagDefineType);
 }

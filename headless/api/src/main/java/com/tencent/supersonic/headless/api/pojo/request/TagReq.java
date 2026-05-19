@@ -2,9 +2,8 @@ package com.tencent.supersonic.headless.api.pojo.request;
 
 import com.tencent.supersonic.common.pojo.RecordInfo;
 import com.tencent.supersonic.headless.api.pojo.enums.TagDefineType;
+import jakarta.validation.constraints.NotNull;
 import lombok.Data;
-
-import javax.validation.constraints.NotNull;
 
 @Data
 public class TagReq extends RecordInfo {
@@ -16,5 +15,4 @@ public class TagReq extends RecordInfo {
 
     @NotNull
     private Long itemId;
-
 }

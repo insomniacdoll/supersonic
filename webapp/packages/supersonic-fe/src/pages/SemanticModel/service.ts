@@ -8,9 +8,6 @@ const getRunningEnv = () => {
 };
 
 export function getDomainList(): Promise<any> {
-  if (getRunningEnv() === 'chat') {
-    return request.get(`${process.env.CHAT_API_BASE_URL}conf/domainList`);
-  }
   return request.get(`${process.env.API_BASE_URL}domain/getDomainList`);
 }
 
@@ -53,9 +50,6 @@ export function getDimensionList(data: any): Promise<any> {
       ...(modelId ? { modelIds: [modelId] } : {}),
     },
   };
-  if (getRunningEnv() === 'chat') {
-    return request.post(`${process.env.CHAT_API_BASE_URL}conf/dimension/page`, queryParams);
-  }
   return request.post(`${process.env.API_BASE_URL}dimension/queryDimension`, queryParams);
 }
 
@@ -93,6 +87,12 @@ export function updateDimension(data: any): Promise<any> {
   });
 }
 
+export function updateDimensionAliasValue(data: any): Promise<any> {
+  return request.post(`${process.env.API_BASE_URL}dimension/updateDimension/alias/value`, {
+    data,
+  });
+}
+
 export function mockDimensionAlias(data: any): Promise<any> {
   return request.post(`${process.env.API_BASE_URL}dimension/mockDimensionAlias`, {
     data,
@@ -101,6 +101,12 @@ export function mockDimensionAlias(data: any): Promise<any> {
 
 export function mockDimensionValuesAlias(data: any): Promise<any> {
   return request.post(`${process.env.API_BASE_URL}dimension/mockDimensionValuesAlias`, {
+    data,
+  });
+}
+
+export function getDictData(data: any): Promise<any> {
+  return request.post(`${process.env.API_BASE_URL}knowledge/dict/data`, {
     data,
   });
 }
@@ -362,35 +368,59 @@ type ExcuteSqlParams = {
 };
 
 // 执行脚本
-export async function excuteSql(params: ExcuteSqlParams) {
+export async function executeSql(params: ExcuteSqlParams) {
   const data = { ...params };
   return request.post(`${process.env.API_BASE_URL}database/executeSql`, { data });
 }
 
-export function getDbNames(dbId: number): Promise<any> {
-  return request(`${process.env.API_BASE_URL}database/getDbNames/${dbId}`, {
+export function getCatalogs(dbId: number): Promise<any> {
+  return request(`${process.env.API_BASE_URL}database/getCatalogs`, {
     method: 'GET',
+    params: {
+      id: dbId,
+    },
   });
 }
 
-export function getTables(dbId: number, dbName: string): Promise<any> {
-  return request(`${process.env.API_BASE_URL}database/getTables/${dbId}/${dbName}`, {
+export function getDbNames(dbId: number, catalog: string): Promise<any> {
+  return request(`${process.env.API_BASE_URL}database/getDbNames`, {
     method: 'GET',
+    params: {
+      id: dbId,
+      catalog: catalog,
+    },
   });
 }
 
-export function getColumns(dbId: number, dbName: string, tableName: string): Promise<any> {
-  return request(`${process.env.API_BASE_URL}database/getColumns/${dbId}/${dbName}/${tableName}`, {
+export function getTables(databaseId: number, catalog: string, dbName: string): Promise<any> {
+  return request(`${process.env.API_BASE_URL}database/getTables`, {
     method: 'GET',
+    params: {
+      databaseId,
+      catalog: catalog,
+      db: dbName,
+    },
+  });
+}
+
+export function getColumns(
+  databaseId: number,
+  catalog: string,
+  dbName: string,
+  tableName: string,
+): Promise<any> {
+  return request(`${process.env.API_BASE_URL}database/getColumnsByName`, {
+    method: 'GET',
+    params: {
+      databaseId,
+      catalog: catalog,
+      db: dbName,
+      table: tableName,
+    },
   });
 }
 
 export function getModelList(domainId: number): Promise<any> {
-  if (getRunningEnv() === 'chat') {
-    return request(`${process.env.CHAT_API_BASE_URL}conf/modelList/${domainId}`, {
-      method: 'GET',
-    });
-  }
   return request(`${process.env.API_BASE_URL}model/getModelList/${domainId}`, {
     method: 'GET',
   });
@@ -404,6 +434,13 @@ export function createModel(data: any): Promise<any> {
 }
 export function updateModel(data: any): Promise<any> {
   return request(`${process.env.API_BASE_URL}model/updateModel`, {
+    method: 'POST',
+    data,
+  });
+}
+
+export function batchUpdateModelStatus(data: any): Promise<any> {
+  return request(`${process.env.API_BASE_URL}model/batchUpdateStatus`, {
     method: 'POST',
     data,
   });
@@ -423,6 +460,9 @@ export function getUnAvailableItem(data: any): Promise<any> {
 }
 
 export function getModelDetail(data: any): Promise<any> {
+  if (!data.modelId) {
+    return {};
+  }
   return request.get(`${process.env.API_BASE_URL}model/getModel/${data.modelId}`);
 }
 
@@ -430,6 +470,15 @@ export function getMetricsToCreateNewMetric(data: any): Promise<any> {
   return request.get(
     `${process.env.API_BASE_URL}metric/getMetricsToCreateNewMetric/${data.modelId}`,
   );
+}
+
+export function getAllModelByDomainId(domainId: number): Promise<any> {
+  return request(`${process.env.API_BASE_URL}model/getAllModelByDomainId`, {
+    method: 'GET',
+    params: {
+      domainId,
+    },
+  });
 }
 
 export function createDictTask(data: any): Promise<any> {
@@ -580,10 +629,16 @@ export function getDatabaseDetail(id: number): Promise<any> {
   return request.get(`${process.env.API_BASE_URL}database/${id}`);
 }
 
-export function getViewList(domainId: number): Promise<any> {
+export function getDataSetList(domainId: number): Promise<any> {
   return request(`${process.env.API_BASE_URL}dataSet/getDataSetList`, {
     method: 'GET',
     params: { domainId },
+  });
+}
+
+export function getDataSetDetail(id: number): Promise<any> {
+  return request(`${process.env.API_BASE_URL}dataSet/${id}`, {
+    method: 'GET',
   });
 }
 
@@ -704,5 +759,79 @@ export function getTagObjectList(data: any): Promise<any> {
   return request(`${process.env.API_BASE_URL}tagObject/query`, {
     method: 'POST',
     data: { pageSize: 9999, status: 1, ...data },
+  });
+}
+
+export function getMetricClassifications(): Promise<any> {
+  return request(`${process.env.API_BASE_URL}metric/getMetricClassifications`, {
+    method: 'GET',
+  });
+}
+
+export function batchUpdateClassifications(data: any): Promise<any> {
+  return request(`${process.env.API_BASE_URL}metric/batchUpdateClassifications`, {
+    method: 'POST',
+    data: { ...data },
+  });
+}
+
+export function batchUpdateDimensionSensitiveLevel(data: any): Promise<any> {
+  return request(`${process.env.API_BASE_URL}dimension/batchUpdateSensitiveLevel`, {
+    method: 'POST',
+    data: { ...data },
+  });
+}
+
+export function batchUpdateMetricSensitiveLevel(data: any): Promise<any> {
+  return request(`${process.env.API_BASE_URL}metric/batchUpdateSensitiveLevel`, {
+    method: 'POST',
+    data: { ...data },
+  });
+}
+
+export function getTermList(data: any): Promise<any> {
+  return request(`${process.env.API_BASE_URL}term`, {
+    method: 'GET',
+    params: data,
+  });
+}
+
+export function saveOrUpdate(data: any): Promise<any> {
+  return request(`${process.env.API_BASE_URL}term/saveOrUpdate`, {
+    method: 'POST',
+    data: { ...data },
+  });
+}
+
+export function deleteTerm(data: any): Promise<any> {
+  return request(`${process.env.API_BASE_URL}term/deleteBatch`, {
+    method: 'POST',
+    data: { ...data },
+  });
+}
+
+export function createLlmConfig(data: any): Promise<any> {
+  return request(`${process.env.CHAT_API_BASE_URL}chat/model`, {
+    method: 'POST',
+    data: { ...data },
+  });
+}
+
+export function saveLlmConfig(data: any): Promise<any> {
+  if (data.id) {
+    return request(`${process.env.CHAT_API_BASE_URL}model`, {
+      method: 'PUT',
+      data,
+    });
+  }
+  return request(`${process.env.CHAT_API_BASE_URL}model`, {
+    method: 'POST',
+    data,
+  });
+}
+
+export function deleteLlmConfig(id: number): Promise<any> {
+  return request(`${process.env.CHAT_API_BASE_URL}model/${id}`, {
+    method: 'DELETE',
   });
 }

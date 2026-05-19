@@ -2,10 +2,8 @@ import type { ActionType, ProColumns } from '@ant-design/pro-components';
 import { ProTable } from '@ant-design/pro-components';
 import { message, Button, Space, Popconfirm, Input, Tag, Select } from 'antd';
 import React, { useRef, useState, useEffect } from 'react';
-import type { Dispatch } from 'umi';
-import { connect } from 'umi';
-import type { StateType } from '../model';
-import { StatusEnum } from '../enum';
+import { useModel, history } from '@umijs/max';
+import { StatusEnum, SemanticNodeType } from '../enum';
 import { SENSITIVE_LEVEL_ENUM, SENSITIVE_LEVEL_OPTIONS, TAG_DEFINE_TYPE } from '../constant';
 import {
   getModelList,
@@ -17,18 +15,22 @@ import {
 import DimensionInfoModal from './DimensionInfoModal';
 import DimensionValueSettingModal from './DimensionValueSettingModal';
 import { ISemantic, IDataSource } from '../data';
-import TableHeaderFilter from './TableHeaderFilter';
+import TableHeaderFilter from '@/components/TableHeaderFilter';
 import BatchCtrlDropDownButton from '@/components/BatchCtrlDropDownButton';
 import { ColumnsConfig } from './TableColumnRender';
+import BatchSensitiveLevelModal from '@/components/BatchCtrlDropDownButton/BatchSensitiveLevelModal';
+import { toDimensionEditPage } from '@/pages/SemanticModel/utils';
 import styles from './style.less';
 
-type Props = {
-  dispatch: Dispatch;
-  domainManger: StateType;
-};
+type Props = {};
 
-const ClassDimensionTable: React.FC<Props> = ({ domainManger, dispatch }) => {
-  const { selectModelId: modelId, selectDomainId: domainId } = domainManger;
+const ClassDimensionTable: React.FC<Props> = ({}) => {
+  const domainModel = useModel('SemanticModel.domainData');
+  const modelModel = useModel('SemanticModel.modelData');
+  const dimensionModel = useModel('SemanticModel.dimensionData');
+  const { selectDomainId: domainId } = domainModel;
+  const { selectModelId: modelId } = modelModel;
+  const { MrefreshDimensionList } = dimensionModel;
   const [createModalVisible, setCreateModalVisible] = useState<boolean>(false);
   const [dimensionItem, setDimensionItem] = useState<ISemantic.IDimensionItem>();
   const [dataSourceList, setDataSourceList] = useState<IDataSource.IDataSourceItem[]>([]);
@@ -36,6 +38,7 @@ const ClassDimensionTable: React.FC<Props> = ({ domainManger, dispatch }) => {
   const [filterParams, setFilterParams] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState<boolean>(false);
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
+  const [batchSensitiveLevelOpenState, setBatchSensitiveLevelOpenState] = useState<boolean>(false);
   const [dimensionValueSettingList, setDimensionValueSettingList] = useState<
     ISemantic.IDimensionValueSettingItem[]
   >([]);
@@ -52,6 +55,9 @@ const ClassDimensionTable: React.FC<Props> = ({ domainManger, dispatch }) => {
   const actionRef = useRef<ActionType>();
 
   const queryDimensionList = async (params: any) => {
+    if (!modelId) {
+      return;
+    }
     setLoading(true);
     const { code, data, msg } = await getDimensionList({
       ...pagination,
@@ -75,6 +81,9 @@ const ClassDimensionTable: React.FC<Props> = ({ domainManger, dispatch }) => {
   };
 
   const queryDataSourceList = async () => {
+    if (!domainId) {
+      return;
+    }
     const { code, data, msg } = await getModelList(domainId);
     if (code === 200) {
       setDataSourceList(data);
@@ -85,11 +94,11 @@ const ClassDimensionTable: React.FC<Props> = ({ domainManger, dispatch }) => {
 
   useEffect(() => {
     queryDimensionList({ ...filterParams, ...defaultPagination });
-  }, [filterParams]);
+  }, [filterParams, modelId]);
 
   useEffect(() => {
     queryDataSourceList();
-  }, [modelId]);
+  }, [domainId]);
 
   const queryBatchUpdateStatus = async (ids: React.Key[], status: StatusEnum) => {
     if (Array.isArray(ids) && ids.length === 0) {
@@ -103,12 +112,7 @@ const ClassDimensionTable: React.FC<Props> = ({ domainManger, dispatch }) => {
     setLoading(false);
     if (code === 200) {
       queryDimensionList({ ...filterParams, ...pagination });
-      dispatch({
-        type: 'domainManger/queryDimensionList',
-        payload: {
-          modelId,
-        },
-      });
+      MrefreshDimensionList({ modelId });
       return;
     }
     message.error(msg);
@@ -131,18 +135,23 @@ const ClassDimensionTable: React.FC<Props> = ({ domainManger, dispatch }) => {
     setLoading(false);
     if (code === 200) {
       queryDimensionList({ ...filterParams, ...pagination });
-      dispatch({
-        type: 'domainManger/queryDimensionList',
-        payload: {
-          modelId,
-        },
-      });
+      MrefreshDimensionList({ modelId });
       return;
     }
     message.error(msg);
   };
 
-  const columnsConfig = ColumnsConfig();
+  // const columnsConfig = ColumnsConfig();
+  const columnsConfig = ColumnsConfig({
+    indicatorInfo: {
+      url: '/model/dimension/:domainId/:modelId/:indicatorId',
+      onNameClick: (record) => {
+        const { id } = record;
+        toDimensionEditPage(domainId, modelId!, id);
+        return false;
+      },
+    },
+  });
 
   const columns: ProColumns[] = [
     {
@@ -177,6 +186,7 @@ const ClassDimensionTable: React.FC<Props> = ({ domainManger, dispatch }) => {
       dataIndex: 'isTag',
       title: '是否标签',
       // width: 90,
+      hideInTable: !!!process.env.SHOW_TAG,
       render: (isTag) => {
         switch (isTag) {
           case 0:
@@ -220,8 +230,10 @@ const ClassDimensionTable: React.FC<Props> = ({ domainManger, dispatch }) => {
               key="dimensionEditBtn"
               type="link"
               onClick={() => {
-                setDimensionItem(record);
-                setCreateModalVisible(true);
+                // setDimensionItem(record);
+                // setCreateModalVisible(true);
+                const { id } = record;
+                toDimensionEditPage(domainId, modelId!, id);
               }}
             >
               编辑
@@ -310,6 +322,9 @@ const ClassDimensionTable: React.FC<Props> = ({ domainManger, dispatch }) => {
       case 'exportTagButton':
         queryBatchExportTag(selectedRowKeys);
         break;
+      case 'batchSensitiveLevel':
+        setBatchSensitiveLevelOpenState(true);
+        break;
       default:
         break;
     }
@@ -324,68 +339,73 @@ const ClassDimensionTable: React.FC<Props> = ({ domainManger, dispatch }) => {
         columns={columns}
         loading={loading}
         headerTitle={
-          <TableHeaderFilter
-            components={[
-              {
-                label: '维度搜索',
-                component: (
-                  <Input.Search
-                    style={{ width: 280 }}
-                    placeholder="请输入ID/维度名称/英文名称"
-                    onSearch={(value) => {
-                      setFilterParams((preState) => {
-                        return {
-                          ...preState,
-                          key: value,
-                        };
-                      });
-                    }}
-                  />
-                ),
-              },
-              {
-                label: '敏感度',
-                component: (
-                  <Select
-                    style={{ width: 140 }}
-                    options={SENSITIVE_LEVEL_OPTIONS}
-                    placeholder="请选择敏感度"
-                    allowClear
-                    onChange={(value) => {
-                      setFilterParams((preState) => {
-                        return {
-                          ...preState,
-                          sensitiveLevel: value,
-                        };
-                      });
-                    }}
-                  />
-                ),
-              },
-              {
-                label: '是否为标签',
-                component: (
-                  <Select
-                    style={{ width: 145 }}
-                    placeholder="请选择标签状态"
-                    allowClear
-                    onChange={(value) => {
-                      setFilterParams((preState) => {
-                        return {
-                          ...preState,
-                          isTag: value,
-                        };
-                      });
-                    }}
-                    options={[
-                      { value: 1, label: '是' },
-                      { value: 0, label: '否' },
-                    ]}
-                  />
-                ),
-              },
-            ]}
-          />
+          <div style={{ marginLeft: 15 }}>
+            <TableHeaderFilter
+              components={
+                [
+                  {
+                    label: '维度搜索',
+                    component: (
+                      <Input.Search
+                        style={{ width: 280 }}
+                        placeholder="请输入ID/维度名称/英文名称"
+                        onSearch={(value) => {
+                          setFilterParams((preState) => {
+                            return {
+                              ...preState,
+                              key: value,
+                            };
+                          });
+                        }}
+                      />
+                    ),
+                  },
+                  {
+                    label: '敏感度',
+                    component: (
+                      <Select
+                        style={{ width: 140 }}
+                        options={SENSITIVE_LEVEL_OPTIONS}
+                        placeholder="请选择敏感度"
+                        allowClear
+                        onChange={(value) => {
+                          setFilterParams((preState) => {
+                            return {
+                              ...preState,
+                              sensitiveLevel: value,
+                            };
+                          });
+                        }}
+                      />
+                    ),
+                  },
+                  {
+                    label: '是否为标签',
+                    hidden: !!!process.env.SHOW_TAG,
+                    component: (
+                      <Select
+                        style={{ width: 145 }}
+                        placeholder="请选择标签状态"
+                        allowClear
+                        onChange={(value) => {
+                          setFilterParams((preState) => {
+                            return {
+                              ...preState,
+                              isTag: value,
+                            };
+                          });
+                        }}
+                        options={[
+                          { value: 1, label: '是' },
+                          { value: 0, label: '否' },
+                        ]}
+                      />
+                    ),
+                  },
+                ].filter((item) => !!!item.hidden) as any
+              }
+            />
+          </div>
         }
         search={false}
         // search={{
@@ -415,19 +435,20 @@ const ClassDimensionTable: React.FC<Props> = ({ domainManger, dispatch }) => {
           queryDimensionList({ ...filterParams, ...currentPagin });
         }}
         toolBarRender={() => [
-          <Button
-            key="create"
-            type="primary"
-            onClick={() => {
-              setDimensionItem(undefined);
-              setCreateModalVisible(true);
-            }}
-          >
-            创建维度
-          </Button>,
+          // <Button
+          //   key="create"
+          //   type="primary"
+          //   onClick={() => {
+          //     toDimensionEditPage(domainId, modelId!, 0);
+          //     // setDimensionItem(undefined);
+          //     // setCreateModalVisible(true);
+          //   }}
+          // >
+          //   创建维度
+          // </Button>,
           <BatchCtrlDropDownButton
             key="ctrlBtnList"
-            extenderList={['exportTagButton']}
+            extenderList={['batchSensitiveLevel', 'exportTagButton']}
             onDeleteConfirm={() => {
               queryBatchUpdateStatus(selectedRowKeys, StatusEnum.DELETED);
             }}
@@ -447,12 +468,7 @@ const ClassDimensionTable: React.FC<Props> = ({ domainManger, dispatch }) => {
           onSubmit={() => {
             setCreateModalVisible(false);
             queryDimensionList({ ...filterParams, ...defaultPagination });
-            dispatch({
-              type: 'domainManger/queryDimensionList',
-              payload: {
-                modelId,
-              },
-            });
+            MrefreshDimensionList({ modelId });
             return;
           }}
           onCancel={() => {
@@ -466,29 +482,32 @@ const ClassDimensionTable: React.FC<Props> = ({ domainManger, dispatch }) => {
           open={dimensionValueSettingModalVisible}
           dimensionItem={dimensionItem}
           onCancel={() => {
-            dispatch({
-              type: 'domainManger/queryDimensionList',
-              payload: {
-                modelId,
-              },
-            });
+            MrefreshDimensionList({ modelId });
+
             setDimensionValueSettingModalVisible(false);
           }}
           onSubmit={() => {
             queryDimensionList({ ...filterParams, ...defaultPagination });
-            dispatch({
-              type: 'domainManger/queryDimensionList',
-              payload: {
-                modelId,
-              },
-            });
+            MrefreshDimensionList({ modelId });
             setDimensionValueSettingModalVisible(false);
+          }}
+        />
+      )}
+      {batchSensitiveLevelOpenState && (
+        <BatchSensitiveLevelModal
+          ids={selectedRowKeys as number[]}
+          open={batchSensitiveLevelOpenState}
+          type={SemanticNodeType.DIMENSION}
+          onCancel={() => {
+            setBatchSensitiveLevelOpenState(false);
+          }}
+          onSubmit={() => {
+            queryDimensionList({ ...filterParams, ...pagination });
+            setBatchSensitiveLevelOpenState(false);
           }}
         />
       )}
     </>
   );
 };
-export default connect(({ domainManger }: { domainManger: StateType }) => ({
-  domainManger,
-}))(ClassDimensionTable);
+export default ClassDimensionTable;

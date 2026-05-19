@@ -1,8 +1,8 @@
 import { message, Tabs, Button, Space } from 'antd';
 import React, { useState, useEffect } from 'react';
 import { getMetricData, getDimensionList, getDrillDownDimension } from '../service';
-import { connect, useParams, history } from 'umi';
-import type { StateType } from '../model';
+import { useParams, history, Helmet } from '@umijs/max';
+import { BASE_TITLE } from '@/common/constants';
 import styles from './style.less';
 import { ArrowLeftOutlined } from '@ant-design/icons';
 import MetricTrendSection from '@/pages/SemanticModel/Metric/components/MetricTrendSection';
@@ -33,6 +33,9 @@ const MetricDetail: React.FC<Props> = () => {
   }, [metricId]);
 
   const queryMetricData = async (metricId: string) => {
+    if (!metricId) {
+      return;
+    }
     const { code, data, msg } = await getMetricData(metricId);
     if (code === 200) {
       setMetircData({ ...data });
@@ -81,7 +84,7 @@ const MetricDetail: React.FC<Props> = () => {
     {
       key: 'metricCaliberInput',
       label: '基础信息',
-      children: <MetricBasicInfo metircData={metircData} onQueryMetricData={queryMetricData} />,
+      children: <MetricBasicInfo metircData={metircData} />,
     },
     {
       key: 'metricTrend',
@@ -159,6 +162,4 @@ const MetricDetail: React.FC<Props> = () => {
   );
 };
 
-export default connect(({ domainManger }: { domainManger: StateType }) => ({
-  domainManger,
-}))(MetricDetail);
+export default MetricDetail;

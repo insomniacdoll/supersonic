@@ -1,15 +1,17 @@
 package com.tencent.supersonic.common.pojo;
 
-
 import com.tencent.supersonic.common.pojo.enums.FilterOperatorEnum;
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+
 import java.util.List;
 
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
+@Builder
 public class Filter {
 
     private Relation relation = Relation.FILTER;
@@ -36,18 +38,12 @@ public class Filter {
     @Override
     public String toString() {
         final StringBuilder sb = new StringBuilder("{");
-        sb.append("\"relation\":")
-                .append(relation);
-        sb.append(",\"bizName\":\"")
-                .append(bizName).append('\"');
-        sb.append(",\"name\":\"")
-                .append(name).append('\"');
-        sb.append(",\"operator\":")
-                .append(operator);
-        sb.append(",\"value\":")
-                .append(value);
-        sb.append(",\"children\":")
-                .append(children);
+        sb.append("\"relation\":").append(relation);
+        sb.append(",\"bizName\":\"").append(bizName).append('\"');
+        sb.append(",\"name\":\"").append(name).append('\"');
+        sb.append(",\"operator\":").append(operator);
+        sb.append(",\"value\":").append(value);
+        sb.append(",\"children\":").append(children);
         sb.append('}');
         return sb.toString();
     }
