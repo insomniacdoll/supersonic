@@ -79,11 +79,11 @@ public class DataSetServiceImpl extends ServiceImpl<DataSetDOMapper, DataSetDO>
     public DataSetResp getDataSet(Long id) {
         DataSetDO dataSetDO = getById(id);
         DataSetResp dataSetResp = convert(dataSetDO);
-        
+
         if (dataSetResp.getDataSetDetail() != null) {
             expandIncludesAllModels(dataSetResp);
         }
-        
+
         return dataSetResp;
     }
 
@@ -111,6 +111,12 @@ public class DataSetServiceImpl extends ServiceImpl<DataSetDOMapper, DataSetDO>
 
     @Override
     public List<DataSetResp> getDataSetList(Long domainId, List<Integer> statuCodesList) {
+        return getDataSetList(domainId, statuCodesList, null);
+    }
+
+    @Override
+    public List<DataSetResp> getDataSetList(Long domainId, List<Integer> statuCodesList,
+            String name) {
         if (domainId == null || CollectionUtils.isEmpty(statuCodesList)) {
             return List.of();
         }
@@ -118,6 +124,12 @@ public class DataSetServiceImpl extends ServiceImpl<DataSetDOMapper, DataSetDO>
         wrapper.lambda().eq(DataSetDO::getDomainId, domainId);
         wrapper.lambda().in(DataSetDO::getStatus, statuCodesList);
         wrapper.lambda().ne(DataSetDO::getStatus, StatusEnum.DELETED.getCode());
+        // 名称模糊搜索：对 name 与 bizName 做 LIKE 匹配（name 为空时不限）
+        if (StringUtils.isNotBlank(name)) {
+            String likePattern = "%" + name.trim() + "%";
+            wrapper.lambda().and(w -> w.like(DataSetDO::getName, likePattern).or()
+                    .like(DataSetDO::getBizName, likePattern));
+        }
 
         return list(wrapper).stream().map(this::convert).collect(Collectors.toList());
 
@@ -286,10 +298,8 @@ public class DataSetServiceImpl extends ServiceImpl<DataSetDOMapper, DataSetDO>
             return;
         }
 
-        Set<Long> includeAllModelIds = configs.stream()
-                .filter(DataSetModelConfig::getIncludesAll)
-                .map(DataSetModelConfig::getId)
-                .collect(Collectors.toSet());
+        Set<Long> includeAllModelIds = configs.stream().filter(DataSetModelConfig::getIncludesAll)
+                .map(DataSetModelConfig::getId).collect(Collectors.toSet());
 
         if (CollectionUtils.isEmpty(includeAllModelIds)) {
             return;
@@ -302,28 +312,26 @@ public class DataSetServiceImpl extends ServiceImpl<DataSetDOMapper, DataSetDO>
         List<DimensionResp> allDimensions = dimensionService.getDimensions(metaFilter);
         List<MetricResp> allMetrics = metricService.getMetrics(metaFilter);
 
-        Map<Long, List<Long>> modelDimensionMap = allDimensions.stream()
-                .collect(Collectors.groupingBy(
-                        DimensionResp::getModelId,
-                        Collectors.mapping(DimensionResp::getId, Collectors.toList())
-                ));
+        Map<Long, List<Long>> modelDimensionMap =
+                allDimensions.stream().collect(Collectors.groupingBy(DimensionResp::getModelId,
+                        Collectors.mapping(DimensionResp::getId, Collectors.toList())));
 
-        Map<Long, List<Long>> modelMetricMap = allMetrics.stream()
-                .collect(Collectors.groupingBy(
-                        MetricResp::getModelId,
-                        Collectors.mapping(MetricResp::getId, Collectors.toList())
-                ));
+        Map<Long, List<Long>> modelMetricMap =
+                allMetrics.stream().collect(Collectors.groupingBy(MetricResp::getModelId,
+                        Collectors.mapping(MetricResp::getId, Collectors.toList())));
 
         for (DataSetModelConfig config : configs) {
             if (Boolean.TRUE.equals(config.getIncludesAll())) {
                 Long modelId = config.getId();
-                
-                List<Long> modelDimensions = modelDimensionMap.getOrDefault(modelId, Lists.newArrayList());
+
+                List<Long> modelDimensions =
+                        modelDimensionMap.getOrDefault(modelId, Lists.newArrayList());
                 Set<Long> existingDimensions = new HashSet<>(config.getDimensions());
                 existingDimensions.addAll(modelDimensions);
                 config.setDimensions(new ArrayList<>(existingDimensions));
 
-                List<Long> modelMetrics = modelMetricMap.getOrDefault(modelId, Lists.newArrayList());
+                List<Long> modelMetrics =
+                        modelMetricMap.getOrDefault(modelId, Lists.newArrayList());
                 Set<Long> existingMetrics = new HashSet<>(config.getMetrics());
                 existingMetrics.addAll(modelMetrics);
                 config.setMetrics(new ArrayList<>(existingMetrics));

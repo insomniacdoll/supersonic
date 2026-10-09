@@ -105,7 +105,7 @@ const ModelFieldForm: React.FC<Props> = ({
                 let defaultParams:any = {};
                 if (value === EnumDataSourceType.MEASURES) {
                   defaultParams = {
-                    agg: AGG_OPTIONS[0].value,
+                    agg: AGG_OPTIONS[AGG_OPTIONS.length - 1].value,
                     classType: EnumDataSourceType.MEASURES,
                     type: EnumDataSourceType.MEASURES,
                   };
@@ -217,7 +217,7 @@ const ModelFieldForm: React.FC<Props> = ({
                 handleFieldChange(record, 'agg', value);
               }}
               allowClear
-              defaultValue={AGG_OPTIONS[0].value}
+              defaultValue={AGG_OPTIONS[AGG_OPTIONS.length - 1].value}
               style={{ width: '100%' }}
             >
               {AGG_OPTIONS.map((item) => (

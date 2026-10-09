@@ -123,8 +123,10 @@ public class DataSetSchemaBuilder {
                 dimToAdd.getExtInfo().put(DimensionConstants.DIMENSION_DATA_TYPE,
                         dim.getDataType());
             } else {
-                dimToAdd.getExtInfo().put(DimensionConstants.DIMENSION_DATA_TYPE,
-                        dataTypeMap.get(dim.getModelId()).get(dim.getBizName()));
+                if (dataTypeMap.containsKey(dim.getModelId())) {
+                    dimToAdd.getExtInfo().put(DimensionConstants.DIMENSION_DATA_TYPE,
+                            dataTypeMap.get(dim.getModelId()).get(dim.getBizName()));
+                }
             }
             if (dim.isTimeDimension()) {
                 String timeFormat =
